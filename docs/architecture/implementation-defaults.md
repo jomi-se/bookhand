@@ -44,7 +44,7 @@ interface ReaderAdapter {
   getVisibleContext(): Promise<Passage>
   getPassage(range: BookRange): Promise<Passage>
   listSections(): BookSection[]
-  createSectionDocument(sectionIndex: number): Promise<Document>
+  getSectionSnapshot(sectionIndex: number): Promise<BookSectionSnapshot>
   navigate(target: BookTarget): Promise<void>
   applyStyle(style: ReaderStyle): void
   resetStyle(): void
@@ -54,6 +54,11 @@ interface ReaderAdapter {
 Use Foliate/EPUB CFI as the navigable anchor and keep section index plus a short
 text fingerprint as diagnostic fallback data. Never expose viewer DOM nodes or
 opaque iframe handles through the domain API.
+
+Foliate-specific extraction code may use a separate internal-only section
+source whose `createSectionDocument()` returns a DOM `Document`; that interface
+must not be reachable from UI, WebMCP, structured-clone messages, or public
+reader-domain callers.
 
 ## Persistence schema
 
@@ -94,7 +99,9 @@ do not maintain an independently serialized lexical snapshot.
 
 ## Text extraction and chunking
 
-Index one section at a time using `ReaderAdapter.createSectionDocument()`.
+Index one section at a time through the internal-only Foliate section source.
+Publish only serializable `BookSectionSnapshot` and `Passage` values from the
+reader domain; section `Document` objects remain inside extraction code.
 
 1. Walk visible text nodes beneath the section body.
 2. Skip `script`, `style`, `noscript`, `template`, hidden/inert content, and
