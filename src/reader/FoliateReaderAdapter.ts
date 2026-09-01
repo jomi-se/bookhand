@@ -31,6 +31,7 @@ import type {
   FoliateTocItem,
   FoliateView,
 } from './foliate-types.ts'
+import { boundCustomCss } from './custom-css.ts'
 import { localized, mapMetadata } from './metadata.ts'
 import {
   extractDocumentText,
@@ -510,6 +511,6 @@ function makeReaderCss(style: ReaderStyle): string {
     p, li, blockquote, dd { line-height: ${style.lineHeight}; }
     p { margin-block: ${style.paragraphSpacingEm}em; }
     img, svg, video { max-inline-size: 100%; block-size: auto; }
-    ${style.customCss ?? ''}
+    ${style.customCss ? boundCustomCss(style.customCss).css : ''}
   `
 }

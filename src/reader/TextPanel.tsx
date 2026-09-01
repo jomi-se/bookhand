@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import type { ReaderStyle, ReaderTheme } from '../domain/reader.ts'
+import { boundCustomCss } from './custom-css.ts'
 
 export interface TextPanelProps {
   readonly style: ReaderStyle
@@ -57,6 +58,7 @@ function Slider({
 
 export function TextPanel({ style, onChange, onReset, onClose }: TextPanelProps) {
   const [draftCss, setDraftCss] = useState(style.customCss ?? '')
+  const [removed, setRemoved] = useState<readonly string[]>([])
   const cssId = useId()
 
   return (
@@ -137,7 +139,10 @@ export function TextPanel({ style, onChange, onReset, onClose }: TextPanelProps)
             <button
               type="button"
               className="button button-quiet"
-              onClick={() => onChange({ ...style, customCss: draftCss })}
+              onClick={() => {
+                setRemoved(boundCustomCss(draftCss).removed)
+                onChange({ ...style, customCss: draftCss })
+              }}
             >
               Preview
             </button>
@@ -146,12 +151,18 @@ export function TextPanel({ style, onChange, onReset, onClose }: TextPanelProps)
               className="button button-text"
               onClick={() => {
                 setDraftCss('')
+                setRemoved([])
                 onReset()
               }}
             >
               Reset all text settings
             </button>
           </div>
+          {removed.length > 0 ? (
+            <p className="control-note" role="status">
+              Applied without {removed.join(', ')}. Book styling stays on this device.
+            </p>
+          ) : null}
         </div>
       </div>
     </aside>
