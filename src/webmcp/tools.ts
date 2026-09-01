@@ -21,7 +21,6 @@ export interface ToolHostOptions {
   readonly commands: BookhandCommands
   /** Every call is reported so the person can see what the agent did. */
   readonly onCall: (record: Omit<ToolCallRecord, 'id' | 'at'>) => void
-  readonly currentStyle: () => ReaderStyle
 }
 
 const RANGE_SCHEMA = {
@@ -245,7 +244,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             commands.resetReadingStyle()
             return textResult('Restored the default presentation.')
           }
-          const current = options.currentStyle()
+          const current = commands.getReadingStyle()
           const next: ReaderStyle = {
             ...current,
             ...(typeof input.fontSizePercent === 'number'

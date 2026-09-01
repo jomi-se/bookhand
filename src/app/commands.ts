@@ -132,6 +132,10 @@ export class BookhandCommands {
     return this.getReadingContext()
   }
 
+  getReadingStyle(): ReaderStyle {
+    return this.#adapter().getStyle()
+  }
+
   setReadingStyle(style: ReaderStyle): void {
     this.#adapter().applyStyle(style)
     this.#changed()

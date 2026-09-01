@@ -114,6 +114,7 @@ export interface ReaderAdapter {
   getSectionSnapshot(sectionIndex: number): Promise<BookSectionSnapshot>
   navigate(target: BookTarget): Promise<void>
   applyStyle(style: ReaderStyle): void
+  getStyle(): ReaderStyle
   resetStyle(): void
   renderAnnotations(marks: readonly ReaderAnnotationMark[]): void
 }

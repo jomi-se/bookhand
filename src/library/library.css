@@ -441,3 +441,11 @@
     text-align: start;
   }
 }
+
+.library-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+  color: var(--accent);
+}

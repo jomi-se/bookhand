@@ -5,7 +5,8 @@ import type { BookCatalogEntry, BookRange, StudyItemPayload } from '../domain/in
 import { StudyBoardPanel } from '../study/StudyBoardPanel.tsx'
 import { useStudy } from '../study/useStudy.ts'
 import { AgentActivity } from '../webmcp/AgentActivity.tsx'
-import { useWebMcpTools } from '../webmcp/useWebMcpTools.ts'
+import type { useWebMcpTools } from '../webmcp/useWebMcpTools.ts'
+import type { BookhandCommands } from '../app/commands.ts'
 import { splitTitle } from '../library/progress.ts'
 import type { ReaderPortBridge } from '../app/reader-bridge.ts'
 import type { RuntimePorts } from '../runtime/ports.ts'
@@ -23,13 +24,28 @@ export interface ReaderScreenProps {
   readonly ports: RuntimePorts
   readonly bridge: ReaderPortBridge
   readonly onExit: () => void
+  /** Lets the composition root offer this book's tools to an agent. */
+  readonly onCommandsReady: (commands: BookhandCommands | undefined) => void
+  readonly agent: ReturnType<typeof useWebMcpTools>
 }
 
-export function ReaderScreen({ entry, client, ports, bridge, onExit }: ReaderScreenProps) {
+export function ReaderScreen({
+  entry,
+  client,
+  ports,
+  bridge,
+  onExit,
+  onCommandsReady,
+  agent,
+}: ReaderScreenProps) {
   const reader = useReader({ entry, client, ports, bridge })
   const study = useStudy({ entry, client, bridge })
-  const agent = useWebMcpTools({ commands: study.commands, style: reader.style })
   const [panel, setPanel] = useState<ReaderPanel>(null)
+
+  useEffect(() => {
+    onCommandsReady(study.commands)
+    return () => onCommandsReady(undefined)
+  }, [onCommandsReady, study.commands])
   const { title } = splitTitle(entry.metadata)
   const expanded = study.board?.view === 'expanded' && panel === 'study'
 

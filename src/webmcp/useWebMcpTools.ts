@@ -1,44 +1,37 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
-import type { ReaderStyle } from '../domain/index.ts'
-import type { BookhandCommands } from '../app/commands.ts'
-import { getModelContext } from './model-context.ts'
-import { createBookhandTools, type ToolCallRecord } from './tools.ts'
+import { getModelContext, type ToolDefinition } from './model-context.ts'
+import type { ToolCallRecord } from './tools.ts'
 
 export type WebMcpStatus = 'unsupported' | 'registering' | 'ready' | 'failed'
 
+export type ToolCallReporter = (entry: Omit<ToolCallRecord, 'id' | 'at'>) => void
+
 export interface UseWebMcpOptions {
-  readonly commands?: BookhandCommands
-  readonly style: ReaderStyle
+  /**
+   * Builds the tools to offer. Memoize it: the tools are registered whenever
+   * this changes, which is how a set is swapped when a book opens or closes.
+   */
+  readonly createTools?: (report: ToolCallReporter) => readonly ToolDefinition[]
   readonly historyLimit?: number
 }
 
 /**
- * Registers Bookhand's tools with the page's agent runtime for as long as a
- * book is open. Registration is deliberately the only thing WebMCP-specific in
- * the product: every tool calls the same commands the interface calls, and the
- * reader behaves identically when no agent runtime exists.
+ * Registers tools with the page's agent runtime. Registration is the only
+ * WebMCP-specific code in the product: the tools themselves call the same
+ * commands the interface calls, and the app behaves identically when no agent
+ * runtime is present.
  */
-export function useWebMcpTools({ commands, style, historyLimit = 20 }: UseWebMcpOptions) {
+export function useWebMcpTools({ createTools, historyLimit = 20 }: UseWebMcpOptions) {
   const [status, setStatus] = useState<WebMcpStatus>('unsupported')
   const [calls, setCalls] = useState<readonly ToolCallRecord[]>([])
   const [toolNames, setToolNames] = useState<readonly string[]>([])
 
-  // Read through refs so a style change or a new call never re-registers tools.
-  const styleRef = useRef(style)
-  useEffect(() => {
-    styleRef.current = style
-  }, [style])
-
-  const record = useCallback(
-    (entry: Omit<ToolCallRecord, 'id' | 'at'>) => {
+  const report = useCallback<ToolCallReporter>(
+    (entry) => {
       setCalls((previous) =>
         [
-          {
-            ...entry,
-            id: `${Date.now()}-${previous.length}`,
-            at: new Date().toISOString(),
-          },
+          { ...entry, id: `${Date.now()}-${previous.length}`, at: new Date().toISOString() },
           ...previous,
         ].slice(0, historyLimit),
       )
@@ -47,19 +40,17 @@ export function useWebMcpTools({ commands, style, historyLimit = 20 }: UseWebMcp
   )
 
   useEffect(() => {
-    if (!commands) return
+    if (!createTools) return
     const modelContext = getModelContext()
     if (!modelContext) {
       setStatus('unsupported')
       return
     }
 
+    const tools = createTools(report)
+    if (tools.length === 0) return
+
     const controller = new AbortController()
-    const tools = createBookhandTools({
-      commands,
-      onCall: record,
-      currentStyle: () => styleRef.current,
-    })
     setToolNames(tools.map((tool) => tool.name))
     setStatus('registering')
 
@@ -75,7 +66,7 @@ export function useWebMcpTools({ commands, style, historyLimit = 20 }: UseWebMcp
     )
 
     return () => controller.abort()
-  }, [commands, record])
+  }, [createTools, report])
 
   const clearHistory = useCallback(() => setCalls([]), [])
 

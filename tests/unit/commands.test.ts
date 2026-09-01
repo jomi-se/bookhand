@@ -45,6 +45,13 @@ function fakeAdapter(overrides: Partial<ReaderAdapter> = {}): ReaderAdapter {
     getSectionSnapshot: vi.fn(),
     navigate: vi.fn().mockResolvedValue(undefined),
     applyStyle: vi.fn(),
+    getStyle: () => ({
+      fontSizePercent: 100,
+      lineHeight: 1.55,
+      measureCh: 68,
+      paragraphSpacingEm: 0.75,
+      theme: 'publisher' as const,
+    }),
     resetStyle: vi.fn(),
     renderAnnotations: vi.fn(),
     ...overrides,

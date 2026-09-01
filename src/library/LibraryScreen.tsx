@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { BookOpen, FolderOpen, LayoutPanelLeft, RotateCw } from 'lucide-react'
+import { Bot, BookOpen, FolderOpen, LayoutPanelLeft, RotateCw } from 'lucide-react'
 
 import type { BookCatalogEntry } from '../domain/index.ts'
 import { Wordmark } from '../app/Identity.tsx'
@@ -14,13 +14,14 @@ import {
 import type { LibraryState } from './useLibrary.ts'
 
 export interface LibraryScreenProps extends LibraryState {
+  readonly agentStatus?: 'unsupported' | 'registering' | 'ready' | 'failed'
   readonly onOpenBook: (entry: BookCatalogEntry) => void
   readonly onImportFile: (file: File) => void
   readonly onRetry: () => void
   readonly onDismissNotice: () => void
 }
 
-function StorageFooter({ state }: { readonly state: LibraryState }) {
+function StorageFooter({ state }: { readonly state: LibraryScreenProps }) {
   const count = state.books.length
   const books = `${count} ${count === 1 ? 'book' : 'books'}`
   const mode = state.diagnostics?.mode
@@ -37,6 +38,12 @@ function StorageFooter({ state }: { readonly state: LibraryState }) {
       <span>{books}</span>
       <span aria-hidden="true">·</span>
       <span data-storage-mode={mode ?? 'unknown'}>{where}</span>
+      {state.agentStatus === 'ready' ? (
+        <span className="library-agent">
+          <Bot size={13} aria-hidden="true" />
+          Your agent can read and annotate this library
+        </span>
+      ) : null}
     </footer>
   )
 }

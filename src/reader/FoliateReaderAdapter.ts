@@ -247,6 +247,10 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#active?.view.renderer.setStyles?.(makeReaderCss(this.#style))
   }
 
+  getStyle(): ReaderStyle {
+    return structuredClone(this.#style)
+  }
+
   resetStyle(): void {
     this.applyStyle(DEFAULT_READER_STYLE)
   }

@@ -140,6 +140,37 @@ test('an agent reads the page, highlights it, and builds a source-linked lesson'
     .toBeGreaterThan(0)
 })
 
+test('an agent arriving at the library can see it and open a book itself', async ({ page }) => {
+  await installAgentRuntime(page)
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
+
+  // Tools exist before any book is open, so an agent never finds a page that
+  // appears to offer nothing.
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __agent: { names(): string[] } }).__agent.names()),
+    )
+    .toEqual(expect.arrayContaining(['list_books', 'open_book']))
+
+  await expect(page.locator('.book-open')).toBeVisible({ timeout: 20_000 })
+  const listed = await agentCall(page, 'list_books')
+  expect(listed.isError).toBe(false)
+  expect(listed.text).toContain('Calculus Made Easy')
+  expect(listed.text).toContain('Storage:')
+
+  const opened = await agentCall(page, 'open_book', { title: 'calculus' })
+  expect(opened.isError).toBe(false)
+  await expect(page.locator('.reader-identity')).toContainText('Calculus Made Easy')
+
+  // Opening the book adds its reading tools to the ones already offered.
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __agent: { names(): string[] } }).__agent.names()),
+    )
+    .toEqual(expect.arrayContaining(['list_books', 'get_reading_context', 'save_annotation']))
+})
+
 test('an agent cannot anchor to a range it invented', async ({ page }) => {
   await installAgentRuntime(page)
   await openBook(page)

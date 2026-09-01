@@ -50,6 +50,7 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
       visible: { text: '', range, chapterBreadcrumb: [] },
     })),
     saveAnnotation: vi.fn(async () => ({ id: 'annotation-1' })),
+    getReadingStyle: vi.fn(() => style),
     setReadingStyle: vi.fn(),
     resetReadingStyle: vi.fn(),
     upsertStudyItem: vi.fn(async () => ({ id: 'item-1' })),
@@ -61,7 +62,6 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
   const tools = createBookhandTools({
     commands,
     onCall: (record) => calls.push(record),
-    currentStyle: () => style,
   })
   const tool = (name: string): ToolDefinition => {
     const found = tools.find((candidate) => candidate.name === name)
