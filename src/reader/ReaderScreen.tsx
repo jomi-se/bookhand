@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronRight, Highlighter, LayoutPanelLeft, List, RotateCw
 import type { BookCatalogEntry, BookRange, StudyItemPayload } from '../domain/index.ts'
 import { StudyBoardPanel } from '../study/StudyBoardPanel.tsx'
 import { useStudy } from '../study/useStudy.ts'
+import { AgentActivity } from '../webmcp/AgentActivity.tsx'
+import { useWebMcpTools } from '../webmcp/useWebMcpTools.ts'
 import { splitTitle } from '../library/progress.ts'
 import type { ReaderPortBridge } from '../app/reader-bridge.ts'
 import type { RuntimePorts } from '../runtime/ports.ts'
@@ -26,6 +28,7 @@ export interface ReaderScreenProps {
 export function ReaderScreen({ entry, client, ports, bridge, onExit }: ReaderScreenProps) {
   const reader = useReader({ entry, client, ports, bridge })
   const study = useStudy({ entry, client, bridge })
+  const agent = useWebMcpTools({ commands: study.commands, style: reader.style })
   const [panel, setPanel] = useState<ReaderPanel>(null)
   const { title } = splitTitle(entry.metadata)
   const expanded = study.board?.view === 'expanded' && panel === 'study'
@@ -183,6 +186,14 @@ export function ReaderScreen({ entry, client, ports, bridge, onExit }: ReaderScr
                 .then(study.setBoard)
             }
             onClose={() => setPanel(null)}
+            agentActivity={
+              <AgentActivity
+                status={agent.status}
+                calls={agent.calls}
+                toolNames={agent.toolNames}
+                onClear={agent.clearHistory}
+              />
+            }
           />
         ) : null}
 

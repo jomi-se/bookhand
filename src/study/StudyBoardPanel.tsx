@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Maximize2, Minimize2, Plus, Trash2 } from 'lucide-react'
 
 import type {
@@ -24,6 +24,7 @@ export interface StudyBoardPanelProps {
   readonly onEditNote: (annotation: Annotation, note: string) => void
   readonly onToggleView: () => void
   readonly onClose: () => void
+  readonly agentActivity?: ReactNode
 }
 
 function NoteEditor({
@@ -80,6 +81,8 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
       </header>
 
       <div className="panel-body">
+        {props.agentActivity}
+
         <div className="add-row">
           {STUDY_ITEM_KINDS.map((kind) => (
             <button
