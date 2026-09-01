@@ -16,6 +16,7 @@
     "typecheck": "tsc -b --pretty false",
     "verify:bundle": "node scripts/verify-production-bundle.mjs",
     "verify:setup": "node scripts/verify-agent-setup.mjs",
+    "check:live": "node scripts/check-live-webmcp.mjs",
     "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run verify:bundle && npm run test:e2e:built && npm run verify:setup",
     "deploy": "npm run build && npx wrangler deploy",
     "deploy:dry": "npm run build && npx wrangler deploy --dry-run",

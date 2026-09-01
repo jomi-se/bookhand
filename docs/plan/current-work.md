@@ -103,14 +103,14 @@ The WebMCP Challenge closes 2026-09-03T20:00Z. Required and still open:
 - The GitHub repository is private and must be public with a detectable
   license. `LICENSE` (MIT) is committed; making the repo public is the owner's
   action, deliberately not automated.
-- Nothing is pushed yet; `origin/main` is far behind local.
-- No live URL. `wrangler.jsonc` matches the working `jomi-se-blog` pattern on
-  this machine, and `docs/deployment.md` records the flow: Cloudflare Workers
-  Builds pulls from GitHub on every push to `main`, builds `./dist`, and deploys
-  it as Worker static assets. No Cloudflare credential lives in this repository;
-  the owner connects the repo once from the Cloudflare dashboard and attaches
-  bookhand.dev there as a custom domain. `npm run deploy` stays as a manual
-  escape hatch only.
+- Pushed and deploying: Cloudflare Workers Builds pulls from GitHub on every
+  push to `main`.
+- Live at https://bookhand.jomi-se.workers.dev/ (bookhand.dev is attached once
+  the repo goes public). `npm run check:live` drives that deployment through the
+  browser's real WebMCP runtime: all eleven tools register, storage reports
+  persistent and survives a reload, and no console or request errors appear.
+  `docs/deployment.md` records the flow: no Cloudflare credential lives in this
+  repository, and `npm run deploy` is a manual escape hatch only.
 - A public YouTube demo video under three minutes, with audio covering what was
   built and how WebMCP was used, is a hard requirement.
 

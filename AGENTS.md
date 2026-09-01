@@ -72,9 +72,9 @@ Use the project Playwright MCP for browser investigation and user-flow checks.
 WebMCP is compiled into Playwright's bundled Chromium but gated: launch with
 `--enable-features=WebMCPTesting` (the switch behind
 `chrome://flags/#enable-webmcp-testing`) to get a real `document.modelContext`
-on a secure origin. Prefer that real runtime over a stand-in; note it speaks
-JSON strings in both directions and `executeTool` takes the tool object, not its
-name.
+on a secure origin. Prefer that real runtime over a stand-in.
+`docs/research/2026-09-01-webmcp-in-playwright.md` has the working recipe, the
+switches that do not work, and the two API shapes a stub gets wrong.
 Prefer the `agent-browser` skill when its workflow applies. Test the real user
 surface and preserve useful screenshots or traces under an ignored artifact
 directory when they are evidence for a decision.
