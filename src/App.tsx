@@ -1,47 +1,24 @@
-import './App.css'
+import { useMemo, useState } from 'react'
 
-const capabilities = [
-  'Read exact book context',
-  'Create worked explanations',
-  'Build visual study labs',
-  'Annotate and reshape the text',
-]
+import type { BookCatalogEntry } from './domain/index.ts'
+import './library/library.css'
+import { LibraryScreen } from './library/LibraryScreen.tsx'
+import { useLibrary } from './library/useLibrary.ts'
+import { createAppRuntime } from './app/runtime.ts'
 
 function App() {
+  const runtime = useMemo(() => createAppRuntime(), [])
+  const library = useLibrary({ client: runtime.client, ports: runtime.ports })
+  const [, setOpenBook] = useState<BookCatalogEntry>()
+
   return (
-    <main>
-      <header className="masthead">
-        <span className="wordmark">Bookhand</span>
-        <span className="status">WebMCP proof of concept</span>
-      </header>
-
-      <section className="hero">
-        <p className="eyebrow">A book is more than a document</p>
-        <h1>Let the page become the lesson.</h1>
-        <p className="lede">
-          A local-first ebook reader with semantic tools that let an AI tutor
-          explain, illustrate, annotate, and transform what you are studying.
-        </p>
-
-        <button type="button" disabled>
-          Open a book <span>Coming next</span>
-        </button>
-      </section>
-
-      <section className="capabilities" aria-label="Planned capabilities">
-        {capabilities.map((capability, index) => (
-          <article key={capability}>
-            <span>0{index + 1}</span>
-            <p>{capability}</p>
-          </article>
-        ))}
-      </section>
-
-      <footer>
-        <p>Bookhand · 1 September 2026</p>
-        <p>The reader comes first. WebMCP opens the rest.</p>
-      </footer>
-    </main>
+    <LibraryScreen
+      {...library}
+      onOpenBook={setOpenBook}
+      onImportFile={(file) => void library.importFile(file)}
+      onRetry={() => void library.retry()}
+      onDismissNotice={library.dismissNotice}
+    />
   )
 }
 

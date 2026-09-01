@@ -1,17 +1,38 @@
+/*
+ * Approved Slice 1 palette from DESIGN.md, written in OKLCH with the approved
+ * sRGB target beside each token. Canvas is a true near-white: no parchment,
+ * gradient, or beige chrome.
+ */
 :root {
-  --paper: #f2ede3;
-  --ink: #1e211d;
-  --muted: #686b62;
-  --line: #cdc6b8;
-  --accent: #b44a2a;
+  --canvas: oklch(98.51% 0 89.88); /* #fafafa */
+  --ink: oklch(17.73% 0.0089 264.32); /* #0f1115 */
+  --muted: oklch(50.23% 0.0205 264.37); /* #5e6470 */
+  --rule: oklch(92.76% 0.0058 264.53); /* #e5e7eb */
+  --accent: oklch(56.66% 0.1606 35.42); /* #c24a2b */
+  --accent-quiet: color-mix(in oklch, var(--accent) 12%, var(--canvas));
+  --raised: oklch(100% 0 0);
+
   --sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --serif: 'Source Serif 4 Variable', Iowan Old Style, Georgia, serif;
+
+  --step-0: 0.9375rem;
+  --step--1: 0.8125rem;
+  --step--2: 0.6875rem;
+  --step-1: 1.125rem;
+  --step-2: 1.5rem;
+  --step-3: 2rem;
+
+  --tap: 44px;
+  --enter: 180ms;
+
   color: var(--ink);
-  background: var(--paper);
+  background: var(--canvas);
   font-family: var(--sans);
+  font-size: var(--step-0);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  color-scheme: light;
 }
 
 * {
@@ -20,11 +41,31 @@
 
 body {
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100svh;
   margin: 0;
+}
+
+#root {
+  min-height: 100svh;
 }
 
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+:where(button, a, input, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

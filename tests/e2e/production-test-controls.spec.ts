@@ -16,16 +16,23 @@ test('production cannot activate validation-only controls', async ({ page }) => 
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text())
   })
+  // Book covers are rendered from same-origin blob URLs, which never leave the
+  // browser. Only a genuinely non-origin destination counts as an escape.
+  const isLocal = (url: string) =>
+    url.startsWith('http://127.0.0.1:4173') ||
+    url.startsWith('blob:http://127.0.0.1:4173') ||
+    url.startsWith('data:')
   page.on('request', (request) => {
-    if (!request.url().startsWith('http://127.0.0.1:4173')) {
-      offOriginRequests.push(request.url())
-    }
+    if (!isLocal(request.url())) offOriginRequests.push(request.url())
   })
 
   const response = await page.goto(
     `/?${testControlNames.map((name) => `${name}=1`).join('&')}`,
   )
-  await expect(page.getByRole('heading', { name: 'Let the page become the lesson.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
+  // The bundled book must reach the catalog through the real worker, so this
+  // also proves the production path runs with every control name attempted.
+  await expect(page.getByRole('heading', { name: 'All books' })).toBeVisible()
 
   const policy = response?.headers()['content-security-policy'] ?? ''
   expect(policy).toContain("default-src 'self'")

@@ -31,6 +31,7 @@ import type {
   FoliateTocItem,
   FoliateView,
 } from './foliate-types.ts'
+import { localized, mapMetadata } from './metadata.ts'
 import {
   extractDocumentText,
   fingerprintText,
@@ -446,33 +447,6 @@ function blockPackagedScripts(book: FoliateBook): void {
   })
 }
 
-async function mapMetadata(book: FoliateBook): Promise<BookMetadata> {
-  const metadata = book.metadata
-  const contributors = asArray(metadata?.author)
-  const cover = await Promise.resolve(book.getCover?.())
-  return {
-    title: localized(metadata?.title) || 'Untitled Book',
-    subtitle: localized(metadata?.subtitle) || undefined,
-    authors: contributors.map((author) =>
-      typeof author === 'string'
-        ? { name: author }
-        : {
-            name: localized(author.name) || 'Unknown author',
-            sortAs: localized(author.sortAs) || undefined,
-          },
-    ),
-    language: asArray(metadata?.language)[0],
-    publisher: contributorName(asArray(metadata?.publisher)[0]),
-    description: metadata?.description,
-    published: metadata?.published,
-    modified: metadata?.modified,
-    identifier: metadata?.identifier,
-    cover: cover
-      ? { mediaType: cover.type || 'application/octet-stream', bytes: new Uint8Array(await cover.arrayBuffer()) }
-      : undefined,
-  }
-}
-
 function mapToc(items: readonly FoliateTocItem[], parent = 'toc'): readonly TocItem[] {
   return items.map((item, index) => {
     const id = `${parent}-${item.id ?? index}`
@@ -516,21 +490,6 @@ function firstTocHref(items: readonly TocItem[]): string | undefined {
     if (nested) return nested
   }
   return undefined
-}
-
-function localized(value: string | Readonly<Record<string, string>> | undefined): string {
-  if (!value) return ''
-  if (typeof value === 'string') return value
-  return Object.values(value)[0] ?? ''
-}
-
-function contributorName(value: string | { readonly name?: string | Readonly<Record<string, string>> } | undefined): string | undefined {
-  if (!value) return undefined
-  return typeof value === 'string' ? value : localized(value.name) || undefined
-}
-
-function asArray<T>(value: T | readonly T[] | undefined): readonly T[] {
-  return value == null ? [] : Array.isArray(value) ? value : [value as T]
 }
 
 function makeReaderCss(style: ReaderStyle): string {
