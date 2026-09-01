@@ -1,0 +1,406 @@
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { createElement, StrictMode } from 'react'
+import { render } from '@testing-library/react'
+import type { BookMetadata, ReaderSelection } from '../../src/domain/reader.ts'
+import {
+  FoliateReaderAdapter,
+  ReaderHost,
+  ReaderNavigationError,
+  ReaderSectionLoadError,
+} from '../../src/reader/index.ts'
+import type {
+  FoliateBook,
+  FoliateModule,
+  FoliateRenderer,
+  FoliateResolvedTarget,
+  FoliateView,
+} from '../../src/reader/foliate-types.ts'
+
+const sectionMarkup = [
+  '<h1>Chapter One</h1><p>Alpha exact passage for selection.</p>',
+  '<h1>Chapter Two</h1><p>Beta destination text with a figure.</p><figure><img alt="A rising curve"><figcaption>Figure one</figcaption></figure>',
+] as const
+
+class FakeFoliateView extends HTMLElement implements FoliateView {
+  book!: FoliateBook
+  renderer: FoliateRenderer
+  history = { pushState: vi.fn() }
+  lastLocation?: {
+    cfi: string
+    range: Range
+    fraction: number
+    section: { current: number }
+    tocItem: { label: string }
+  }
+
+  constructor() {
+    super()
+    const renderer = document.createElement('div') as unknown as FoliateRenderer
+    let current = 0
+    let currentDocument = makeDocument(sectionMarkup[current])
+    renderer.getContents = () => [{ index: current, doc: currentDocument }]
+    renderer.setStyles = vi.fn()
+    renderer.goTo = vi.fn(async (target: FoliateResolvedTarget) => {
+      current = target.index
+      currentDocument = makeDocument(sectionMarkup[current] ?? '')
+      this.dispatchEvent(new CustomEvent('load', { detail: { doc: currentDocument, index: current } }))
+      this.relocate(current, currentDocument)
+    })
+    renderer.prev = vi.fn(async () => renderer.goTo({ index: Math.max(0, current - 1) }))
+    renderer.next = vi.fn(async () => renderer.goTo({ index: Math.min(1, current + 1) }))
+    this.renderer = renderer
+  }
+
+  async open(book: FoliateBook) {
+    this.book = book
+    this.append(this.renderer)
+  }
+
+  async init() {
+    await this.renderer.goTo({ index: 0 })
+  }
+
+  close = vi.fn(() => this.replaceChildren())
+
+  getCFI(index: number, range?: Range): string {
+    const start = range?.startOffset ?? 0
+    const end = range?.endOffset ?? start
+    return `fixture:${index}:${start}:${end}`
+  }
+
+  resolveNavigation(target: string | number): FoliateResolvedTarget | undefined {
+    if (typeof target === 'number') return target >= 0 && target < 2 ? { index: target } : undefined
+    if (target.startsWith('fixture:')) return { index: Number(target.split(':')[1]) }
+    if (target.startsWith('chapter-1')) return { index: 0 }
+    if (target.startsWith('chapter-2')) return { index: 1 }
+    return undefined
+  }
+
+  deselect() {
+    for (const { doc } of this.renderer.getContents()) doc.getSelection()?.removeAllRanges()
+  }
+
+  private relocate(index: number, doc: Document) {
+    const range = doc.createRange()
+    range.selectNodeContents(doc.querySelector('p')!)
+    this.lastLocation = {
+      cfi: `fixture:${index}:0:0`,
+      range,
+      fraction: index / 2,
+      section: { current: index },
+      tocItem: { label: `Chapter ${index + 1}` },
+    }
+    this.dispatchEvent(new CustomEvent('relocate', { detail: this.lastLocation }))
+  }
+}
+
+beforeAll(() => {
+  if (!customElements.get('foliate-view')) customElements.define('foliate-view', FakeFoliateView)
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  document.body.replaceChildren()
+})
+
+describe('FoliateReaderAdapter', () => {
+  it('publishes fixture-grounded metadata, nested TOC, sections, location, and text snapshots', async () => {
+    const host = document.createElement('div')
+    const adapter = makeAdapter(host)
+
+    const metadata = await adapter.open(new Blob(['fixture']))
+
+    expect(metadata).toEqual<BookMetadata>({
+      title: 'Tiny Technical Book',
+      subtitle: 'A deterministic fixture',
+      authors: [{ name: 'Ada Reader', sortAs: 'Reader, Ada' }],
+      language: 'en',
+      publisher: 'Bookhand Fixtures',
+      identifier: 'urn:bookhand:tiny',
+      cover: { mediaType: 'image/svg+xml', bytes: new Uint8Array([1, 2, 3]) },
+    })
+    expect(adapter.getToc()[0]?.children[0]?.label).toBe('Nested destination')
+    expect(adapter.listSections()).toEqual([
+      { index: 0, id: 'chapter-1.xhtml', href: 'chapter-1.xhtml', label: 'Chapter one', linear: true },
+      { index: 1, id: 'chapter-2.xhtml', href: 'chapter-2.xhtml', label: 'Nested destination', linear: true },
+    ])
+    expect(adapter.getLocation()).toMatchObject({ sectionIndex: 0, chapterLabel: 'Chapter 1' })
+    await expect(adapter.getSectionSnapshot(1)).resolves.toMatchObject({
+      sectionIndex: 1,
+      text: 'Chapter Two Beta destination text with a figure. A rising curve Figure one',
+      chapterBreadcrumb: ['Nested destination'],
+    })
+
+    expect(() => structuredClone(metadata)).not.toThrow()
+    expect(() => structuredClone(adapter.getToc())).not.toThrow()
+    expect(() => structuredClone(adapter.getLocation())).not.toThrow()
+    expect(() => structuredClone(adapter.listSections())).not.toThrow()
+    expect(containsDomValue(metadata)).toBe(false)
+  })
+
+  it('captures an exact selection, round-trips it in a fresh section, and clears it on navigation', async () => {
+    const selectionChanges: (ReaderSelection | null)[] = []
+    const adapter = makeAdapter(document.createElement('div'), {
+      onSelectionChange: (selection) => selectionChanges.push(selection),
+    })
+    await adapter.open(new Blob(['fixture']))
+    const view = document.querySelector('foliate-view') as FakeFoliateView
+    const doc = view.renderer.getContents()[0]!.doc
+    const text = doc.querySelector('p')!.firstChild!
+    const range = doc.createRange()
+    range.setStart(text, 0)
+    range.setEnd(text, 11)
+    let selectedRange: Range | undefined = range
+    Object.defineProperty(doc, 'getSelection', {
+      configurable: true,
+      value: () => ({
+        get rangeCount() {
+          return selectedRange ? 1 : 0
+        },
+        get isCollapsed() {
+          return selectedRange?.collapsed ?? true
+        },
+        getRangeAt: () => selectedRange!,
+        removeAllRanges: () => {
+          selectedRange = undefined
+        },
+      }),
+    })
+    doc.dispatchEvent(new Event('selectionchange'))
+
+    const saved = adapter.getSelection()
+    expect(saved?.quote).toBe('Alpha exact')
+    expect(saved?.range).toMatchObject({
+      startCfi: 'fixture:0:0:0',
+      endCfi: 'fixture:0:11:11',
+      sectionIndex: 0,
+    })
+    await expect(adapter.getPassage(saved!.range)).resolves.toMatchObject({ text: 'Alpha exact' })
+
+    const staleDocument = doc
+    await adapter.navigate({ kind: 'href', href: 'chapter-2.xhtml' })
+    expect(adapter.getSelection()).toBeNull()
+    expect(selectionChanges.at(-1)).toBeNull()
+    expect(adapter.getLocation()).toMatchObject({ sectionIndex: 1 })
+    staleDocument.dispatchEvent(new Event('selectionchange'))
+    expect(adapter.getSelection()).toBeNull()
+  })
+
+  it('rejects a fingerprint mismatch instead of resolving unrelated text', async () => {
+    const adapter = makeAdapter(document.createElement('div'))
+    await adapter.open(new Blob(['fixture']))
+    await expect(
+      adapter.getPassage({
+        startCfi: 'fixture:0:0:0',
+        endCfi: 'fixture:0:5:5',
+        sectionIndex: 0,
+        textFingerprint: 'fnv1a-deadbeef',
+      }),
+    ).rejects.toThrow('fingerprint mismatch')
+  })
+
+  it('names invalid navigation and wraps injected section failures without replacing the viewer', async () => {
+    let failSection = false
+    const errors: ReaderSectionLoadError[] = []
+    const adapter = makeAdapter(document.createElement('div'), {
+      faults: {
+        beforeSectionLoad: async () => {
+          if (failSection) throw new Error('Injected section-load failure')
+        },
+      },
+      onSectionError: (error) => errors.push(error),
+    })
+    await adapter.open(new Blob(['fixture']))
+    const original = document.querySelector('foliate-view')
+
+    await expect(adapter.navigate({ kind: 'href', href: 'missing.xhtml' })).rejects.toBeInstanceOf(
+      ReaderNavigationError,
+    )
+    failSection = true
+    await expect(adapter.navigate({ kind: 'section', sectionIndex: 1 })).rejects.toMatchObject({
+      name: 'ReaderSectionLoadError',
+      sectionIndex: 1,
+      sectionLabel: 'Nested destination',
+    })
+    expect(errors).toHaveLength(1)
+    expect(document.querySelector('foliate-view')).toBe(original)
+    failSection = false
+    await expect(adapter.navigate({ kind: 'section', sectionIndex: 1 })).resolves.toBeUndefined()
+    expect(adapter.getLocation()).toMatchObject({ sectionIndex: 1 })
+    expect(document.querySelector('foliate-view')).toBe(original)
+  })
+
+  it('supports direct CFI, relative navigation, and scoped style/reset primitives', async () => {
+    const adapter = makeAdapter(document.createElement('div'))
+    await adapter.open(new Blob(['fixture']))
+    const view = document.querySelector('foliate-view') as FakeFoliateView
+    const setStyles = vi.mocked(view.renderer.setStyles!)
+
+    await adapter.navigate({ kind: 'cfi', cfi: 'fixture:1:0:0' })
+    expect(adapter.getLocation()).toMatchObject({ sectionIndex: 1 })
+    await adapter.navigate({ kind: 'relative', direction: 'previous' })
+    expect(adapter.getLocation()).toMatchObject({ sectionIndex: 0 })
+    await adapter.navigate({ kind: 'relative', direction: 'next' })
+    expect(adapter.getLocation()).toMatchObject({ sectionIndex: 1 })
+
+    adapter.applyStyle({
+      fontFamily: 'Atkinson Hyperlegible',
+      fontSizePercent: 112,
+      lineHeight: 1.7,
+      measureCh: 60,
+      paragraphSpacingEm: 1,
+      theme: 'sepia',
+      customCss: 'h1 { letter-spacing: 0.01em; }',
+    })
+    expect(setStyles.mock.lastCall?.[0]).toContain('font-size: 112%')
+    expect(setStyles.mock.lastCall?.[0]).toContain('h1 { letter-spacing: 0.01em; }')
+    adapter.resetStyle()
+    expect(setStyles.mock.lastCall?.[0]).toContain('font-size: 100%')
+    expect(setStyles.mock.lastCall?.[0]).not.toContain('letter-spacing')
+  })
+
+  it('times out an unresolved open and removes its viewer state', async () => {
+    vi.useFakeTimers()
+    const adapter = makeAdapter(document.createElement('div'), {
+      openDeadlineMs: 10_000,
+      faults: { beforeOpen: () => new Promise<never>(() => undefined) },
+    })
+    const open = adapter.open(new Blob(['fixture']))
+    const rejection = expect(open).rejects.toMatchObject({ name: 'DeadlineExceededError', deadlineMs: 10_000 })
+    await vi.advanceTimersByTimeAsync(10_000)
+    await rejection
+    expect(document.querySelector('foliate-view')).toBeNull()
+  })
+
+  it('discards a delayed stale open and retains only the latest viewer', async () => {
+    let releaseFirst!: () => void
+    let markFirstStarted!: () => void
+    let calls = 0
+    const firstReady = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    const firstStarted = new Promise<void>((resolve) => {
+      markFirstStarted = resolve
+    })
+    const books: FoliateBook[] = []
+    const module: FoliateModule = {
+      async makeBook() {
+        calls += 1
+        if (calls === 1) {
+          markFirstStarted()
+          await firstReady
+        }
+        const book = makeBook()
+        books.push(book)
+        return book
+      },
+    }
+    const host = document.createElement('div')
+    document.body.append(host)
+    const adapter = new FoliateReaderAdapter(host, {}, { loadFoliate: async () => module })
+
+    const stale = adapter.open(new Blob(['first']))
+    await firstStarted
+    const latest = adapter.open(new Blob(['second']))
+    await expect(latest).resolves.toMatchObject({ title: 'Tiny Technical Book' })
+    releaseFirst()
+    await expect(stale).rejects.toMatchObject({ name: 'ReaderClosedError' })
+    expect(host.querySelectorAll('foliate-view')).toHaveLength(1)
+    expect(books).toHaveLength(2)
+    const latestBook = books.find((book) => !(book.destroy as ReturnType<typeof vi.fn>).mock.calls.length)
+    expect(latestBook).toBeDefined()
+
+    await adapter.close()
+    expect(host.children).toHaveLength(0)
+    expect(latestBook!.destroy).toHaveBeenCalledOnce()
+  })
+
+  it('keeps one live viewer through the React StrictMode setup and cleanup cycle', async () => {
+    const adapters: FoliateReaderAdapter[] = []
+    const onReady = (adapter: unknown) => adapters.push(adapter as FoliateReaderAdapter)
+    const close = vi.spyOn(FoliateReaderAdapter.prototype, 'close')
+    const surface = render(
+      createElement(
+        StrictMode,
+        null,
+        createElement(ReaderHost, { onReady }),
+      ),
+    )
+
+    expect(adapters.length).toBeGreaterThanOrEqual(1)
+    expect(surface.container.querySelectorAll('[data-reader-host]')).toHaveLength(1)
+    expect(close).toHaveBeenCalledTimes(adapters.length - 1)
+
+    surface.unmount()
+    expect(close).toHaveBeenCalledTimes(adapters.length)
+  })
+
+})
+
+function makeAdapter(
+  host: HTMLElement,
+  options: ConstructorParameters<typeof FoliateReaderAdapter>[1] = {},
+) {
+  document.body.append(host)
+  return new FoliateReaderAdapter(host, {
+    ...options,
+  }, { loadFoliate: async () => ({ makeBook: async () => makeBook() }) })
+}
+
+function makeBook(): FoliateBook {
+  const documents = sectionMarkup.map(makeDocument)
+  const book: FoliateBook = {
+    metadata: {
+      title: { en: 'Tiny Technical Book' },
+      subtitle: 'A deterministic fixture',
+      author: { name: 'Ada Reader', sortAs: 'Reader, Ada' },
+      language: ['en'],
+      publisher: { name: 'Bookhand Fixtures' },
+      identifier: 'urn:bookhand:tiny',
+    },
+    toc: [
+      {
+        id: 1,
+        label: 'Chapter one',
+        href: 'chapter-1.xhtml',
+        subitems: [{ id: 2, label: 'Nested destination', href: 'chapter-2.xhtml' }],
+      },
+    ],
+    sections: documents.map((doc, index) => ({
+      id: `chapter-${index + 1}.xhtml`,
+      linear: 'yes',
+      cfi: `fixture:${index}:0:0`,
+      createDocument: async () => doc.cloneNode(true) as Document,
+    })),
+    transformTarget: new EventTarget(),
+    getCover: async () => new Blob([new Uint8Array([1, 2, 3])], { type: 'image/svg+xml' }),
+    resolveCFI(cfi) {
+      const [, rawIndex, rawStart, rawEnd] = cfi.split(':')
+      const index = Number(rawIndex)
+      const start = Number(rawStart)
+      const end = Number(rawEnd)
+      return {
+        index,
+        anchor(doc: Document) {
+          const text = doc.querySelector('p')!.firstChild!
+          const range = doc.createRange()
+          range.setStart(text, start)
+          range.setEnd(text, end)
+          return range
+        },
+      }
+    },
+    destroy: vi.fn(),
+  }
+  return book
+}
+
+function makeDocument(markup: string): Document {
+  return new DOMParser().parseFromString(`<html><body>${markup}</body></html>`, 'text/html')
+}
+
+function containsDomValue(value: unknown): boolean {
+  if (value instanceof Node || value instanceof Range || value instanceof Event) return true
+  if (!value || typeof value !== 'object') return false
+  return Object.values(value).some(containsDomValue)
+}

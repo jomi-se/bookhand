@@ -22,8 +22,8 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
   are settled in `docs/architecture/implementation-defaults.md` and ADR 0002.
 - The delivery order and cut order are settled in
   `docs/plan/vertical-slice-build-order.md`.
-- Application remains the generated Vite shell; the W1 reader foundation is in
-  place, but storage, adapter, and product-surface behavior have not started.
+- Application remains the generated Vite shell; the W1 foundation, W2 storage,
+  and W3 reader adapter are in place, but no product surface consumes them yet.
 - Bookhand naming and the approved Slice 1 visual system are committed; the
   reader/library implementation mission is now active.
 - Slice 1 scope, work topology, and reviewed validation contracts live in
@@ -45,16 +45,35 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
   show the named globals, messages, query parameters, errors, and raw-state
   controls are absent. Full real adapter/worker failure-and-recovery traces stay
   open until W2 and W3 provide those paths; W1 does not claim them synthetically.
+- Slice 1 W2 is implemented: one dedicated worker owns one official SQLite `oo1`
+  connection over `opfs-sahpool`, with the STRICT schema, FTS5 chunk triggers,
+  SHA-256 content identity, a runtime-validated typed protocol in both
+  directions, in-memory session fallback, second-tab lock classification and
+  Retry, and a one-time durable-storage claim.
+- Slice 1 W3 is implemented: the imperative Foliate adapter and its React host
+  boundary provide metadata, nested TOC, sections, location, passage, selection,
+  and section snapshots; navigation and style primitives; revision-guarded
+  lifecycle safety; the open deadline; and test-only fault seams. Foliate
+  internals stay private to the adapter; callers see only `ReaderAdapter`.
+- An independent review of W2 and W3 found and fixed four defects the parallel
+  lanes missed: the storage client hung forever after a worker `error` event
+  because it never stopped accepting requests; no storage request had any
+  deadline, so `LIBRARY_LOAD_DEADLINE_MS` existed but bounded nothing;
+  `ReaderHost` synced an options ref the adapter never read again, freezing
+  callbacks at their mount-time closures; and `dispose()` double-sent `close`
+  and rethrew into React cleanup paths.
 
 ## Next actions
 
 1. Run the preserved SQLite spike's Pixel 7 drills when the phone is available:
    indexing/query timings, reload mid-batch, app background/resume, memory, and
    second-tab behavior. Record results without blocking desktop implementation.
-2. Implement W2, the official SQLite WASM worker and persistent library store,
-   using the W1 request types, runtime ports, deadlines, fixtures, and test-only
-   control seam. Then implement W3 behind the same boundary.
-3. Execute W4 through W7 in `slice-1-build-tasks.md`; preserve independent
+2. Implement W4, the library product surface, against the W2 client and W3
+   adapter. `VAL-LIBRARY-CATALOG` needs the five-second bound surfaced as a
+   named recoverable error with Retry; the client now raises
+   `storage-request-timed-out` and the `leave-library-list-unresolved` control
+   drives it, so W4 owns the UI, not the mechanism.
+3. Execute W5 through W7 in `slice-1-build-tasks.md`; preserve independent
    scrutiny, browser, and physical-device evidence.
 4. Continue through the slices in order; preserve the Slice 3 submission
    checkpoint before adding semantic retrieval or generated labs.
