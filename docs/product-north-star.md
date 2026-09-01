@@ -69,8 +69,10 @@ of the lesson. Useful capability families include:
 - inspect relevant highlights, notes, prior study artifacts, and progress.
 
 Semantic search is desirable, but it should not become infrastructure theater.
-For the proof of concept, structural and lexical retrieval may be enough. Add
-embeddings only if the hero interaction clearly needs them.
+For the proof of concept, structural and lexical retrieval must work first.
+Local embeddings are a planned later slice because they strengthen whole-book
+discovery without uploading the book, but they remain cuttable if the hero
+interaction does not need them or phone performance is poor.
 
 ### Change the reading presentation
 
@@ -182,4 +184,3 @@ The target experience is:
 
 If this feels obviously more useful than “chat with this PDF,” the project has
 proved its thesis.
-

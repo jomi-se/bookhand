@@ -16,3 +16,5 @@ The agent observes and changes the application through the same domain
 operations used by the UI. Generated content does not receive implicit access
 to the reader's storage or surrounding page.
 
+The concrete fast-path choices and complexity gates are defined in
+`implementation-defaults.md`.

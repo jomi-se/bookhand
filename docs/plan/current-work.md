@@ -10,16 +10,21 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
 
 - Repository and cross-harness agent environment initialized.
 - Product North Star, boundary, and first architecture decision recorded.
+- Readest/Reedy lessons have been extracted without adopting its full stack.
+- Browser-local storage, retrieval, embedding, WebMCP, and study-board defaults
+  are settled in `docs/architecture/implementation-defaults.md`.
+- The delivery order and cut order are settled in
+  `docs/plan/vertical-slice-build-order.md`.
 - Application remains the generated Vite shell; reader work has not started.
 
 ## Next actions
 
-1. Confirm the smallest Foliate.js integration and licensing/distribution path.
-2. Define the exact demo story and minimum WebMCP tool vocabulary it needs.
-3. Implement EPUB rendering plus stable location and selection APIs.
-4. Add local persistence for position, annotations, styles, and study boards.
-5. Implement the WebMCP surface over those domain operations.
-6. Build and validate one agent-created study artifact end to end.
+1. Execute Slice 1 from `vertical-slice-build-order.md`: reader, hero EPUB,
+   stable selection/CFI, position persistence, and minimum presentation controls.
+2. Continue through the slices in order; preserve the Slice 3 submission
+   checkpoint before adding semantic retrieval or generated labs.
+3. Update this ledger with the chosen hero book and passage as soon as they are
+   known.
 
 ## Handoff notes
 
@@ -28,4 +33,3 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
 - Impeccable is installed as a skill but automatic hooks are deliberately off.
 - Update this file whenever a completed step changes what the next agent should
   do.
-

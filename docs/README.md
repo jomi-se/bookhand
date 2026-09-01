@@ -14,3 +14,6 @@ Documentation is organized by authority rather than chronology:
 When a decision changes, update the earliest authoritative document and then
 repair downstream plans rather than leaving contradictory snapshots.
 
+Before implementation, read `architecture/implementation-defaults.md` and
+`plan/vertical-slice-build-order.md`. They intentionally settle routine choices
+and the cut order for the short hackathon build.

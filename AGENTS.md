@@ -13,6 +13,9 @@ security machinery without recording the decision under `docs/decisions/`.
 
 Read `docs/product-north-star.md` before making product or scope decisions. It
 captures the motivating discussion and is the highest-level product authority.
+Then follow `docs/architecture/implementation-defaults.md` and
+`docs/plan/vertical-slice-build-order.md`; they exist to stop implementation
+agents from reopening settled choices during the short build.
 
 ## Current scope
 
@@ -101,4 +104,3 @@ usage reset without reconstructing the project from chat history.
 - Keep WebMCP tool inputs narrow, schema-described, and observable in the UI.
 - Preserve user control over persistent changes and destructive operations.
 - Record architectural forks before implementing both sides of them.
-
