@@ -90,9 +90,10 @@ generated labs.
 - Browser evidence for library import, bundled-book open, TOC navigation,
   selection, style changes, reload restoration, security fixture, error states,
   console/network cleanliness, desktop, 320px, Pixel viewport, and 200% zoom.
-- Physical Pixel 7 evidence is required before claiming Slice 1 complete on the
-  target phone. Desktop implementation may land while that device check is
-  pending.
+- ADR 0003 makes an embedded agent browser on a mobile-sized viewport the
+  judged surface, so physical Pixel 7 evidence is best effort and no longer
+  gates Slice 1. Mobile layout, touch, and selection ergonomics keep their
+  contracts; the Android-native drill set does not.
 
 ## Reproducible validation controls
 
@@ -115,8 +116,9 @@ generated labs.
   proven after the first tab closes.
 - Network validation blocks and counts every non-origin request after the app
   shell and fixtures are available.
-- Pixel 7 evidence records device/Chrome versions and source-location state
-  before and after reload plus 30-second background/resume.
+- Any opportunistic Pixel 7 pass records device/Chrome versions and
+  source-location state before and after reload. Under ADR 0003 this is
+  supporting evidence, not a gate.
 - Production bundles expose none of the fault-injection or raw-state-dump
   controls; validation must prove that boundary rather than trusting a build
   flag by convention.

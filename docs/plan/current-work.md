@@ -55,6 +55,11 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
   and section snapshots; navigation and style primitives; revision-guarded
   lifecycle safety; the open deadline; and test-only fault seams. Foliate
   internals stay private to the adapter; callers see only `ReaderAdapter`.
+- ADR 0003 records that the judged surface is an embedded agent browser on a
+  mobile-sized viewport, not a specific handset. Physical Pixel 7 evidence is
+  now best effort and no longer gates Slice 1; mobile layout, touch, and
+  selection ergonomics keep their contracts, while the Android-native drill set
+  is cut. Submissions close 2026-09-03T20:00Z.
 - An independent review of W2 and W3 found and fixed four defects the parallel
   lanes missed: the storage client hung forever after a worker `error` event
   because it never stopped accepting requests; no storage request had any
@@ -65,9 +70,10 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
 
 ## Next actions
 
-1. Run the preserved SQLite spike's Pixel 7 drills when the phone is available:
-   indexing/query timings, reload mid-batch, app background/resume, memory, and
-   second-tab behavior. Record results without blocking desktop implementation.
+1. Confirm the real storage mode and hero flow in the embedded agent browser
+   ADR 0003 names as the judged surface. An in-app browser may refuse OPFS sync
+   access handles, in which case the session-only fallback becomes the judged
+   path and must read as truthful rather than broken.
 2. Implement W4, the library product surface, against the W2 client and W3
    adapter. `VAL-LIBRARY-CATALOG` needs the five-second bound surfaced as a
    named recoverable error with Retry; the client now raises

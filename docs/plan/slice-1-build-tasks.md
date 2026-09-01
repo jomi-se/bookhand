@@ -80,9 +80,10 @@ Depends on: W2 through W6.
 
 Target: `VAL-DEVICE-PIXEL7`.
 
-- Expose the verified build over HTTPS, run the complete physical Pixel 7 flow
-  and preserved storage drills, and fix real-device defects. This target remains
-  open if the phone is unavailable; emulation cannot close it.
+- Expose the verified build over HTTPS and confirm the real storage mode and
+  hero flow in the embedded agent browser that ADR 0003 names as the judged
+  surface. Run the physical Pixel 7 flow opportunistically if the device is at
+  hand; it is best effort and does not gate Slice 1.
 
 ## Milestone validation
 
@@ -90,7 +91,7 @@ Target: `VAL-DEVICE-PIXEL7`.
   build artifacts, banned-path checks, and evidence integrity.
 - Real-surface lane: all browser and data contracts through the production
   surface, including empty/error/retry/security/two-tab/responsive states.
-- Physical-device lane: `VAL-DEVICE-PIXEL7` only.
+- Physical-device lane: `VAL-DEVICE-PIXEL7` only, best effort under ADR 0003.
 - Slice 1 gate closes only after every contract has independent evidence or an
   explicit accepted blocked/remaining-device decision.
 
