@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bookhand",
+  "compatibility_date": "2026-09-01",
+  // Bookhand is entirely client-side: the Worker serves the built assets and
+  // nothing else. There is no backend to add, and adding one would need a
+  // decision recorded under docs/decisions/.
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    { "pattern": "bookhand.dev", "custom_domain": true },
+    { "pattern": "www.bookhand.dev", "custom_domain": true }
+  ]
+}

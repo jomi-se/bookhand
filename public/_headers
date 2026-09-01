@@ -1,0 +1,15 @@
+# Served by Cloudflare for every response. The Content-Security-Policy is the
+# same policy the application ships in its own meta tag; sent as a header it can
+# additionally express frame-ancestors, which a meta tag cannot.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' blob:; img-src 'self' blob: data:; font-src 'self' blob: data:; media-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  Cross-Origin-Opener-Policy: same-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/books/*
+  Cache-Control: public, max-age=86400

@@ -66,6 +66,15 @@ export default defineConfig(({ mode }) => ({
       ],
     }),
   ],
-  server: { headers: { 'Content-Security-Policy': contentSecurityPolicy } },
-  preview: { headers: { 'Content-Security-Policy': contentSecurityPolicy } },
+  server: {
+    headers: { 'Content-Security-Policy': contentSecurityPolicy },
+    allowedHosts: ['.ts.net'],
+  },
+  // The preview server is the honest one to test against: it serves the real
+  // build under the real CSP. `.ts.net` is allowed so a phone on the same
+  // tailnet can reach it over HTTPS during development.
+  preview: {
+    headers: { 'Content-Security-Policy': contentSecurityPolicy },
+    allowedHosts: ['.ts.net'],
+  },
 }))
