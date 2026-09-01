@@ -1,6 +1,13 @@
 export const LIBRARY_LOAD_DEADLINE_MS = 5_000
 export const BOOK_OPEN_DEADLINE_MS = 10_000
 
+/**
+ * Importing a book copies whole EPUB bytes across the worker boundary and into
+ * SQLite, so it is bounded separately from the catalog read that
+ * `LIBRARY_LOAD_DEADLINE_MS` governs.
+ */
+export const BOOK_IMPORT_DEADLINE_MS = 30_000
+
 export interface RuntimeClock {
   now(): number
   setTimeout(callback: () => void, delayMs: number): ReturnType<typeof setTimeout>

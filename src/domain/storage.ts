@@ -29,6 +29,13 @@ export interface StoredBook {
   readonly provenance: BookProvenance
 }
 
+export interface ImportBookInput {
+  readonly metadata: BookMetadata
+  readonly epubBytes: Uint8Array
+  readonly importedAt: string
+  readonly provenance: BookProvenance
+}
+
 export interface BookCatalogEntry {
   readonly id: BookIdentifier
   readonly metadata: BookMetadata
@@ -49,14 +56,16 @@ export interface StorageDiagnostics {
   readonly sqliteVersion: string
   readonly vfsName: string
   readonly schemaVersion: number
+  readonly connectionOwner: 'dedicated-worker'
+  readonly bookCount: number
 }
 
 export type StorageWorkerRequest =
   | { readonly requestId: string; readonly type: 'initialize' }
   | {
       readonly requestId: string
-      readonly type: 'put-book'
-      readonly book: StoredBook
+      readonly type: 'import-book'
+      readonly book: ImportBookInput
     }
   | { readonly requestId: string; readonly type: 'get-book'; readonly bookId: string }
   | { readonly requestId: string; readonly type: 'list-books' }
@@ -72,6 +81,8 @@ export type StorageWorkerRequest =
     }
   | { readonly requestId: string; readonly type: 'get-diagnostics' }
   | { readonly requestId: string; readonly type: 'retry-persistence' }
+  | { readonly requestId: string; readonly type: 'claim-persistence-request' }
+  | { readonly requestId: string; readonly type: 'close' }
 
 export type StorageWorkerResult =
   | { readonly type: 'initialized'; readonly diagnostics: StorageDiagnostics }
@@ -81,6 +92,8 @@ export type StorageWorkerResult =
   | { readonly type: 'reading-state-written'; readonly bookId: string }
   | { readonly type: 'reading-state'; readonly state: ReadingState | null }
   | { readonly type: 'diagnostics'; readonly diagnostics: StorageDiagnostics }
+  | { readonly type: 'persistence-request-claimed'; readonly claimed: boolean }
+  | { readonly type: 'closed' }
 
 export type StorageWorkerResponse =
   | {
@@ -97,4 +110,3 @@ export type StorageWorkerResponse =
         readonly retryable: boolean
       }
     }
-
