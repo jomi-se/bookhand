@@ -1,0 +1,46 @@
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
+sandbox_mode = "workspace-write"
+web_search = "live"
+
+[sandbox_workspace_write]
+network_access = true
+
+[agents]
+max_threads = 6
+max_depth = 1
+
+[mcp_servers.playwright]
+command = "bash"
+args = ["scripts/start-playwright-mcp.sh"]
+
+[mcp_servers.playwright.tools.navigate]
+approval_mode = "never"
+
+[mcp_servers.playwright.tools.select_option]
+approval_mode = "never"
+
+[mcp_servers.playwright.tools.click]
+approval_mode = "never"
+
+[mcp_servers.playwright.tools.run_code_unsafe]
+approval_mode = "never"
+
+[mcp_servers.playwright.tools.resize]
+approval_mode = "never"
+
+[mcp_servers.playwright.tools.evaluate]
+approval_mode = "never"
+
+[mcp_servers.playwright.tools.tabs]
+approval_mode = "never"
+
+[mcp_servers.playwright.tools.file_upload]
+approval_mode = "never"
+
+[mcp_servers.playwright.tools.close]
+approval_mode = "never"
+
+[mcp_servers.devpost]
+url = "https://devpost.com/mcp"
+

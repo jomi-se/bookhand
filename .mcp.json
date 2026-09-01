@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "bash",
+      "args": ["scripts/start-playwright-mcp.sh"]
+    },
+    "devpost": {
+      "type": "http",
+      "url": "https://devpost.com/mcp"
+    }
+  }
+}
+
