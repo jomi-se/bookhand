@@ -1,0 +1,238 @@
+.study-panel {
+  min-inline-size: 0;
+}
+
+.panel-head-tools {
+  display: flex;
+  gap: 2px;
+}
+
+/* Expanded view: the board becomes the workspace and the book steps back to a
+   supporting column, rather than both fighting for the same space. */
+.reader[data-board='expanded'][data-panel='study'] .reader-stage {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+}
+
+.reader[data-board='expanded'][data-panel='study'] .study-panel {
+  order: -1;
+  border-inline-end: 0;
+  border-inline-start: 1px solid var(--rule);
+}
+
+.add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block-end: 16px;
+}
+
+.add-row .button {
+  min-block-size: 34px;
+  padding-inline: 10px;
+  font-size: var(--step--2);
+  text-transform: capitalize;
+}
+
+.composer {
+  margin-block-end: 20px;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--raised);
+}
+
+.composer label {
+  display: block;
+  margin-block-end: 8px;
+  font-size: var(--step--1);
+  font-weight: 500;
+}
+
+.composer textarea,
+.highlight-note textarea {
+  inline-size: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--step--1);
+  resize: vertical;
+}
+
+.study-items,
+.highlight-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.study-item {
+  padding: 14px 0;
+  border-block-start: 1px solid var(--rule);
+}
+
+.study-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-block-end: 8px;
+}
+
+.study-item-kind {
+  color: var(--muted);
+  font-size: var(--step--2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.study-item-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-item-tools .button-text {
+  gap: 5px;
+  min-inline-size: 0;
+}
+
+.source-label {
+  display: block;
+  max-inline-size: 22ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: start;
+}
+
+.block-prose,
+.block-question-prompt {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.block-quotation {
+  margin: 0;
+}
+
+.block-quotation blockquote {
+  margin: 0;
+  padding-inline-start: 12px;
+  border-inline-start: 2px solid var(--accent);
+  font-family: var(--serif);
+  font-size: var(--step-0);
+  line-height: 1.55;
+}
+
+.block-quotation figcaption,
+.block-equation figcaption {
+  margin-block-start: 8px;
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.block-equation {
+  margin: 0;
+}
+
+.block-equation pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--raised);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--step--1);
+}
+
+.block-steps-title {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.block-steps ol {
+  margin: 0;
+  padding-inline-start: 20px;
+  line-height: 1.55;
+}
+
+.block-steps li + li {
+  margin-block-start: 6px;
+}
+
+.block-question details {
+  margin-block-start: 8px;
+}
+
+.block-question summary {
+  color: var(--accent);
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+
+.block-question details p {
+  margin: 8px 0 0;
+  line-height: 1.55;
+}
+
+.highlights {
+  margin-block-start: 28px;
+}
+
+.highlight {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  padding: 14px 0;
+  border-block-start: 1px solid var(--rule);
+}
+
+.highlight-quote {
+  grid-column: 1;
+  padding: 0 0 0 12px;
+  border: 0;
+  border-inline-start: 3px solid var(--accent);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-family: var(--serif);
+  line-height: 1.5;
+  text-align: start;
+  cursor: pointer;
+}
+
+.highlight[data-color='amber'] .highlight-quote {
+  border-inline-start-color: #d69e2e;
+}
+
+.highlight[data-color='sky'] .highlight-quote {
+  border-inline-start-color: #3b82f6;
+}
+
+.highlight[data-color='moss'] .highlight-quote {
+  border-inline-start-color: #48946a;
+}
+
+.highlight-note {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.highlight > .button-icon {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+}
+
+@media (max-width: 860px) {
+  .reader[data-board='expanded'][data-panel='study'] .reader-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

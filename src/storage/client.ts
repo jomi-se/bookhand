@@ -1,6 +1,10 @@
 import type {
+  Annotation,
   BookCatalogEntry,
   ImportBookInput,
+  StudyBoard,
+  StudyBoardView,
+  StudyItem,
   ReadingState,
   StorageDiagnostics,
   StoredBook,
@@ -208,6 +212,52 @@ export class StorageClient {
       await this.request({ type: 'claim-persistence-request' }),
       'persistence-request-claimed',
     ).claimed
+  }
+
+  async saveAnnotation(annotation: Annotation): Promise<Annotation> {
+    return expectResult(
+      await this.request({ type: 'save-annotation', annotation }),
+      'annotation-saved',
+    ).annotation
+  }
+
+  async deleteAnnotation(annotationId: string): Promise<void> {
+    expectResult(
+      await this.request({ type: 'delete-annotation', annotationId }),
+      'annotation-deleted',
+    )
+  }
+
+  async listAnnotations(bookId: string): Promise<readonly Annotation[]> {
+    return expectResult(await this.request({ type: 'list-annotations', bookId }), 'annotations')
+      .annotations
+  }
+
+  async getBoard(bookId: string): Promise<StudyBoard> {
+    return expectResult(await this.request({ type: 'get-board', bookId }), 'board').board
+  }
+
+  async setBoardView(boardId: string, view: StudyBoardView): Promise<StudyBoard> {
+    return expectResult(
+      await this.request({ type: 'set-board-view', boardId, view }),
+      'board',
+    ).board
+  }
+
+  async upsertStudyItem(item: StudyItem): Promise<StudyItem> {
+    return expectResult(
+      await this.request({ type: 'upsert-study-item', item }),
+      'study-item-saved',
+    ).item
+  }
+
+  async deleteStudyItem(itemId: string): Promise<void> {
+    expectResult(await this.request({ type: 'delete-study-item', itemId }), 'study-item-deleted')
+  }
+
+  async listStudyItems(boardId: string): Promise<readonly StudyItem[]> {
+    return expectResult(await this.request({ type: 'list-study-items', boardId }), 'study-items')
+      .items
   }
 
   /** Idempotent, and never rejects: teardown must be safe from a cleanup path. */

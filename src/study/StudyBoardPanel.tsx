@@ -1,0 +1,213 @@
+import { useState } from 'react'
+import { Maximize2, Minimize2, Plus, Trash2 } from 'lucide-react'
+
+import type {
+  Annotation,
+  BookRange,
+  StudyBoard,
+  StudyItem,
+  StudyItemKind,
+  StudyItemPayload,
+} from '../domain/index.ts'
+import { STUDY_ITEM_KINDS } from '../domain/study.ts'
+import { StudyItemCard } from './StudyItemCard.tsx'
+
+export interface StudyBoardPanelProps {
+  readonly board?: StudyBoard
+  readonly items: readonly StudyItem[]
+  readonly annotations: readonly Annotation[]
+  readonly selectionQuote?: string
+  readonly onAddItem: (payload: StudyItemPayload, withSource: boolean) => void
+  readonly onDeleteItem: (item: StudyItem) => void
+  readonly onGoToSource: (range: BookRange) => void
+  readonly onDeleteAnnotation: (annotation: Annotation) => void
+  readonly onEditNote: (annotation: Annotation, note: string) => void
+  readonly onToggleView: () => void
+  readonly onClose: () => void
+}
+
+function NoteEditor({
+  annotation,
+  onSave,
+}: {
+  readonly annotation: Annotation
+  readonly onSave: (note: string) => void
+}) {
+  const [note, setNote] = useState(annotation.note ?? '')
+  const dirty = note !== (annotation.note ?? '')
+  return (
+    <div className="highlight-note">
+      <textarea
+        rows={2}
+        value={note}
+        placeholder="Add a note"
+        aria-label={`Note for “${annotation.quote.slice(0, 40)}”`}
+        onChange={(event) => setNote(event.target.value)}
+      />
+      {dirty ? (
+        <button type="button" className="button button-quiet" onClick={() => onSave(note)}>
+          Save note
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+export function StudyBoardPanel(props: StudyBoardPanelProps) {
+  const { board, items, annotations, selectionQuote } = props
+  const [composing, setComposing] = useState<StudyItemKind>()
+  const [draft, setDraft] = useState('')
+  const expanded = board?.view === 'expanded'
+
+  return (
+    <aside className="reader-panel study-panel" aria-label="Study">
+      <header className="panel-head">
+        <h2>{board?.title ?? 'Study'}</h2>
+        <span className="panel-head-tools">
+          <button
+            type="button"
+            className="button button-icon"
+            onClick={props.onToggleView}
+            aria-label={expanded ? 'Dock the study board' : 'Expand the study board'}
+            aria-pressed={expanded}
+          >
+            {expanded ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}
+          </button>
+          <button type="button" className="button button-icon" onClick={props.onClose} aria-label="Close study">
+            ✕
+          </button>
+        </span>
+      </header>
+
+      <div className="panel-body">
+        <div className="add-row">
+          {STUDY_ITEM_KINDS.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className="button button-quiet"
+              aria-pressed={composing === kind}
+              onClick={() => {
+                setComposing((current) => (current === kind ? undefined : kind))
+                setDraft(kind === 'quotation' ? (selectionQuote ?? '') : '')
+              }}
+            >
+              <Plus size={14} aria-hidden="true" />
+              {kind}
+            </button>
+          ))}
+        </div>
+
+        {composing ? (
+          <div className="composer">
+            <label htmlFor="study-draft">
+              New {composing}
+              {selectionQuote ? ' — will link to the selected passage' : ''}
+            </label>
+            <textarea
+              id="study-draft"
+              rows={composing === 'steps' ? 4 : 3}
+              value={draft}
+              placeholder={
+                composing === 'steps'
+                  ? 'One step per line'
+                  : composing === 'equation'
+                    ? 'dy/dx = y / (x - a)'
+                    : composing === 'question'
+                      ? 'What does the slope at a point mean?'
+                      : 'Write something worth keeping'
+              }
+              onChange={(event) => setDraft(event.target.value)}
+            />
+            <div className="control-actions">
+              <button
+                type="button"
+                className="button button-primary"
+                disabled={draft.trim().length === 0}
+                onClick={() => {
+                  const payload =
+                    composing === 'steps'
+                      ? {
+                          kind: 'steps' as const,
+                          steps: draft.split('\n').map((line) => line.trim()).filter(Boolean),
+                        }
+                      : composing === 'quotation'
+                        ? { kind: 'quotation' as const, text: draft.trim() }
+                        : composing === 'equation'
+                          ? { kind: 'equation' as const, expression: draft.trim() }
+                          : composing === 'question'
+                            ? { kind: 'question' as const, prompt: draft.trim() }
+                            : { kind: 'prose' as const, text: draft.trim() }
+                  props.onAddItem(payload, Boolean(selectionQuote))
+                  setDraft('')
+                  setComposing(undefined)
+                }}
+              >
+                Add to board
+              </button>
+              <button
+                type="button"
+                className="button button-text"
+                onClick={() => {
+                  setComposing(undefined)
+                  setDraft('')
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {items.length === 0 ? (
+          <p className="panel-empty">
+            Nothing on this board yet. Select a passage in the book and keep it here, or add a
+            block above. Everything stays on this device.
+          </p>
+        ) : (
+          <ul className="study-items">
+            {items.map((item) => (
+              <StudyItemCard
+                key={item.id}
+                item={item}
+                onGoToSource={(target) => target.sourceRange && props.onGoToSource(target.sourceRange)}
+                onDelete={props.onDeleteItem}
+              />
+            ))}
+          </ul>
+        )}
+
+        {annotations.length > 0 ? (
+          <section className="highlights">
+            <h3 className="section-heading">Highlights</h3>
+            <ul className="highlight-list">
+              {annotations.map((annotation) => (
+                <li key={annotation.id} className="highlight" data-color={annotation.color}>
+                  <button
+                    type="button"
+                    className="highlight-quote"
+                    onClick={() => props.onGoToSource(annotation.range)}
+                  >
+                    {annotation.quote}
+                  </button>
+                  <NoteEditor
+                    annotation={annotation}
+                    onSave={(note) => props.onEditNote(annotation, note)}
+                  />
+                  <button
+                    type="button"
+                    className="button button-icon"
+                    aria-label="Delete this highlight"
+                    onClick={() => props.onDeleteAnnotation(annotation)}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+      </div>
+    </aside>
+  )
+}

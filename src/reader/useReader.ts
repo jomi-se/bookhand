@@ -20,7 +20,7 @@ import {
   type RuntimeClock,
 } from '../runtime/deadlines.ts'
 import type { RuntimePorts } from '../runtime/ports.ts'
-import type { ReaderPortBridge } from '../app/runtime.ts'
+import type { ReaderPortBridge } from '../app/reader-bridge.ts'
 import type { StorageClient } from '../storage/client.ts'
 import { DEFAULT_READER_STYLE } from './FoliateReaderAdapter.ts'
 

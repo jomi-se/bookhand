@@ -62,6 +62,22 @@ export interface FoliateRenderer extends HTMLElement {
   setStyles?(styles: string): void
 }
 
+/** The shape Foliate hands back through its `draw-annotation` event. */
+export interface FoliateAnnotationValue {
+  readonly value: string
+  readonly color?: string
+}
+
+export type FoliateDrawFunction = (
+  rects: readonly DOMRect[],
+  options?: Record<string, unknown>,
+) => Element
+
+export interface FoliateDrawDetail {
+  readonly draw: (func: FoliateDrawFunction, options?: Record<string, unknown>) => void
+  readonly annotation: FoliateAnnotationValue
+}
+
 export interface FoliateView extends HTMLElement {
   book: FoliateBook
   renderer: FoliateRenderer
@@ -73,8 +89,16 @@ export interface FoliateView extends HTMLElement {
   getCFI(index: number, range?: Range): string
   resolveNavigation(target: string | number): FoliateResolvedTarget | undefined
   deselect(): void
+  addAnnotation?(annotation: FoliateAnnotationValue, remove?: boolean): Promise<unknown>
+  deleteAnnotation?(annotation: FoliateAnnotationValue): Promise<unknown>
+}
+
+export interface FoliateOverlayer {
+  readonly highlight: FoliateDrawFunction
+  readonly underline: FoliateDrawFunction
 }
 
 export interface FoliateModule {
   makeBook(file: File): Promise<FoliateBook>
+  readonly Overlayer?: FoliateOverlayer
 }

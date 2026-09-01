@@ -33,12 +33,46 @@ export function extractDocumentText(document: Document): string {
   return normalizeBookText(clone.textContent ?? '')
 }
 
+/**
+ * Returns an equivalent range whose endpoints are text nodes.
+ *
+ * A range whose boundaries sit on elements — what a triple-click or
+ * select-all produces — yields a CFI that collapses to the element and
+ * therefore resolves to no rectangles, so a highlight over it would silently
+ * draw nothing. Anchoring to the text itself keeps the drawn highlight and the
+ * stored range describing the same characters.
+ */
+export function toTextRange(range: Range): Range {
+  const startIsText = range.startContainer.nodeType === Node.TEXT_NODE
+  const endIsText = range.endContainer.nodeType === Node.TEXT_NODE
+  if (startIsText && endIsText) return range
+
+  const root = range.commonAncestorContainer
+  const document_ = root.ownerDocument
+  if (!document_ || root.nodeType === Node.TEXT_NODE) return range
+
+  const walker = document_.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const nodes: Text[] = []
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (range.intersectsNode(node) && (node.nodeValue ?? '').trim()) nodes.push(node as Text)
+  }
+  const first = nodes[0]
+  const last = nodes.at(-1)
+  if (!first || !last) return range
+
+  const anchored = document_.createRange()
+  anchored.setStart(first, startIsText ? range.startOffset : 0)
+  anchored.setEnd(last, endIsText ? range.endOffset : (last.nodeValue?.length ?? 0))
+  return anchored
+}
+
 export function passageFromRange(
-  range: Range,
+  source: Range,
   sectionIndex: number,
   chapterBreadcrumb: readonly string[],
   getCfi: (range: Range) => string,
 ): Passage {
+  const range = toTextRange(source)
   const text = normalizeBookText(range.toString())
   const start = range.cloneRange()
   start.collapse(true)
@@ -47,6 +81,7 @@ export function passageFromRange(
   const bookRange: BookRange = {
     startCfi: getCfi(start),
     endCfi: getCfi(end),
+    cfi: getCfi(range),
     sectionIndex,
     textFingerprint: fingerprintText(text),
   }

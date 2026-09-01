@@ -24,6 +24,12 @@ export interface BookMetadata {
 export interface BookRange {
   readonly startCfi: string
   readonly endCfi: string
+  /**
+   * The single range CFI spanning start to end. Highlights are anchored by this
+   * rather than by the two collapsed endpoints, because the rendering engine
+   * resolves one range CFI to the run of text it must draw over.
+   */
+  readonly cfi?: string
   readonly sectionIndex: number
   readonly textFingerprint: string
 }
@@ -89,6 +95,13 @@ export interface ReaderStyle {
   readonly customCss?: string
 }
 
+/** What the reader needs in order to draw a stored highlight. */
+export interface ReaderAnnotationMark {
+  readonly id: string
+  readonly cfi: string
+  readonly color: string
+}
+
 export interface ReaderAdapter {
   open(blob: Blob): Promise<BookMetadata>
   close(): Promise<void>
@@ -102,5 +115,6 @@ export interface ReaderAdapter {
   navigate(target: BookTarget): Promise<void>
   applyStyle(style: ReaderStyle): void
   resetStyle(): void
+  renderAnnotations(marks: readonly ReaderAnnotationMark[]): void
 }
 

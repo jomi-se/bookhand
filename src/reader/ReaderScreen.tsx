@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, LayoutPanelLeft, List, RotateCw, Type } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Highlighter, LayoutPanelLeft, List, RotateCw, Type } from 'lucide-react'
 
-import type { BookCatalogEntry } from '../domain/index.ts'
+import type { BookCatalogEntry, BookRange, StudyItemPayload } from '../domain/index.ts'
+import { StudyBoardPanel } from '../study/StudyBoardPanel.tsx'
+import { useStudy } from '../study/useStudy.ts'
 import { splitTitle } from '../library/progress.ts'
-import type { ReaderPortBridge } from '../app/runtime.ts'
+import type { ReaderPortBridge } from '../app/reader-bridge.ts'
 import type { RuntimePorts } from '../runtime/ports.ts'
 import type { StorageClient } from '../storage/client.ts'
 import { ContentsPanel } from './ContentsPanel.tsx'
@@ -23,8 +25,45 @@ export interface ReaderScreenProps {
 
 export function ReaderScreen({ entry, client, ports, bridge, onExit }: ReaderScreenProps) {
   const reader = useReader({ entry, client, ports, bridge })
+  const study = useStudy({ entry, client, bridge })
   const [panel, setPanel] = useState<ReaderPanel>(null)
   const { title } = splitTitle(entry.metadata)
+  const expanded = study.board?.view === 'expanded' && panel === 'study'
+
+  // Stored highlights are drawn whenever the set changes or a section renders.
+  useEffect(() => {
+    bridge.adapter?.renderAnnotations(study.marks)
+  }, [bridge, reader.location, study.marks])
+
+  const goToSource = useCallback(
+    (range: BookRange) => {
+      if (!range.cfi) return
+      void reader.navigate({ kind: 'cfi', cfi: range.cfi })
+      if (window.matchMedia('(max-width: 860px)').matches) setPanel(null)
+    },
+    [reader],
+  )
+
+  const highlightSelection = useCallback(() => {
+    const selection = reader.selection
+    if (!selection || !study.commands) return
+    void study.commands.saveAnnotation({ range: selection.range, quote: selection.quote })
+  }, [reader.selection, study.commands])
+
+  const addStudyItem = useCallback(
+    (payload: StudyItemPayload, withSource: boolean) => {
+      if (!study.commands) return
+      const selection = withSource ? reader.selection : null
+      void study.commands.upsertStudyItem({
+        payload,
+        ...(selection ? { sourceRange: selection.range } : {}),
+        ...(selection && reader.location?.chapterLabel
+          ? { sourceLabel: reader.location.chapterLabel }
+          : {}),
+      })
+    },
+    [reader.location, reader.selection, study.commands],
+  )
 
   const toggle = useCallback(
     (next: Exclude<ReaderPanel, null>) => setPanel((p) => (p === next ? null : next)),
@@ -49,7 +88,7 @@ export function ReaderScreen({ entry, client, ports, bridge, onExit }: ReaderScr
     reader.location === undefined ? undefined : Math.round(reader.location.fraction * 100)
 
   return (
-    <div className="reader" data-panel={panel ?? 'none'}>
+    <div className="reader" data-panel={panel ?? 'none'} data-board={expanded ? 'expanded' : 'docked'}>
       <header className="reader-chrome">
         <button type="button" className="button button-quiet button-back" onClick={onExit}>
           <ChevronLeft size={16} aria-hidden="true" />
@@ -118,28 +157,33 @@ export function ReaderScreen({ entry, client, ports, bridge, onExit }: ReaderScr
         ) : null}
 
         {panel === 'study' ? (
-          <aside className="reader-panel" aria-label="Study">
-            <header className="panel-head">
-              <h2>Study</h2>
-              <button
-                type="button"
-                className="button button-icon"
-                onClick={() => setPanel(null)}
-                aria-label="Close study"
-              >
-                ✕
-              </button>
-            </header>
-            <div className="panel-body">
-              <p className="panel-empty">
-                Study boards arrive in the next slice. Selecting a passage here will send it
-                to a board with its exact source range.
-              </p>
-              {reader.selection ? (
-                <blockquote className="study-preview">{reader.selection.quote}</blockquote>
-              ) : null}
-            </div>
-          </aside>
+          <StudyBoardPanel
+            board={study.board}
+            items={study.items}
+            annotations={study.annotations}
+            selectionQuote={reader.selection?.quote}
+            onAddItem={addStudyItem}
+            onDeleteItem={(item) => void study.commands?.deleteStudyItem(item.id)}
+            onGoToSource={goToSource}
+            onDeleteAnnotation={(annotation) =>
+              void study.commands?.deleteAnnotation(annotation.id)
+            }
+            onEditNote={(annotation, note) =>
+              void study.commands?.saveAnnotation({
+                id: annotation.id,
+                range: annotation.range,
+                quote: annotation.quote,
+                color: annotation.color,
+                note,
+              })
+            }
+            onToggleView={() =>
+              void study.commands
+                ?.setStudyBoardView(study.board?.view === 'expanded' ? 'docked' : 'expanded')
+                .then(study.setBoard)
+            }
+            onClose={() => setPanel(null)}
+          />
         ) : null}
 
         <div className="reader-book-area">
@@ -189,7 +233,18 @@ export function ReaderScreen({ entry, client, ports, bridge, onExit }: ReaderScr
 
           {reader.selection ? (
             <div className="selection-action" role="status">
-              <button type="button" className="button button-quiet" onClick={() => setPanel('study')}>
+              <button type="button" className="button button-quiet" onClick={highlightSelection}>
+                <Highlighter size={16} aria-hidden="true" />
+                Highlight
+              </button>
+              <button
+                type="button"
+                className="button button-quiet"
+                onClick={() => {
+                  addStudyItem({ kind: 'quotation', text: reader.selection!.quote }, true)
+                  setPanel('study')
+                }}
+              >
                 <LayoutPanelLeft size={16} aria-hidden="true" />
                 Study this
               </button>

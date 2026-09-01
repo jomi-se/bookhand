@@ -255,6 +255,7 @@
   inset-block-end: max(18px, env(safe-area-inset-bottom));
   inset-inline: 0;
   display: flex;
+  gap: 8px;
   justify-content: center;
   pointer-events: none;
 }

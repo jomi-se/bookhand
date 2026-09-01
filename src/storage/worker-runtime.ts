@@ -140,6 +140,49 @@ export class StorageWorkerRuntime {
       case 'close':
         this.close()
         return { type: 'closed' }
+      case 'save-annotation':
+        return {
+          type: 'annotation-saved',
+          annotation: this.requireRepository().saveAnnotation(request.annotation),
+        }
+      case 'delete-annotation':
+        this.requireRepository().deleteAnnotation(request.annotationId)
+        return { type: 'annotation-deleted', annotationId: request.annotationId }
+      case 'list-annotations':
+        return {
+          type: 'annotations',
+          annotations: this.requireRepository().listAnnotations(request.bookId),
+        }
+      case 'get-board':
+        return {
+          type: 'board',
+          board: this.requireRepository().getOrCreateBoard(
+            request.bookId,
+            new Date().toISOString(),
+          ),
+        }
+      case 'set-board-view':
+        return {
+          type: 'board',
+          board: this.requireRepository().setBoardView(
+            request.boardId,
+            request.view,
+            new Date().toISOString(),
+          ),
+        }
+      case 'upsert-study-item':
+        return {
+          type: 'study-item-saved',
+          item: this.requireRepository().upsertStudyItem(request.item),
+        }
+      case 'delete-study-item':
+        this.requireRepository().deleteStudyItem(request.itemId)
+        return { type: 'study-item-deleted', itemId: request.itemId }
+      case 'list-study-items':
+        return {
+          type: 'study-items',
+          items: this.requireRepository().listStudyItems(request.boardId),
+        }
     }
   }
 

@@ -4,6 +4,7 @@ import type {
   ReaderLocation,
   ReaderStyle,
 } from './reader.ts'
+import type { Annotation, StudyBoard, StudyItem, StudyBoardView } from './study.ts'
 
 export type StorageMode = 'persistent' | 'session-only' | 'locked'
 
@@ -83,6 +84,27 @@ export type StorageWorkerRequest =
   | { readonly requestId: string; readonly type: 'retry-persistence' }
   | { readonly requestId: string; readonly type: 'claim-persistence-request' }
   | { readonly requestId: string; readonly type: 'close' }
+  | {
+      readonly requestId: string
+      readonly type: 'save-annotation'
+      readonly annotation: Annotation
+    }
+  | {
+      readonly requestId: string
+      readonly type: 'delete-annotation'
+      readonly annotationId: string
+    }
+  | { readonly requestId: string; readonly type: 'list-annotations'; readonly bookId: string }
+  | { readonly requestId: string; readonly type: 'get-board'; readonly bookId: string }
+  | {
+      readonly requestId: string
+      readonly type: 'set-board-view'
+      readonly boardId: string
+      readonly view: StudyBoardView
+    }
+  | { readonly requestId: string; readonly type: 'upsert-study-item'; readonly item: StudyItem }
+  | { readonly requestId: string; readonly type: 'delete-study-item'; readonly itemId: string }
+  | { readonly requestId: string; readonly type: 'list-study-items'; readonly boardId: string }
 
 export type StorageWorkerResult =
   | { readonly type: 'initialized'; readonly diagnostics: StorageDiagnostics }
@@ -94,6 +116,13 @@ export type StorageWorkerResult =
   | { readonly type: 'diagnostics'; readonly diagnostics: StorageDiagnostics }
   | { readonly type: 'persistence-request-claimed'; readonly claimed: boolean }
   | { readonly type: 'closed' }
+  | { readonly type: 'annotation-saved'; readonly annotation: Annotation }
+  | { readonly type: 'annotation-deleted'; readonly annotationId: string }
+  | { readonly type: 'annotations'; readonly annotations: readonly Annotation[] }
+  | { readonly type: 'board'; readonly board: StudyBoard }
+  | { readonly type: 'study-item-saved'; readonly item: StudyItem }
+  | { readonly type: 'study-item-deleted'; readonly itemId: string }
+  | { readonly type: 'study-items'; readonly items: readonly StudyItem[] }
 
 export type StorageWorkerResponse =
   | {

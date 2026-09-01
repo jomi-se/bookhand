@@ -81,6 +81,80 @@ function isImportBook(value: unknown): value is ImportBookInput {
   )
 }
 
+function isBookRange(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isString(value.startCfi) &&
+    isString(value.endCfi) &&
+    (value.cfi === undefined || isString(value.cfi)) &&
+    Number.isInteger(value.sectionIndex) &&
+    isString(value.textFingerprint, 200)
+  )
+}
+
+function isAnnotation(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isString(value.id, 200) &&
+    isString(value.bookId, 256) &&
+    isBookRange(value.range) &&
+    isString(value.quote, 20_000) &&
+    ['accent', 'amber', 'sky', 'moss'].includes(String(value.color)) &&
+    (value.note === undefined || isString(value.note, 20_000)) &&
+    isString(value.createdAt) &&
+    isString(value.updatedAt)
+  )
+}
+
+function isStudyPayload(value: unknown): boolean {
+  if (!isRecord(value)) return false
+  switch (value.kind) {
+    case 'prose':
+      return isString(value.text, 20_000)
+    case 'quotation':
+      return isString(value.text, 20_000) && isOptionalString(value.attribution)
+    case 'equation':
+      return isString(value.expression, 5_000) && isOptionalString(value.caption)
+    case 'steps':
+      return (
+        isOptionalString(value.title) &&
+        Array.isArray(value.steps) &&
+        value.steps.length <= 100 &&
+        value.steps.every((step) => isString(step, 5_000))
+      )
+    case 'question':
+      return isString(value.prompt, 20_000) && isOptionalString(value.answer)
+    default:
+      return false
+  }
+}
+
+function isStudyItem(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isString(value.id, 200) &&
+    isString(value.boardId, 256) &&
+    isStudyPayload(value.payload) &&
+    (value.sourceRange === undefined || isBookRange(value.sourceRange)) &&
+    isOptionalString(value.sourceLabel) &&
+    Number.isInteger(value.sortOrder) &&
+    isString(value.createdAt) &&
+    isString(value.updatedAt)
+  )
+}
+
+function isBoard(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isString(value.id, 256) &&
+    isString(value.bookId, 256) &&
+    isString(value.title, 500) &&
+    ['docked', 'expanded'].includes(String(value.view)) &&
+    isString(value.createdAt) &&
+    isString(value.updatedAt)
+  )
+}
+
 function isLocation(value: unknown): value is ReaderLocation {
   return (
     isRecord(value) &&
@@ -174,6 +248,30 @@ export function assertStorageWorkerRequest(value: unknown): asserts value is Sto
     case 'put-reading-state':
       if (isReadingState(value.state)) return
       break
+    case 'list-annotations':
+    case 'get-board':
+      if (isString(value.bookId, 256)) return
+      break
+    case 'save-annotation':
+      if (isAnnotation(value.annotation)) return
+      break
+    case 'delete-annotation':
+      if (isString(value.annotationId, 200)) return
+      break
+    case 'set-board-view':
+      if (isString(value.boardId, 256) && ['docked', 'expanded'].includes(String(value.view))) {
+        return
+      }
+      break
+    case 'upsert-study-item':
+      if (isStudyItem(value.item)) return
+      break
+    case 'delete-study-item':
+      if (isString(value.itemId, 200)) return
+      break
+    case 'list-study-items':
+      if (isString(value.boardId, 256)) return
+      break
   }
   throw new TypeError(`Invalid storage worker request: ${String(value.type)}`)
 }
@@ -222,6 +320,27 @@ export function assertStorageWorkerResponse(
       break
     case 'closed':
       return
+    case 'annotation-saved':
+      if (isAnnotation(result.annotation)) return
+      break
+    case 'annotation-deleted':
+      if (isString(result.annotationId, 200)) return
+      break
+    case 'annotations':
+      if (Array.isArray(result.annotations) && result.annotations.every(isAnnotation)) return
+      break
+    case 'board':
+      if (isBoard(result.board)) return
+      break
+    case 'study-item-saved':
+      if (isStudyItem(result.item)) return
+      break
+    case 'study-item-deleted':
+      if (isString(result.itemId, 200)) return
+      break
+    case 'study-items':
+      if (Array.isArray(result.items) && result.items.every(isStudyItem)) return
+      break
   }
   throw new TypeError(`Invalid storage worker result: ${String(result.type)}`)
 }

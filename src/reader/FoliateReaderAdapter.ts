@@ -1,6 +1,7 @@
 import type {
   BookMetadata,
   BookRange,
+  ReaderAnnotationMark,
   BookSection,
   BookSectionSnapshot,
   BookTarget,
@@ -25,6 +26,7 @@ import {
 } from './errors.ts'
 import type {
   FoliateBook,
+  FoliateDrawDetail,
   FoliateModule,
   FoliateRelocation,
   FoliateResolvedTarget,
@@ -44,6 +46,8 @@ export interface ReaderAdapterEvents {
   readonly onLocationChange?: (location: ReaderLocation) => void
   readonly onSelectionChange?: (selection: ReaderSelection | null) => void
   readonly onSectionError?: (error: ReaderSectionLoadError) => void
+  /** A drawn highlight was activated in the book. */
+  readonly onAnnotationActivate?: (annotationId: string) => void
 }
 
 export interface ReaderFaultHooks {
@@ -86,6 +90,8 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   #location: ReaderLocation | undefined
   #selection: ReaderSelection | null = null
   #style = DEFAULT_READER_STYLE
+  #marks: readonly ReaderAnnotationMark[] = []
+  #overlayer: FoliateModule['Overlayer']
   #disposedViews = new WeakSet<FoliateView>()
 
   constructor(
@@ -245,10 +251,31 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.applyStyle(DEFAULT_READER_STYLE)
   }
 
+  /**
+   * Draws stored highlights over the book. Marks whose CFI no longer resolves
+   * are skipped rather than throwing: a book that changed underneath an
+   * annotation should still be readable.
+   */
+  renderAnnotations(marks: readonly ReaderAnnotationMark[]): void {
+    const previous = this.#marks
+    this.#marks = marks
+    const view = this.#active?.view
+    if (!view?.addAnnotation) return
+
+    const kept = new Set(marks.map((mark) => mark.cfi))
+    for (const stale of previous) {
+      if (!kept.has(stale.cfi)) void view.deleteAnnotation?.({ value: stale.cfi })?.catch?.(noop)
+    }
+    for (const mark of marks) {
+      void view.addAnnotation({ value: mark.cfi, color: mark.color })?.catch?.(noop)
+    }
+  }
+
   async #openAtRevision(blob: Blob, revision: number): Promise<BookMetadata> {
     await this.#options.faults?.beforeOpen?.(blob)
     this.#assertCurrent(revision)
     const module = await this.#dependencies.loadFoliate()
+    this.#overlayer = module.Overlayer
     this.#assertCurrent(revision)
     const file =
       blob instanceof File
@@ -300,11 +327,32 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         detail.doc.removeEventListener('selectionchange', onSelectionChange),
       )
     }
+    const onDrawAnnotation = (event: Event) => {
+      const detail = (event as CustomEvent<FoliateDrawDetail>).detail
+      const overlayer = this.#overlayer
+      if (!overlayer) return
+      detail.draw(overlayer.highlight, { color: detail.annotation.color ?? 'currentColor' })
+    }
+    const onShowAnnotation = (event: Event) => {
+      const value = (event as CustomEvent<{ value: string }>).detail.value
+      const mark = this.#marks.find((candidate) => candidate.cfi === value)
+      if (mark) this.#options.onAnnotationActivate?.(mark.id)
+    }
+    // A newly rendered section has a fresh overlay, so stored marks are drawn
+    // again rather than only existing on the section that was open when saved.
+    const onCreateOverlay = () => this.renderAnnotations(this.#marks)
+
     view.addEventListener('relocate', onRelocate)
     view.addEventListener('load', onLoad)
+    view.addEventListener('draw-annotation', onDrawAnnotation)
+    view.addEventListener('show-annotation', onShowAnnotation)
+    view.addEventListener('create-overlay', onCreateOverlay)
     return [
       () => view.removeEventListener('relocate', onRelocate),
       () => view.removeEventListener('load', onLoad),
+      () => view.removeEventListener('draw-annotation', onDrawAnnotation),
+      () => view.removeEventListener('show-annotation', onShowAnnotation),
+      () => view.removeEventListener('create-overlay', onCreateOverlay),
       () => {
         while (sectionCleanups.length) sectionCleanups.pop()?.()
       },
@@ -437,8 +485,11 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#sections = []
     this.#location = undefined
     this.#selection = null
+    this.#marks = []
   }
 }
+
+function noop(): void {}
 
 async function loadFoliate(): Promise<FoliateModule> {
   return import('./foliate-module.ts')
