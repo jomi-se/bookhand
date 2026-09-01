@@ -95,6 +95,7 @@ than maintaining two copies.
 - Active work and handoff state: `docs/plan/current-work.md`
 - Time-stamped external research: `docs/research/`
 - Time-stamped reviews: `docs/reviews/`
+- Deployment and hosting: `docs/deployment.md`
 
 Update the earliest source of truth that changed. Keep
 `docs/plan/current-work.md` current enough that another agent can resume after a

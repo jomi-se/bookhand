@@ -105,23 +105,28 @@ The WebMCP Challenge closes 2026-09-03T20:00Z. Required and still open:
   action, deliberately not automated.
 - Nothing is pushed yet; `origin/main` is far behind local.
 - No live URL. `wrangler.jsonc` matches the working `jomi-se-blog` pattern on
-  this machine: `npm run deploy` builds and uploads `./dist` as Worker static
-  assets, with bookhand.dev attached as a custom domain from the Cloudflare
-  dashboard rather than declared in config. Deploying needs Cloudflare
-  credentials, which the owner supplies.
+  this machine, and `docs/deployment.md` records the flow: Cloudflare Workers
+  Builds pulls from GitHub on every push to `main`, builds `./dist`, and deploys
+  it as Worker static assets. No Cloudflare credential lives in this repository;
+  the owner connects the repo once from the Cloudflare dashboard and attaches
+  bookhand.dev there as a custom domain. `npm run deploy` stays as a manual
+  escape hatch only.
 - A public YouTube demo video under three minutes, with audio covering what was
   built and how WebMCP was used, is a hard requirement.
 
 ## Next actions
 
 1. Confirm the real storage mode, the WebMCP tools, and the hero flow in the
-   ChatGPT in-app browser, which is the judged surface under ADR 0003. This is
-   the largest remaining unknown: the agent path has only been proven against a
-   stand-in runtime, because neither real Chrome nor the WebMCP flag is
-   installable on this VM without root. The Pixel 7 is on the same tailnet, so
-   serving the preview build over `tailscale serve` reaches it directly.
-   An in-app browser may also refuse OPFS sync access handles, in which case the
-   session-only fallback becomes the judged path and must read as truthful.
+   ChatGPT **desktop** app's built-in browser, which is the judged surface under
+   ADR 0003 and its 2026-09-01 amendment. This is the largest remaining unknown:
+   the agent path has only been proven against a stand-in runtime. It cannot be
+   closed on this VM — Linux ARM64 has no Chrome build, no system Chromium is
+   installed, and Playwright's bundled Chromium does not expose WebMCP through
+   `--enable-features`. Nor can the Pixel 7 close it: WebMCP shipped in the
+   ChatGPT desktop app, not the Android one. The owner runs this check on their
+   desktop against deployed bookhand.dev. An in-app browser may also refuse OPFS
+   sync access handles, in which case the session-only fallback becomes the
+   judged path and must read as truthful.
 2. Deploy to bookhand.dev and confirm the live URL in the judged surface.
 3. Slice 4 and 5 remain unbuilt and are the documented cut order: semantic
    search first, then generated labs. Neither is required for the submission.

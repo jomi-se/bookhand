@@ -25,9 +25,18 @@ export interface ModelContext {
   registerTool(tool: ToolDefinition, options?: { signal?: AbortSignal }): Promise<unknown>
 }
 
+/**
+ * `document.modelContext` is the current surface (Chrome's imperative WebMCP
+ * API, and the one ChatGPT's desktop in-app browser implements). The earlier
+ * Chrome 146 preview exposed the same shape on `navigator`, so both are probed
+ * rather than betting the whole agent path on one host object.
+ */
 export function getModelContext(): ModelContext | undefined {
-  const host = document as Document & { modelContext?: ModelContext }
-  return typeof host.modelContext?.registerTool === 'function' ? host.modelContext : undefined
+  const hosts = [
+    (document as Document & { modelContext?: ModelContext }).modelContext,
+    (navigator as Navigator & { modelContext?: ModelContext }).modelContext,
+  ]
+  return hosts.find((host) => typeof host?.registerTool === 'function')
 }
 
 export function isWebMcpAvailable(): boolean {

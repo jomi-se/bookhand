@@ -47,6 +47,33 @@ Android-native drill set — memory ceilings, background/resume, app-switch
 lifecycle, and second-tab behavior on the handset — none of which a judge will
 exercise.
 
+## Amendment, 2026-09-01: the embedded browser is desktop-only
+
+Checking the event and vendor documentation after this record was accepted
+resolves where the embedded browser actually exists. OpenAI added WebMCP to the
+**ChatGPT desktop app's built-in browser** and to ChatGPT Sites. The Android
+ChatGPT app has no announced WebMCP surface, and the challenge resources name
+only two testing surfaces: ChatGPT's in-app browser, or Chrome 149+ with
+`chrome://flags/#enable-webmcp-testing`.
+
+So the judged surface is a desktop-hosted embedded browser, not a mobile one.
+This strengthens the decision above rather than reversing it — the Pixel 7 is
+now confirmed to be a proxy for nothing a judge touches — but it corrects the
+viewport assumption: the reader should be verified at a desktop window size
+first, with the mobile layout kept correct because it is good work, not because
+it is the judged geometry.
+
+It also fixes where verification can happen. This VM is Linux ARM64: Google
+ships no Chrome build for it, the only local browsers are Playwright's bundled
+Chromium (WebMCP compiled in but not reachable through `--enable-features`),
+and no system Chromium is installed. Real-runtime verification therefore
+happens on the owner's desktop against the deployed bookhand.dev, not on this
+machine and not over the tailnet to the phone.
+
+`src/webmcp/model-context.ts` probes `document.modelContext` first, which the
+current imperative API and ChatGPT's browser both use, and falls back to
+`navigator.modelContext`, the shape Chrome's 146 preview exposed.
+
 ## Consequences
 
 Storage carries a new risk that the Pixel 7 drills would have surfaced late and
