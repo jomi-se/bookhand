@@ -121,7 +121,10 @@ export function useLibrary({
 
     setState((p) => ({ ...p, bootstrapping: true }))
     try {
-      await bootstrapBundledBooks(client, missing, books, dependencies)
+      await bootstrapBundledBooks(client, missing, books, {
+        baseUrl: import.meta.env.BASE_URL,
+        ...dependencies,
+      })
       const refreshed = await listBooks()
       if (current()) {
         setState((p) => ({ ...p, books: refreshed, bootstrapping: false }))

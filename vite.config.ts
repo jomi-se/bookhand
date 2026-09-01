@@ -44,7 +44,10 @@ function testControlBoundary(mode: string): Plugin {
 }
 
 // https://vite.dev/config/
+// `BOOKHAND_BASE` lets the same build serve from a subpath, such as a GitHub
+// Pages project site, without any path being hard-coded in the application.
 export default defineConfig(({ mode }) => ({
+  base: process.env.BOOKHAND_BASE ?? '/',
   plugins: [
     react(),
     testControlBoundary(mode),
