@@ -10,6 +10,8 @@ Documentation is organized by authority rather than chronology:
 - `plan/current-work.md` is the resumable execution ledger.
 - `research/` contains dated external findings and source links.
 - `reviews/` contains dated design and implementation reviews.
+- `../experiments/` contains reproducible technical spikes and their measured
+  outputs when the experiment is part of an accepted decision.
 
 When a decision changes, update the earliest authoritative document and then
 repair downstream plans rather than leaving contradictory snapshots.

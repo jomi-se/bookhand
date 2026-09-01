@@ -1,0 +1,7 @@
+<!doctype html><meta charset=utf-8><script type="module">
+let w=null;
+window.mk=()=>{ w=new Worker('/lockw2.js',{type:'module'}); };
+window.send=(cmd)=>new Promise(res=>{ const h=e=>{w.removeEventListener('message',h);res(e.data);}; w.addEventListener('message',h); w.postMessage({cmd}); });
+window.kill=()=>{ w.terminate(); w=null; };
+window.__ready=true;
+</script>

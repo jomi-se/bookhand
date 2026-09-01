@@ -8,9 +8,9 @@ the hero flow is blocked, and record the reason in `docs/plan/current-work.md`.
 ## One-sentence architecture
 
 A Vite/React client loads an EPUB with upstream Foliate.js, persists reader and
-study state through Dexie/IndexedDB, indexes book passages in a Web Worker with
-Transformers.js, exposes domain operations as WebMCP tools, and renders agent
-artifacts as native study blocks or explicit sandboxed labs.
+study state in official SQLite WASM over OPFS, runs SQLite and Transformers.js
+in separate dedicated workers, exposes domain operations as WebMCP tools, and
+renders agent artifacts as native study blocks or explicit sandboxed labs.
 
 ## Dependency defaults
 
@@ -18,16 +18,16 @@ Use direct dependencies rather than frameworks around frameworks:
 
 - `foliate-js` from the upstream MIT project for EPUB parsing, rendering, CFI,
   and navigation;
-- `dexie` for IndexedDB schema and transactions;
-- `minisearch` for the small in-memory lexical index;
+- `@sqlite.org/sqlite-wasm` for the sole local database and FTS5 lexical index;
 - `@huggingface/transformers` for local embeddings;
 - `zod` only if it materially simplifies runtime validation shared by UI and
   tools; JSON Schema remains the WebMCP declaration format;
 - `vitest` and Testing Library for narrow domain/component tests;
 - Playwright only for the real hero flow.
 
-Do not add Redux, a server framework, an ORM, SQLite/Turso WASM, a vector
-database, LangChain, an agent SDK, or a general canvas framework in v0.
+Do not add Redux, a server framework, an ORM, Turso, Dexie, MiniSearch,
+`sqlite-vec`, another vector database, LangChain, an agent SDK, or a general
+canvas framework in v0.
 
 ## Reader boundary
 
@@ -57,7 +57,7 @@ opaque iframe handles through the domain API.
 
 ## Persistence schema
 
-Use one Dexie database with small, explicit records:
+Use one SQLite database with small, explicit tables:
 
 - `books`: content hash, metadata, original EPUB `Blob`, import time;
 - `readingState`: book id, current CFI/location, style profile, timestamps;
@@ -66,11 +66,31 @@ Use one Dexie database with small, explicit records:
 - `studyItems`: id, board id, optional source range, kind, payload, order;
 - `chunks`: id, book id, section, title breadcrumb, start/end CFI, order, text,
   text hash, index version;
-- `embeddings`: chunk id, book id, model id, normalized `Float32Array`.
+- `vector_batches`: book id, model id, first chunk/order metadata, count,
+  dimensions, and a packed normalized float32 BLOB;
+- `chunks_fts`: an FTS5 external-content index over chunk text.
 
 Hash imported EPUB bytes with SHA-256 for the book id. Keep application records
 separate from the Foliate viewer so the reader engine can be replaced without a
 data migration. Persist after meaningful transitions, not on every render.
+
+The database lives in `opfs-sahpool` and is owned for its lifetime by exactly
+one dedicated worker. Use the synchronous SQLite `oo1` API inside that worker
+and expose a small typed request protocol to the UI. Do not use SQLite's
+deprecated Worker1 or Promiser APIs, even if a tutorial recommends them. Do not
+set COOP/COEP headers for this path.
+
+Commit ingestion in transactions of roughly 250 chunks and yield between
+batches. Record progress and the index epoch after each committed batch so a
+reload or cancellation resumes rather than restarts. A second-tab sahpool lock
+is an expected product state: show “This library is open in another tab” and a
+retry action.
+
+Keep the external-content FTS5 table synchronized with `chunks` through
+`INSERT`, `UPDATE`, and `DELETE` triggers, so the source row and lexical index
+change in the same SQLite transaction. On an FTS schema or tokenizer version
+change, use FTS5's `rebuild` command and record completion in the index metadata;
+do not maintain an independently serialized lexical snapshot.
 
 ## Text extraction and chunking
 
@@ -99,12 +119,33 @@ Implement retrieval in this order:
 
 1. Exact current selection and visible context.
 2. Direct lookup by CFI and structural neighbors.
-3. Exact/lexical search with MiniSearch.
+3. Exact/lexical search with SQLite FTS5 and BM25 ranking.
 4. Local semantic retrieval.
 5. Simple hybrid fusion.
 
 This order ensures the first WebMCP demo can work before the embedding layer is
 finished and leaves a useful fallback if local inference fails.
+
+### Database worker
+
+The database worker owns:
+
+- the sole SQLite connection and `opfs-sahpool` lifecycle;
+- schema creation and migrations;
+- all persistent reader and study state;
+- FTS5 lookup;
+- vector BLOB loading and the lazy in-memory vector matrix;
+- exact vector top-k and small-list hybrid fusion inputs.
+
+Use the official package's direct module initialization and `oo1` APIs. The
+database worker is not the embedding worker: model inference is long-running and
+must not queue interactive searches behind it. Communicate with a small typed
+message protocol; Comlink is optional if it removes more code than it adds.
+
+At startup, try to install `opfs-sahpool` with a short bounded retry for ordinary
+reload teardown races. If persistence is unavailable, open an in-memory SQLite
+database and display an unmistakable session-only warning. Request
+`navigator.storage.persist()` after the user's first book import.
 
 ### Local embedding worker
 
@@ -133,15 +174,25 @@ Do not auto-download the model merely because a book opened. Start when the user
 enables semantic search or an agent requests it, and show the cost honestly.
 Indexing must be abortable and resume by reusing already committed chunks.
 
-### Ranking
+### Vector storage and ranking
 
-Normalize vectors at creation, then calculate dot products in the worker or a
-non-blocking batch. Search the current book only. Take the top 20 lexical and top
-20 semantic results, combine them with reciprocal-rank fusion, deduplicate
-overlapping chunks, and return five by default.
+Normalize vectors at creation and transfer them from the embedding worker in
+batches. Store about 1,000 consecutive vectors per ordinary SQLite BLOB rather
+than one row per vector. On first semantic query, load the current book into one
+`Float32Array` in the database worker, retain the chunk-id/offset mapping, and
+calculate exact dot products there.
 
-Do not build ANN indexing. Measure before optimizing. A few thousand vectors of
-384 floats are a small corpus by vector-search standards.
+Invalidate the in-memory matrix only after the transaction containing a changed
+vector batch commits. Rebuild it lazily on the next semantic query.
+
+Search the current book only. Take the top 20 FTS5 and top 20 semantic results,
+combine them with reciprocal-rank fusion in TypeScript, deduplicate overlapping
+chunks, and return five by default.
+
+Do not use `sqlite-vec`: the available browser builds require replacing the
+official SQLite artifact, and measured exact search was no faster than the
+plain JavaScript scan at 10,000 chunks. Do not build ANN indexing. A few thousand
+vectors of 384 floats are a small corpus by vector-search standards.
 
 ## WebMCP v0 surface
 
@@ -190,7 +241,7 @@ Store structured payloads, not rendered HTML, for native blocks.
 When these are insufficient, allow a `lab` item containing HTML, CSS, JavaScript,
 and a JSON data payload. Render it in an iframe with `sandbox="allow-scripts"`
 and no `allow-same-origin`. Pass initial data with `postMessage`; do not give the
-lab IndexedDB, WebMCP, or parent-DOM access. A visible badge, reload, edit-source,
+lab storage, WebMCP, or parent-DOM access. A visible badge, reload, edit-source,
 and delete controls are enough for the POC. This single browser primitive is the
 right amount of containment; do not build a permissions platform around it.
 
@@ -214,7 +265,9 @@ Keep the test suite proportional to a hackathon POC:
 - unit-test chunk boundaries and CFI round trips on one small EPUB fixture;
 - unit-test hybrid ranking and duplicate suppression;
 - contract-test every WebMCP handler without a browser agent;
-- test IndexedDB persistence with one reload scenario;
+- integration-test SQLite schema creation, FTS5, transactions, export, and
+  batched-index resume against the real official WASM artifact;
+- test OPFS reload recovery and the explicit second-tab lock state;
 - run one Playwright hero path from selection to persisted study artifact;
 - manually run the same path with the actual supported WebMCP agent before
   submission.
@@ -223,12 +276,21 @@ Do not create a cross-browser matrix, exhaustive visual snapshots, or elaborate
 performance harness before the hero flow works. Capture three timings on the
 target phone: first model load, full hero-book index, and semantic query.
 
+Before treating the storage choice as phone-validated, run the preserved
+`experiments/sqlite-browser-storage-spike/` drills on a Pixel 7. Desktop
+Chromium results choose the default; they do not prove Android lifecycle and
+memory behavior.
+
 ## Complexity gates
 
 The following require evidence recorded in `current-work.md`:
 
-- SQLite/vector database: only after IndexedDB or brute-force retrieval fails a
-  measured target.
+- `sqlite-vec` or another vector extension: only after the official SQLite plus
+  exact-scan path fails a measured target and a maintained official-compatible
+  browser artifact exists.
+- another persistence system: only if the Pixel 7 OPFS drills fail in a way that
+  cannot be mitigated within the hackathon; Dexie is the documented fallback,
+  not a parallel implementation.
 - WebGPU: only after WASM is too slow and the target environment is confirmed.
 - semantic chunk reranking: only after reviewing actual bad queries.
 - OCR or image embeddings: only if the chosen hero passage cannot be extracted.

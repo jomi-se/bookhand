@@ -21,6 +21,10 @@ agents from reopening settled choices during the short build.
 
 - EPUB reading built on the smallest practical Foliate.js integration.
 - Local persistence for books, position, highlights, notes, and study boards.
+- Official SQLite WASM owned by one dedicated worker, persisted with
+  `opfs-sahpool`; FTS5 for lexical retrieval and ordinary packed BLOBs plus an
+  exact JavaScript scan for vectors. Do not use `sqlite-vec`, Dexie, MiniSearch,
+  SQLite Worker1, or the deprecated Promiser API unless ADR 0002 is revisited.
 - Exact navigation, text lookup, table-of-contents access, and scoped search
   exposed through WebMCP.
 - Typography and book CSS customization, including an agent-applicable style

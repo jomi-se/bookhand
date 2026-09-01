@@ -37,9 +37,11 @@ This is the first credible submission checkpoint. Preserve it before continuing.
 
 ## Slice 4: local whole-book retrieval
 
-- Extract CFI-anchored chunks and implement exact/lexical search.
-- Add the local embedding worker, explicit model download, visible indexing,
-  IndexedDB vector persistence, brute-force cosine, and hybrid fusion.
+- Extract CFI-anchored chunks and implement FTS5 lexical search in the dedicated
+  SQLite worker.
+- Add the separate local embedding worker, explicit model download, visible
+  batched indexing, packed SQLite vector BLOBs, exact in-worker cosine, and
+  hybrid fusion.
 - Add `search_book` and `get_table_of_contents` to the WebMCP surface.
 - Test queries that require an earlier definition and a related worked example.
 

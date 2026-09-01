@@ -17,6 +17,8 @@
   and study-board construction.
 - Optional-on-first-use local semantic indexing in a Web Worker, with lexical
   search remaining available before or without it.
+- Official SQLite WASM over OPFS for one-file local state, FTS5 lexical search,
+  and packed vector BLOBs searched exactly in the database worker.
 - Docked and expanded study-board modes.
 - A small native block vocabulary plus a bounded generated-lab escape hatch.
 - One polished end-to-end tutor scenario.
@@ -24,8 +26,8 @@
 ## Deferred
 
 - Agent Connect integration.
-- Approximate-nearest-neighbor infrastructure, hosted embeddings, multiple
-  embedding models, and library-wide semantic search.
+- `sqlite-vec`, approximate-nearest-neighbor infrastructure, hosted embeddings,
+  multiple embedding models, and library-wide semantic search.
 - Accounts, cloud storage, cross-device sync, and collaboration.
 - General ebook-library management and format coverage beyond the demo needs.
 - A broad plugin or extension ecosystem.

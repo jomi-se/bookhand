@@ -63,12 +63,12 @@ infecting the reader domain.
 
 ## Deliberately not copied
 
-- Readest's Turso/SQLite database and vector column. IndexedDB is already the
-  browser's native persistent store and is sufficient for one locally opened
-  book.
-- Tantivy FTS and a database-level reciprocal-rank implementation. An in-memory
-  lexical index plus brute-force cosine over one book is simpler and fast enough
-  until measured otherwise.
+- Readest's Turso-specific database service, vector columns, and native-provider
+  assumptions. We use the official browser SQLite WASM artifact, OPFS, ordinary
+  BLOBs, and an application-owned exact scan instead.
+- Its database-level hybrid implementation. We retain the principle of FTS plus
+  semantic fusion, but use the official build's FTS5 and fuse two small ranked
+  lists in TypeScript.
 - Multiple hosted and local embedding providers. The POC pins one local model.
 - Reedy's agent runtime, prompt layering, memories, skills, chat history, and
   provider adapters. The connected WebMCP agent owns intelligence and dialogue.
@@ -91,3 +91,5 @@ infecting the reader domain.
 - Foliate.js: <https://github.com/johnfactotum/foliate-js>
 - Transformers.js: <https://huggingface.co/docs/transformers.js/en/index>
 - Local embedding default: <https://huggingface.co/mixedbread-ai/mxbai-embed-xsmall-v1>
+- Measured browser storage report:
+  `2026-09-01-sqlite-wasm-vs-indexeddb-report.md`
