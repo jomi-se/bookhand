@@ -1,40 +1,56 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * Installs a stand-in for the browser's agent runtime before the app loads, so
- * the production build registers its real tools against it and the test can
- * call them the way an agent would. Nothing in the app knows this is a test:
- * it registers through `document.modelContext` exactly as it would in
- * ChatGPT's in-app browser.
+ * These tests drive Bookhand through the browser's real WebMCP runtime, not a
+ * stand-in. Chromium compiles the API in but keeps it behind the same switch
+ * `chrome://flags/#enable-webmcp-testing` sets, so enabling `WebMCPTesting`
+ * gives `document.modelContext` exactly as ChatGPT's in-app browser exposes it.
+ * The app is told nothing: it registers through `document.modelContext` and the
+ * test calls back through `getTools()` and `executeTool()` the way an agent
+ * would.
+ *
+ * The runtime speaks JSON strings in both directions — `executeTool` takes the
+ * arguments serialized and returns the result serialized — so the helpers below
+ * do that translation and nothing else.
  */
-async function installAgentRuntime(page: Page) {
-  await page.addInitScript(() => {
-    const tools = new Map<string, { execute(input: unknown): Promise<unknown> }>()
-    Object.defineProperty(document, 'modelContext', {
-      configurable: true,
-      value: {
-        async registerTool(tool: { name: string; execute(input: unknown): Promise<unknown> }) {
-          tools.set(tool.name, tool)
-          return undefined
-        },
-      },
-    })
-    Object.assign(window, {
-      __agent: {
-        names: () => [...tools.keys()],
-        async call(name: string, input: unknown) {
-          const tool = tools.get(name)
-          if (!tool) throw new Error(`no tool ${name}`)
-          const result = (await tool.execute(input ?? {})) as {
-            content: { text: string }[]
-            isError?: boolean
-          }
-          return { text: result.content.map((part) => part.text).join('\n'), isError: !!result.isError }
-        },
-      },
-    })
+test.use({ launchOptions: { args: ['--enable-features=WebMCPTesting'] } })
+
+interface RegisteredTool {
+  readonly name: string
+}
+
+interface RealModelContext {
+  getTools(): Promise<RegisteredTool[]>
+  executeTool(tool: RegisteredTool, args: string): Promise<string>
+}
+
+declare global {
+  interface Document {
+    modelContext?: RealModelContext
+  }
+}
+
+function agentToolNames(page: Page) {
+  return page.evaluate(async () => {
+    const context = document.modelContext
+    if (!context) throw new Error('no WebMCP runtime: launch with --enable-features=WebMCPTesting')
+    return (await context.getTools()).map((tool) => tool.name)
   })
 }
+
+const agentCall = (page: Page, name: string, input?: unknown) =>
+  page.evaluate(
+    async ([toolName, toolInput]) => {
+      const context = document.modelContext
+      if (!context) throw new Error('no WebMCP runtime: launch with --enable-features=WebMCPTesting')
+      const tool = (await context.getTools()).find((candidate) => candidate.name === toolName)
+      if (!tool) throw new Error(`no tool ${toolName}`)
+      const raw = await context.executeTool(tool, JSON.stringify(toolInput ?? {}))
+      const result = JSON.parse(raw) as { content: { text: string }[]; isError?: boolean }
+      return { text: result.content.map((part) => part.text).join('\n'), isError: !!result.isError }
+    },
+    [name, input] as const,
+  )
 
 async function openBook(page: Page) {
   await page.goto('/')
@@ -61,23 +77,12 @@ async function openBook(page: Page) {
     .toBeGreaterThan(200)
 }
 
-const agentCall = (page: Page, name: string, input?: unknown) =>
-  page.evaluate(
-    ([toolName, toolInput]) =>
-      (window as unknown as { __agent: { call(n: string, i: unknown): Promise<{ text: string; isError: boolean }> } }).__agent.call(
-        toolName as string,
-        toolInput,
-      ),
-    [name, input] as const,
-  )
-
 test('an agent reads the page, highlights it, and builds a source-linked lesson', async ({ page }) => {
-  await installAgentRuntime(page)
   await openBook(page)
 
   // The tools are offered only once a book is open.
   await expect
-    .poll(() => page.evaluate(() => (window as unknown as { __agent: { names(): string[] } }).__agent.names()))
+    .poll(() => agentToolNames(page))
     .toContain('get_reading_context')
 
   // 1. Ground itself in what the person is actually reading.
@@ -141,7 +146,6 @@ test('an agent reads the page, highlights it, and builds a source-linked lesson'
 })
 
 test('an agent arriving at the library can see it and open a book itself', async ({ page }) => {
-  await installAgentRuntime(page)
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
 
@@ -149,7 +153,7 @@ test('an agent arriving at the library can see it and open a book itself', async
   // appears to offer nothing.
   await expect
     .poll(() =>
-      page.evaluate(() => (window as unknown as { __agent: { names(): string[] } }).__agent.names()),
+      agentToolNames(page),
     )
     .toEqual(expect.arrayContaining(['list_books', 'open_book']))
 
@@ -166,16 +170,15 @@ test('an agent arriving at the library can see it and open a book itself', async
   // Opening the book adds its reading tools to the ones already offered.
   await expect
     .poll(() =>
-      page.evaluate(() => (window as unknown as { __agent: { names(): string[] } }).__agent.names()),
+      agentToolNames(page),
     )
     .toEqual(expect.arrayContaining(['list_books', 'get_reading_context', 'save_annotation']))
 })
 
 test('an agent cannot anchor to a range it invented', async ({ page }) => {
-  await installAgentRuntime(page)
   await openBook(page)
   await expect
-    .poll(() => page.evaluate(() => (window as unknown as { __agent: { names(): string[] } }).__agent.names()))
+    .poll(() => agentToolNames(page))
     .toContain('save_annotation')
 
   const result = await agentCall(page, 'save_annotation', {
@@ -186,13 +189,4 @@ test('an agent cannot anchor to a range it invented', async ({ page }) => {
   // and nothing is drawn.
   await page.getByRole('button', { name: 'Study' }).click()
   await expect(page.locator('.highlight')).toHaveCount(result.isError ? 0 : 1)
-})
-
-test('the reader is unchanged when no agent runtime exists', async ({ page }) => {
-  await openBook(page)
-  expect(await page.evaluate(() => 'modelContext' in document)).toBe(false)
-
-  await page.getByRole('button', { name: 'Study' }).click()
-  await expect(page.getByText('No agent connected')).toBeVisible()
-  await expect(page.getByRole('button', { name: /quotation/i })).toBeVisible()
 })

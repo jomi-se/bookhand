@@ -63,16 +63,34 @@ viewport assumption: the reader should be verified at a desktop window size
 first, with the mobile layout kept correct because it is good work, not because
 it is the judged geometry.
 
-It also fixes where verification can happen. This VM is Linux ARM64: Google
-ships no Chrome build for it, the only local browsers are Playwright's bundled
-Chromium (WebMCP compiled in but not reachable through `--enable-features`),
-and no system Chromium is installed. Real-runtime verification therefore
-happens on the owner's desktop against the deployed bookhand.dev, not on this
-machine and not over the tailnet to the phone.
-
 `src/webmcp/model-context.ts` probes `document.modelContext` first, which the
 current imperative API and ChatGPT's browser both use, and falls back to
 `navigator.modelContext`, the shape Chrome's 146 preview exposed.
+
+### The real runtime does run on this VM
+
+An earlier draft of this amendment said real-runtime verification was
+impossible here, because Google ships no stable Chrome for Linux ARM64 and
+`--enable-features` appeared not to reach WebMCP. That was a wrong feature name,
+not a missing capability. The switch behind
+`chrome://flags/#enable-webmcp-testing` is `WebMCPTesting`, and launching
+Playwright's own bundled Chromium with `--enable-features=WebMCPTesting` on a
+secure origin exposes a genuine `document.modelContext` with `registerTool`,
+`getTools`, `executeTool`, and `ontoolchange`.
+
+`tests/e2e/webmcp-agent.spec.ts` therefore drives the production build through
+the browser's real runtime rather than a stand-in, and
+`tests/e2e/reader-without-agent.spec.ts` keeps the no-agent case honest by
+deliberately omitting the switch. Two facts about that runtime that a stand-in
+had hidden: `executeTool` takes its arguments as a JSON **string** and returns
+its result as a JSON **string**, and it takes the registered tool object rather
+than a tool name.
+
+This does not make the desktop check optional. It proves the tools register,
+validate, and execute against the real API; it cannot prove how ChatGPT's
+in-app browser presents them, whether it grants OPFS synchronous access
+handles, or how it phrases consent. The owner still confirms the hero flow
+there against the deployed site.
 
 ## Consequences
 

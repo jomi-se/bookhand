@@ -116,17 +116,18 @@ The WebMCP Challenge closes 2026-09-03T20:00Z. Required and still open:
 
 ## Next actions
 
-1. Confirm the real storage mode, the WebMCP tools, and the hero flow in the
-   ChatGPT **desktop** app's built-in browser, which is the judged surface under
-   ADR 0003 and its 2026-09-01 amendment. This is the largest remaining unknown:
-   the agent path has only been proven against a stand-in runtime. It cannot be
-   closed on this VM — Linux ARM64 has no Chrome build, no system Chromium is
-   installed, and Playwright's bundled Chromium does not expose WebMCP through
-   `--enable-features`. Nor can the Pixel 7 close it: WebMCP shipped in the
-   ChatGPT desktop app, not the Android one. The owner runs this check on their
-   desktop against deployed bookhand.dev. An in-app browser may also refuse OPFS
-   sync access handles, in which case the session-only fallback becomes the
-   judged path and must read as truthful.
+1. Confirm the real storage mode and the hero flow in the ChatGPT **desktop**
+   app's built-in browser, the judged surface under ADR 0003 and its 2026-09-01
+   amendment. The Pixel 7 cannot close this: WebMCP shipped in the ChatGPT
+   desktop app, not the Android one. An in-app browser may also refuse OPFS sync
+   access handles, in which case the session-only fallback becomes the judged
+   path and must read as truthful.
+
+   The tools themselves are no longer an unknown. `--enable-features=WebMCPTesting`
+   gives Playwright's bundled Chromium a genuine `document.modelContext`, so
+   `tests/e2e/webmcp-agent.spec.ts` exercises the production build through the
+   real runtime and passes. What remains untested is that browser's presentation
+   and storage policy, not the tool contract.
 2. Deploy to bookhand.dev and confirm the live URL in the judged surface.
 3. Slice 4 and 5 remain unbuilt and are the documented cut order: semantic
    search first, then generated labs. Neither is required for the submission.
