@@ -4,8 +4,8 @@
   --muted: #686b62;
   --line: #cdc6b8;
   --accent: #b44a2a;
-  --sans: Inter, ui-sans-serif, system-ui, sans-serif;
-  --serif: Iowan Old Style, Palatino Linotype, Georgia, serif;
+  --sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --serif: 'Source Serif 4 Variable', Iowan Old Style, Georgia, serif;
   color: var(--ink);
   background: var(--paper);
   font-family: var(--sans);
