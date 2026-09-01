@@ -1,16 +1,16 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  // Static-site deployment on Cloudflare Workers, matching the jomi-se-blog
+  // setup on this machine: `npm run build` produces ./dist and
+  // `npx wrangler deploy` uploads it as static assets. No Worker script
+  // ("main") is needed, and bookhand.dev is attached as a custom domain from
+  // the Cloudflare dashboard rather than declared here.
   "name": "bookhand",
   "compatibility_date": "2026-09-01",
-  // Bookhand is entirely client-side: the Worker serves the built assets and
-  // nothing else. There is no backend to add, and adding one would need a
-  // decision recorded under docs/decisions/.
   "assets": {
     "directory": "./dist",
+    // Bookhand is one page; any unknown path should still boot the reader
+    // rather than 404, so a shared deep link never dead-ends.
     "not_found_handling": "single-page-application"
-  },
-  "routes": [
-    { "pattern": "bookhand.dev", "custom_domain": true },
-    { "pattern": "www.bookhand.dev", "custom_domain": true }
-  ]
+  }
 }

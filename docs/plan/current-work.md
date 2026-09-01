@@ -22,10 +22,21 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
   are settled in `docs/architecture/implementation-defaults.md` and ADR 0002.
 - The delivery order and cut order are settled in
   `docs/plan/vertical-slice-build-order.md`.
-- Slice 1 is implemented through W6. The application is a working local-first
-  reader: library, bundled-book bootstrap, import, reader shell, contents,
-  typography and custom CSS, study shell, persistence and restore, and proven
-  EPUB containment. W7 is the judged-surface check and remains open.
+- Slices 1, 2, and 3 are implemented. Bookhand is a working local-first reader
+  whose reading and study capabilities are registered as WebMCP tools. W7, the
+  judged-surface check, is the only Slice 1 item still open.
+- Slice 2: highlights and notes on CFI ranges drawn over the book, one study
+  board per book in docked and expanded views, and prose/quotation/equation/
+  steps/question blocks that each carry the source range they came from.
+- Slice 3: eleven tools registered through `document.modelContext`. `list_books`
+  and `open_book` are offered from first load; a book's reading and study tools
+  join them when it opens. Every tool calls `BookhandCommands`, the same surface
+  the interface calls. Book text is returned inside an untrusted-data boundary,
+  agents can only anchor to ranges tools returned, and every call is listed in
+  the study board as it happens.
+- Evidence: 106 unit tests and 8 Playwright specs against the production build,
+  including an end-to-end agent path driven through a stand-in runtime installed
+  before the app loads.
 - Bookhand naming and the approved Slice 1 visual system are committed; the
   reader/library implementation mission is now active.
 - Slice 1 scope, work topology, and reviewed validation contracts live in
@@ -85,24 +96,46 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
   callbacks at their mount-time closures; and `dispose()` double-sent `close`
   and rethrew into React cleanup paths.
 
+## Submission state
+
+The WebMCP Challenge closes 2026-09-03T20:00Z. Required and still open:
+
+- The GitHub repository is private and must be public with a detectable
+  license. `LICENSE` (MIT) is committed; making the repo public is the owner's
+  action, deliberately not automated.
+- Nothing is pushed yet; `origin/main` is far behind local.
+- No live URL. `wrangler.jsonc` matches the working `jomi-se-blog` pattern on
+  this machine: `npm run deploy` builds and uploads `./dist` as Worker static
+  assets, with bookhand.dev attached as a custom domain from the Cloudflare
+  dashboard rather than declared in config. Deploying needs Cloudflare
+  credentials, which the owner supplies.
+- A public YouTube demo video under three minutes, with audio covering what was
+  built and how WebMCP was used, is a hard requirement.
+
 ## Next actions
 
-1. Confirm the real storage mode and hero flow in the embedded agent browser
-   ADR 0003 names as the judged surface. An in-app browser may refuse OPFS sync
-   access handles, in which case the session-only fallback becomes the judged
-   path and must read as truthful rather than broken.
-2. Move to Slice 2 and Slice 3. `vertical-slice-build-order.md` places the
-   first credible submission checkpoint at Slice 3, where WebMCP drives the
-   domain; Slice 1 alone contains no WebMCP and cannot carry the product claim
-   in a WebMCP contest.
-3. Close W7 by confirming the real storage mode and hero flow in the embedded
-   agent browser. Physical Pixel 7 evidence is best effort under ADR 0003.
+1. Confirm the real storage mode, the WebMCP tools, and the hero flow in the
+   ChatGPT in-app browser, which is the judged surface under ADR 0003. This is
+   the largest remaining unknown: the agent path has only been proven against a
+   stand-in runtime, because neither real Chrome nor the WebMCP flag is
+   installable on this VM without root. The Pixel 7 is on the same tailnet, so
+   serving the preview build over `tailscale serve` reaches it directly.
+   An in-app browser may also refuse OPFS sync access handles, in which case the
+   session-only fallback becomes the judged path and must read as truthful.
+2. Deploy to bookhand.dev and confirm the live URL in the judged surface.
+3. Slice 4 and 5 remain unbuilt and are the documented cut order: semantic
+   search first, then generated labs. Neither is required for the submission.
 4. Continue through the slices in order; preserve the Slice 3 submission
    checkpoint before adding semantic retrieval or generated labs.
 5. Use the real Chapter X content from the bundled EPUB; the approved mock's
    prose and figure are illustrative and must not be copied into the reader.
 
 ## Handoff notes
+
+- `npm run dev` does not work by design: the production CSP blocks the dev
+  server's inline React preamble. Use `npm run build && npm run preview`.
+- Sudo is not available to agents on this machine, and that is deliberate. Ask
+  the owner to run privileged commands, saying why it helps.
 
 - The product is named Bookhand; *Calculus Made Easy* is the temporary bundled
   judging book and must remain removable without changing the library model.
