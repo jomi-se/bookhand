@@ -38,7 +38,8 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
 
 ## Handoff notes
 
-- The project name is a placeholder and may be changed mechanically.
+- The product is now named Bookhand; the hero book remains a placeholder until
+  Slice 1 chooses it.
 - Devpost OAuth is user-owned and is not stored in this repository.
 - Impeccable is installed as a skill but automatic hooks are deliberately off.
 - Do not follow older SQLite browser tutorials using Worker1/Promiser or the

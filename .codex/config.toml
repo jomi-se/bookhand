@@ -15,32 +15,34 @@ command = "bash"
 args = ["scripts/start-playwright-mcp.sh"]
 
 [mcp_servers.playwright.tools.navigate]
-approval_mode = "never"
+approval_mode = "approve"
 
 [mcp_servers.playwright.tools.select_option]
-approval_mode = "never"
+approval_mode = "approve"
 
 [mcp_servers.playwright.tools.click]
-approval_mode = "never"
+approval_mode = "approve"
 
 [mcp_servers.playwright.tools.run_code_unsafe]
-approval_mode = "never"
+approval_mode = "approve"
 
 [mcp_servers.playwright.tools.resize]
-approval_mode = "never"
+approval_mode = "approve"
 
 [mcp_servers.playwright.tools.evaluate]
-approval_mode = "never"
+approval_mode = "approve"
 
 [mcp_servers.playwright.tools.tabs]
-approval_mode = "never"
+approval_mode = "approve"
 
 [mcp_servers.playwright.tools.file_upload]
-approval_mode = "never"
+approval_mode = "approve"
 
 [mcp_servers.playwright.tools.close]
-approval_mode = "never"
+approval_mode = "approve"
 
 [mcp_servers.devpost]
 url = "https://devpost.com/mcp"
 
+[mcp_servers.devpost.oauth]
+callback_port = 35579

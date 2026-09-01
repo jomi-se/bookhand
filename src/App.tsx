@@ -11,7 +11,7 @@ function App() {
   return (
     <main>
       <header className="masthead">
-        <span className="wordmark">Study Reader</span>
+        <span className="wordmark">Bookhand</span>
         <span className="status">WebMCP proof of concept</span>
       </header>
 
@@ -38,7 +38,7 @@ function App() {
       </section>
 
       <footer>
-        <p>Working title · 1 September 2026</p>
+        <p>Bookhand · 1 September 2026</p>
         <p>The reader comes first. WebMCP opens the rest.</p>
       </footer>
     </main>
@@ -46,4 +46,3 @@ function App() {
 }
 
 export default App
-

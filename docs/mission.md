@@ -13,11 +13,12 @@ changes.
 
 ## Success for the first demo
 
-A judge can open the application, load the bundled placeholder book, connect a
-compatible WebMCP agent, ask for help understanding a passage, and watch the
-agent use book context to build a useful in-page study artifact. The demo must
-make the difference between browser automation and a semantic WebMCP interface
-visible without requiring Agent Connect or private infrastructure.
+A judge can open the application, load the bundled hero book (currently a
+placeholder calculus text), connect a compatible WebMCP agent, ask for help
+understanding a passage, and watch the agent use book context to build a useful
+in-page study artifact. The demo must make the difference between browser
+automation and a semantic WebMCP interface visible without requiring Agent
+Connect or private infrastructure.
 
 ## Non-goals for the first demo
 
@@ -26,4 +27,3 @@ visible without requiring Agent Connect or private infrastructure.
 - A general-purpose agent UI framework.
 - Production-grade execution of arbitrary generated applications.
 - Agent Connect as a prerequisite for judging.
-

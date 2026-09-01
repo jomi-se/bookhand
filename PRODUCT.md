@@ -1,8 +1,8 @@
-# Product context
+# Bookhand product context
 
-## Working name
+## Product name
 
-WebMCP Study Reader (placeholder)
+Bookhand
 
 ## Purpose
 
@@ -30,4 +30,3 @@ Bookish and tactile rather than dashboard-like. Strong typography, generous
 reading measure, restrained chrome, and clear spatial changes between reading,
 annotation, and study modes. Avoid card grids, nested panels, generic AI
 gradients, and walls of equally weighted controls.
-

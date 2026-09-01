@@ -7,7 +7,7 @@ usage() {
   exit 64
 }
 
-log_root=${TMPDIR:-/tmp}/webmcp-study-reader-command-logs
+log_root=${TMPDIR:-/tmp}/bookhand-command-logs
 mkdir -p "$log_root"
 
 # Internal detached worker. The tmux server below owns this process after the

@@ -1,8 +1,7 @@
-# WebMCP Study Reader
+# Bookhand
 
-Working placeholder name for a local-first ebook reader that becomes an in-page
-AI study environment through WebMCP. The repository name is deliberately easy
-to replace once the product has a real name.
+Bookhand is a local-first ebook reader that becomes an in-page AI study
+environment through WebMCP.
 
 The first proof of concept will open an EPUB, preserve reading state, highlights
 and notes locally, and expose precise reading/study capabilities as WebMCP
@@ -25,4 +24,3 @@ Run the complete local gate with:
 
 The product North Star is [`docs/product-north-star.md`](docs/product-north-star.md).
 Agent and MCP setup is documented in [`docs/agent-setup.md`](docs/agent-setup.md).
-
