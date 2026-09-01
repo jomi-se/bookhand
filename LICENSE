@@ -1,0 +1,38 @@
+MIT License
+
+Copyright (c) 2026 José Arroyo
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+This license covers Bookhand's own source code and assets.
+
+Third-party material distributed with this repository keeps its own terms:
+
+- `public/books/calculus-made-easy.epub` and its extracted cover are the
+  unmodified Project Gutenberg edition of *Calculus Made Easy* (eBook #33283).
+  The underlying work is public domain in the United States, but Project
+  Gutenberg's trademark and redistribution terms still apply to that edition,
+  and readers outside the United States must check their own copyright law.
+  See `public/books/README.md` and the license preserved inside the EPUB.
+- `tests/fixtures/epub/` contains Bookhand-authored CC0 fixtures; see
+  `tests/fixtures/epub/LICENSE`.
+- Dependencies keep the licenses declared in their own packages, including
+  foliate-js (MIT) and SQLite WASM (public domain).
