@@ -62,6 +62,13 @@ export function useLibrary({
   })
   const generation = useRef(0)
   const alive = useRef(true)
+  /**
+   * Catalog reads overlap: the bundled-book bootstrap and a user import both
+   * list books, and the slower one can resolve last carrying an older
+   * snapshot. Tickets keep a stale list from erasing a newer one.
+   */
+  const listTicket = useRef(0)
+  const appliedTicket = useRef(0)
 
   useEffect(() => {
     alive.current = true
@@ -70,9 +77,24 @@ export function useLibrary({
     }
   }, [])
 
-  const listBooks = useCallback(
-    () => withDeadline(ports.library.listBooks(), LIBRARY_LOAD_DEADLINE_MS, clock),
-    [clock, ports],
+  const listBooks = useCallback(async () => {
+    const ticket = ++listTicket.current
+    const books = await withDeadline(
+      ports.library.listBooks(),
+      LIBRARY_LOAD_DEADLINE_MS,
+      clock,
+    )
+    return { books, ticket }
+  }, [clock, ports])
+
+  /** Applies a catalog read only if nothing newer has already been applied. */
+  const applyBooks = useCallback(
+    (result: { books: readonly BookCatalogEntry[]; ticket: number }) => {
+      if (result.ticket < appliedTicket.current) return false
+      appliedTicket.current = result.ticket
+      return true
+    },
+    [],
   )
 
   const load = useCallback(async () => {
@@ -102,9 +124,9 @@ export function useLibrary({
       return
     }
 
-    let books: readonly BookCatalogEntry[]
+    let listed: { books: readonly BookCatalogEntry[]; ticket: number }
     try {
-      books = await listBooks()
+      listed = await listBooks()
     } catch (error) {
       if (current()) {
         setState((p) => ({ ...p, phase: 'error', diagnostics, error: describe(error) }))
@@ -112,7 +134,12 @@ export function useLibrary({
       return
     }
     if (!current()) return
-    setState((p) => ({ ...p, phase: 'ready', books, diagnostics }))
+    const books = listed.books
+    if (applyBooks(listed)) {
+      setState((p) => ({ ...p, phase: 'ready', books, diagnostics }))
+    } else {
+      setState((p) => ({ ...p, phase: 'ready', diagnostics }))
+    }
 
     const missing = registrations.filter(
       (registration) => !books.some((book) => book.id === registration.sha256),
@@ -127,7 +154,11 @@ export function useLibrary({
       })
       const refreshed = await listBooks()
       if (current()) {
-        setState((p) => ({ ...p, books: refreshed, bootstrapping: false }))
+        setState((p) => ({
+          ...p,
+          ...(applyBooks(refreshed) ? { books: refreshed.books } : {}),
+          bootstrapping: false,
+        }))
       }
     } catch (error) {
       if (current()) {
@@ -138,7 +169,7 @@ export function useLibrary({
         }))
       }
     }
-  }, [clock, client, dependencies, listBooks, ports, registrations])
+  }, [applyBooks, clock, client, dependencies, listBooks, ports, registrations])
 
   useEffect(() => {
     void load()
@@ -161,11 +192,11 @@ export function useLibrary({
       setState((p) => ({ ...p, importing: true, notice: undefined }))
       try {
         await importEpubFile(client, file, dependencies)
-        const books = await listBooks()
+        const listed = await listBooks()
         if (!alive.current) return
         setState((p) => ({
           ...p,
-          books,
+          ...(applyBooks(listed) ? { books: listed.books } : {}),
           importing: false,
           notice: { tone: 'success', message: `Added ${file.name} to your library.` },
         }))
@@ -178,19 +209,21 @@ export function useLibrary({
         setState((p) => ({ ...p, importing: false, notice: { tone: 'failure', message } }))
       }
     },
-    [client, dependencies, listBooks],
+    [applyBooks, client, dependencies, listBooks],
   )
 
   /** Re-reads the catalog without re-running bootstrap, so returning from the
    *  reader shows the progress that was just persisted. */
   const refresh = useCallback(async () => {
     try {
-      const books = await listBooks()
-      if (alive.current) setState((p) => ({ ...p, books }))
+      const listed = await listBooks()
+      if (alive.current && applyBooks(listed)) {
+        setState((p) => ({ ...p, books: listed.books }))
+      }
     } catch {
       // A refresh is opportunistic; the catalog already on screen stays valid.
     }
-  }, [listBooks])
+  }, [applyBooks, listBooks])
 
   const dismissNotice = useCallback(() => {
     setState((p) => ({ ...p, notice: undefined }))
