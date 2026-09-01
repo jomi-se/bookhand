@@ -178,12 +178,23 @@ export function useLibrary({
     [client, dependencies, listBooks],
   )
 
+  /** Re-reads the catalog without re-running bootstrap, so returning from the
+   *  reader shows the progress that was just persisted. */
+  const refresh = useCallback(async () => {
+    try {
+      const books = await listBooks()
+      if (alive.current) setState((p) => ({ ...p, books }))
+    } catch {
+      // A refresh is opportunistic; the catalog already on screen stays valid.
+    }
+  }, [listBooks])
+
   const dismissNotice = useCallback(() => {
     setState((p) => ({ ...p, notice: undefined }))
   }, [])
 
   return useMemo(
-    () => ({ ...state, retry, importFile, dismissNotice }),
-    [dismissNotice, importFile, retry, state],
+    () => ({ ...state, retry, refresh, importFile, dismissNotice }),
+    [dismissNotice, importFile, refresh, retry, state],
   )
 }

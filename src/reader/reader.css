@@ -1,0 +1,337 @@
+.reader {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  block-size: 100svh;
+}
+
+.reader-chrome {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px max(14px, env(safe-area-inset-right)) 10px max(14px, env(safe-area-inset-left));
+  border-block-end: 1px solid var(--rule);
+}
+
+.reader-identity {
+  flex: 1;
+  min-inline-size: 0;
+  margin: 0;
+  text-align: center;
+  font-size: var(--step--1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reader-book {
+  font-weight: 600;
+}
+
+.reader-chapter {
+  color: var(--muted);
+}
+
+.reader-tools {
+  display: flex;
+  gap: 6px;
+}
+
+.reader-tools .button,
+.button-back {
+  padding-inline: 12px;
+}
+
+.button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.reader-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-block-size: 0;
+}
+
+.reader[data-panel='contents'] .reader-stage,
+.reader[data-panel='text'] .reader-stage,
+.reader[data-panel='study'] .reader-stage {
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+}
+
+.reader-panel {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  border-inline-end: 1px solid var(--rule);
+  background: var(--canvas);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 10px 12px 18px;
+  border-block-end: 1px solid var(--rule);
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: var(--step-0);
+  font-weight: 600;
+}
+
+.panel-body {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 18px calc(24px + env(safe-area-inset-bottom));
+}
+
+.panel-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--step--1);
+  line-height: 1.5;
+}
+
+.button-icon {
+  min-inline-size: var(--tap);
+  padding: 0;
+  color: var(--muted);
+  background: none;
+  border: 0;
+}
+
+.toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc-list[data-depth='1'] {
+  padding-inline-start: 14px;
+}
+
+.toc-list[data-depth='2'] {
+  padding-inline-start: 14px;
+}
+
+.toc-item {
+  display: block;
+  inline-size: 100%;
+  min-block-size: var(--tap);
+  padding: 8px 6px;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  font-size: var(--step--1);
+  line-height: 1.4;
+  text-align: start;
+  cursor: pointer;
+}
+
+.toc-list[data-depth='1'] .toc-item {
+  color: var(--muted);
+}
+
+.toc-item:hover {
+  background: color-mix(in oklch, var(--rule) 45%, transparent);
+}
+
+.control {
+  margin-block-end: 22px;
+}
+
+.control label,
+.control legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-block-end: 8px;
+  font-size: var(--step--1);
+  font-weight: 500;
+}
+
+.control output {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.control input[type='range'] {
+  inline-size: 100%;
+  accent-color: var(--accent);
+  block-size: var(--tap);
+}
+
+.control-themes {
+  padding: 0;
+  border: 0;
+  margin-inline: 0;
+}
+
+.theme-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.css-editor {
+  inline-size: 100%;
+  padding: 10px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--step--1);
+  resize: vertical;
+}
+
+.control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-block-start: 10px;
+}
+
+.reader-book-area {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: stretch;
+  min-block-size: 0;
+}
+
+.reader-surface {
+  min-inline-size: 0;
+  min-block-size: 0;
+  block-size: 100%;
+}
+
+.reader-surface foliate-view {
+  display: block;
+  block-size: 100%;
+}
+
+.page-step {
+  display: grid;
+  place-items: center;
+  inline-size: clamp(var(--tap), 6vw, 72px);
+  color: var(--muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: color var(--enter) ease;
+}
+
+.page-step:hover {
+  color: var(--ink);
+}
+
+.reader-state {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 24px;
+  background: var(--canvas);
+  text-align: center;
+}
+
+.reader-state.state-panel {
+  border: 0;
+}
+
+.selection-action {
+  position: absolute;
+  inset-block-end: max(18px, env(safe-area-inset-bottom));
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.selection-action .button {
+  pointer-events: auto;
+  background: var(--raised);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+
+.reader-section-error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 10px 16px;
+  border-block-start: 1px solid var(--rule);
+  background: var(--accent-quiet);
+  font-size: var(--step--1);
+}
+
+.reader-footer {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  border-block-start: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums;
+}
+
+.reader-footer-chapter {
+  max-inline-size: 46ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 860px) {
+  .tool-label {
+    display: none;
+  }
+
+  .reader-tools .button,
+  .button-back {
+    min-inline-size: var(--tap);
+    padding-inline: 10px;
+  }
+
+  .button-back {
+    font-size: 0;
+    gap: 0;
+  }
+
+  /* One surface at a time: a panel takes the whole stage rather than
+     squeezing the book into a second column. */
+  .reader[data-panel='contents'] .reader-stage,
+  .reader[data-panel='text'] .reader-stage,
+  .reader[data-panel='study'] .reader-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reader[data-panel='contents'] .reader-book-area,
+  .reader[data-panel='text'] .reader-book-area,
+  .reader[data-panel='study'] .reader-book-area {
+    display: none;
+  }
+
+  .reader-panel {
+    border-inline-end: 0;
+  }
+
+  .page-step {
+    inline-size: var(--tap);
+  }
+}

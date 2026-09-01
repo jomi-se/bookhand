@@ -66,7 +66,7 @@ interface ActiveReader {
   readonly cleanups: readonly (() => void)[]
 }
 
-const DEFAULT_STYLE: ReaderStyle = {
+export const DEFAULT_READER_STYLE: ReaderStyle = {
   fontSizePercent: 100,
   lineHeight: 1.55,
   measureCh: 68,
@@ -84,7 +84,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   #sections: readonly BookSection[] = []
   #location: ReaderLocation | undefined
   #selection: ReaderSelection | null = null
-  #style = DEFAULT_STYLE
+  #style = DEFAULT_READER_STYLE
   #disposedViews = new WeakSet<FoliateView>()
 
   constructor(
@@ -241,7 +241,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   }
 
   resetStyle(): void {
-    this.applyStyle(DEFAULT_STYLE)
+    this.applyStyle(DEFAULT_READER_STYLE)
   }
 
   async #openAtRevision(blob: Blob, revision: number): Promise<BookMetadata> {
@@ -284,7 +284,10 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   #listen(view: FoliateView): readonly (() => void)[] {
     const sectionCleanups: (() => void)[] = []
     const onRelocate = (event: Event) => {
-      this.#clearSelection()
+      // Relocation is not deselection. The paginator relocates whenever its box
+      // changes, so clearing here would drop the reader's selection every time
+      // a panel opened. Genuine deselection arrives through `selectionchange`,
+      // and deliberate navigation clears the selection itself.
       this.#captureRelocation((event as CustomEvent<FoliateRelocation>).detail)
     }
     const onLoad = (event: Event) => {

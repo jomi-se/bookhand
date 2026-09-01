@@ -315,6 +315,48 @@ describe('FoliateReaderAdapter', () => {
     expect(latestBook!.destroy).toHaveBeenCalledOnce()
   })
 
+  it('keeps the selection when the paginator merely relocates, and drops it on deliberate navigation', async () => {
+    const host = document.createElement('div')
+    const adapter = makeAdapter(host)
+    await adapter.open(new Blob(['fixture']))
+    const view = host.querySelector('foliate-view') as unknown as FakeFoliateView
+    const doc = view.renderer.getContents()[0]!.doc
+    const text = doc.querySelector('p')!.firstChild!
+    const range = doc.createRange()
+    range.setStart(text, 0)
+    range.setEnd(text, 11)
+    let selectedRange: Range | undefined = range
+    Object.defineProperty(doc, 'getSelection', {
+      configurable: true,
+      value: () => ({
+        get rangeCount() {
+          return selectedRange ? 1 : 0
+        },
+        get isCollapsed() {
+          return selectedRange?.collapsed ?? true
+        },
+        getRangeAt: () => selectedRange!,
+        removeAllRanges: () => {
+          selectedRange = undefined
+        },
+      }),
+    })
+    doc.dispatchEvent(new Event('selectionchange'))
+    expect(adapter.getSelection()?.quote).toBe('Alpha exact')
+
+    // Opening a panel resizes the paginator, which relocates without the
+    // reader touching the text. The selection must survive it.
+    view.dispatchEvent(
+      new CustomEvent('relocate', {
+        detail: { ...view.lastLocation, cfi: 'fixture:0:0:0' },
+      }),
+    )
+    expect(adapter.getSelection()?.quote).toBe('Alpha exact')
+
+    await adapter.navigate({ kind: 'relative', direction: 'next' })
+    expect(adapter.getSelection()).toBeNull()
+  })
+
   it('keeps one live viewer through the React StrictMode setup and cleanup cycle', async () => {
     const adapters: FoliateReaderAdapter[] = []
     const onReady = (adapter: unknown) => adapters.push(adapter as FoliateReaderAdapter)
