@@ -108,8 +108,20 @@ export interface ReaderAnnotationMark {
   readonly color: string
 }
 
+/**
+ * What the reader needs to know about a book beyond its bytes.
+ *
+ * Optional throughout: a reader given neither an identity nor a store opens
+ * the book and reads it, and simply forgets any rewrite when the page reloads.
+ */
+export interface ReaderOpenOptions {
+  /** The library's id for this book, which saved rewrites are filed under. */
+  readonly bookId?: string
+  readonly rewrites?: import('./remaster.ts').RemasterStore
+}
+
 export interface ReaderAdapter {
-  open(blob: Blob): Promise<BookMetadata>
+  open(blob: Blob, options?: ReaderOpenOptions): Promise<BookMetadata>
   close(): Promise<void>
   getToc(): readonly TocItem[]
   getLocation(): ReaderLocation

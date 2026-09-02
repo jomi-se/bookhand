@@ -1,6 +1,6 @@
 # Document remaster: a coding harness inside the reader
 
-Branch: `feat/document-remaster` — isolated worktree, based on `4780220`.
+Branch: `feat/document-remaster` — isolated worktree, reconciled with `main`.
 
 ## What this is
 
@@ -118,8 +118,9 @@ partway through.
 
 Freedom this wide needs recovery, not restriction:
 
-- **Version history.** Every rewrite appends. The publisher's markup is version
-  zero, captured before the first edit, and never overwritten.
+- **Version history.** Every rewrite appends, and the history is saved. The
+  publisher's markup is the imported EPUB itself, which is never rewritten, so
+  there is nothing to overwrite and nothing to keep a second copy of.
 - **Undo** steps back one revision. **Reset** returns to the book as published.
 - **Original / Rewritten** flips what is on screen without discarding anything.
 - **Sanitization** is the one thing code keeps for itself. Agent-authored
@@ -130,22 +131,53 @@ Freedom this wide needs recovery, not restriction:
   kept, because they are the whole point. This is a sanity check on the way in,
   not a vocabulary the agent must write within.
 
-## Persistence: what this does not do yet
+## Persistence
 
-**Rewrites live in adapter memory for the session.** A rewritten section
-survives navigating away and coming back — the transform serves it on every
-load — but it does **not** survive a page reload, and it is not written to
-SQLite or re-indexed through FTS5.
+Rewrites are saved locally and survive a page reload. Schema version 5 adds one
+table:
 
-That is the next piece of work, and the source contract above is what makes it
-possible: because a version stores package-relative markup rather than
-ephemeral blob URLs, it can be persisted, re-applied in a later session, and
-eventually exported as a repaired EPUB. Until then the honest claim is a
-session-scoped repair with full in-session recovery, not "re-reading costs zero
-tokens forever".
+```sql
+section_rewrites (book_id, section_index, revision, html, css, summary, created_at)
+```
 
-Re-anchoring existing highlights across a rewrite is unsolved for the same
-reason, and is named below.
+What is stored is the agent's **package-relative, sanitized** markup — the same
+form it wrote and the same form the section transform serves. That is what
+makes a saved revision mean the same thing tomorrow as it did today, and it is
+why `get_section_source` hands over packaged source rather than the rendered
+DOM: a version full of `blob:` URLs would be dead on the next load.
+
+**The publisher's markup is not stored.** It is the imported EPUB, which this
+feature never rewrites, so Reset is exact by dropping every revision and reading
+the section again. A second archived copy could only drift from the real one.
+
+Hydration happens **before** the view opens, in `#openAtRevision`, so the first
+document Foliate parses is already the version the reader last saw. Loading
+after the first render would show the publisher's markup and then replace it,
+which reads as the app changing its mind.
+
+Writes are ordered save-then-show. A rewrite the library refuses is not
+displayed and the caller is told, because a rewrite that vanishes on the next
+reload is not a rewrite. A reset the library refuses leaves the rewrite on
+screen for the same reason.
+
+### Honest limits
+
+- **History is capped at 20 revisions per section**
+  (`SECTION_REWRITE_HISTORY_LIMIT`). Undo walks back through what is kept; the
+  in-memory history is trimmed to match what was saved, so the reader never
+  offers an Undo the library can no longer honour. Reset never depends on
+  history, so returning to the book as published stays exact regardless.
+- **Nothing is re-indexed.** A rewritten section is not re-chunked and FTS5 is
+  not updated, so search still reflects the text as first indexed. Extraction
+  reads the rewritten document, so a *fresh* index would pick it up, but no
+  reindex is triggered and none is claimed.
+- **There is no export.** The stored form is deliberately exportable — that is
+  what package-relative markup buys — but writing a repaired EPUB is not built.
+- **A library that cannot be read does not stop the book.** The reader opens as
+  published and says nothing, because a person who came to read should not be
+  blocked by a feature they may never use.
+- Re-anchoring existing highlights across a rewrite is unsolved, and is named
+  below.
 
 ## What a rewrite costs, stated plainly
 
@@ -212,10 +244,13 @@ In:
 - A visible Original / Rewritten control with Undo and Reset.
 - The five WebMCP tools above.
 
-Out, named so it is deferred rather than forgotten: persisting rewrites into
-SQLite and re-indexing them through FTS5; exporting a repaired EPUB;
-re-anchoring existing annotations across a rewrite. All three sit on top of the
-source contract this slice establishes.
+- Schema v5, the worker protocol and client methods, and hydration before the
+  first render.
+
+Out, named so it is deferred rather than forgotten: re-indexing a rewritten
+section through FTS5; exporting a repaired EPUB; re-anchoring existing
+annotations across a rewrite. All three sit on top of the source contract and
+the stored form this slice establishes.
 
 ## Security posture
 

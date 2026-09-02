@@ -14,6 +14,7 @@ import {
   translateResources,
   type ResourceMap,
 } from './resources.ts'
+import type { SectionRewriteVersion, StoredSectionRewrite } from '../domain/remaster.ts'
 import { sanitizeCss, sanitizeSectionHtml, type SanitizeResult } from './sanitize.ts'
 
 /** Marks the stylesheet Bookhand injects on an agent's behalf. */
@@ -41,35 +42,21 @@ export interface SectionSource {
   readonly bytes: number
 }
 
-export interface SectionVersion {
-  /** The sanitized markup of this version. */
-  readonly html: string
-  /** Sanitized stylesheet text for this version, if the agent wrote any. */
-  readonly css?: string
-  /** What the agent said it was doing, in its own words. */
-  readonly summary?: string
-  readonly at: number
-}
+/** One saved revision. The shape the library stores and the reader serves. */
+export type SectionVersion = SectionRewriteVersion
 
 /**
  * A section's edit history.
  *
- * The publisher's own markup is version zero and is never overwritten, so
- * Reset is always exact. Each agent edit appends, so Undo steps back one
+ * The publisher's own markup is not part of it. That is the imported EPUB,
+ * which is never rewritten, so Reset is exact by dropping every revision and
+ * reading the section again. Each agent edit appends, so Undo steps back one
  * revision at a time rather than throwing the whole session away.
  */
-export interface SectionRewrite {
-  readonly sectionIndex: number
-  readonly original: string
-  readonly versions: readonly SectionVersion[]
-}
+export type SectionRewrite = StoredSectionRewrite
 
 export function currentVersion(rewrite: SectionRewrite): SectionVersion | undefined {
   return rewrite.versions.at(-1)
-}
-
-export function currentHtml(rewrite: SectionRewrite): string {
-  return currentVersion(rewrite)?.html ?? rewrite.original
 }
 
 /** Read a packaged section back out as source an agent can work on. */

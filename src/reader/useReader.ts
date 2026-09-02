@@ -182,7 +182,18 @@ export function useReader({
             type: 'application/epub+zip',
           })
           const metadata = await withDeadline(
-            ports.reader.openBook(blob),
+            ports.reader.openBook(blob, {
+              bookId: entry.id,
+              // Saved rewrites are the library's, so the reader borrows the
+              // client rather than owning storage itself.
+              rewrites: {
+                load: (bookId) => client.listSectionRewrites(bookId),
+                append: (bookId, sectionIndex, version) =>
+                  client.appendSectionRewrite(bookId, sectionIndex, version),
+                undo: (bookId, sectionIndex) => client.undoSectionRewrite(bookId, sectionIndex),
+                reset: (bookId, sectionIndex) => client.clearSectionRewrites(bookId, sectionIndex),
+              },
+            }),
             BOOK_OPEN_DEADLINE_MS,
             clock,
           )

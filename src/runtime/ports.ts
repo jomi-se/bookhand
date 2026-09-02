@@ -1,6 +1,7 @@
 import type {
   BookCatalogEntry,
   BookMetadata,
+  ReaderOpenOptions,
   StorageDiagnostics,
 } from '../domain/index.ts'
 
@@ -18,7 +19,7 @@ export interface LibraryQueryPort {
 }
 
 export interface ReaderEnginePort {
-  openBook(blob: Blob): Promise<BookMetadata>
+  openBook(blob: Blob, options?: ReaderOpenOptions): Promise<BookMetadata>
   loadSection(sectionIndex: number): Promise<void>
 }
 
