@@ -82,11 +82,18 @@ function setup(overrides: Partial<ReaderAdapter> = {}) {
         1,
       )
     }),
-    upsertStudyItem: vi.fn(async (item: StudyItem) => {
+    commitStudyItem: vi.fn(async (item: StudyItem) => {
       const index = items.findIndex((i) => i.id === item.id)
       if (index >= 0) items[index] = item
       else items.push(item)
-      return item
+      return { item, replayed: false }
+    }),
+    undoStudyItem: vi.fn(async (itemId: string) => {
+      items.splice(
+        items.findIndex((i) => i.id === itemId),
+        1,
+      )
+      return null
     }),
     listStudyItems: vi.fn(async () => items),
     deleteStudyItem: vi.fn(async () => undefined),
@@ -184,9 +191,9 @@ describe('the shared command surface', () => {
       sourceLabel: 'Chapter X',
     })
 
-    expect(second.sortOrder).toBe(1)
-    expect(second.sourceRange).toEqual(range)
-    expect(second.sourceLabel).toBe('Chapter X')
+    expect(second.applied.sortOrder).toBe(1)
+    expect(second.applied.sourceRange).toEqual(range)
+    expect(second.applied.sourceLabel).toBe('Chapter X')
   })
 
   it('notifies subscribers so every surface reflects one change', async () => {

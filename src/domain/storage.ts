@@ -4,7 +4,14 @@ import type {
   ReaderLocation,
   ReaderStyle,
 } from './reader.ts'
-import type { Annotation, StudyBoard, StudyItem, StudyBoardView } from './study.ts'
+import type {
+  Annotation,
+  StudyBoard,
+  StudyItem,
+  StudyItemCommit,
+  StudyBoardView,
+  StudyMutation,
+} from './study.ts'
 
 export type StorageMode = 'persistent' | 'session-only' | 'locked'
 
@@ -102,7 +109,18 @@ export type StorageWorkerRequest =
       readonly boardId: string
       readonly view: StudyBoardView
     }
-  | { readonly requestId: string; readonly type: 'upsert-study-item'; readonly item: StudyItem }
+  | {
+      readonly requestId: string
+      readonly type: 'commit-study-item'
+      readonly item: StudyItem
+      readonly mutation: StudyMutation
+    }
+  | {
+      readonly requestId: string
+      readonly type: 'undo-study-item'
+      readonly itemId: string
+      readonly expectedRevision: number
+    }
   | { readonly requestId: string; readonly type: 'delete-study-item'; readonly itemId: string }
   | { readonly requestId: string; readonly type: 'list-study-items'; readonly boardId: string }
 
@@ -120,7 +138,8 @@ export type StorageWorkerResult =
   | { readonly type: 'annotation-deleted'; readonly annotationId: string }
   | { readonly type: 'annotations'; readonly annotations: readonly Annotation[] }
   | { readonly type: 'board'; readonly board: StudyBoard }
-  | { readonly type: 'study-item-saved'; readonly item: StudyItem }
+  | { readonly type: 'study-item-committed'; readonly commit: StudyItemCommit }
+  | { readonly type: 'study-item-undone'; readonly item: StudyItem | null }
   | { readonly type: 'study-item-deleted'; readonly itemId: string }
   | { readonly type: 'study-items'; readonly items: readonly StudyItem[] }
 

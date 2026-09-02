@@ -3,14 +3,23 @@ import type {
   AnnotationColor,
   BookRange,
   BookTarget,
+  MutationOrigin,
+  MutationReceipt,
   Passage,
   ReaderStyle,
+  ReversalAction,
   StudyBoard,
   StudyBoardView,
   StudyItem,
   StudyItemPayload,
+  StudyMutation,
   TocItem,
 } from '../domain/index.ts'
+import {
+  DELETE_ACTION,
+  RETURN_TO_SOURCE_ACTION,
+  UNDO_ACTION,
+} from '../domain/provenance.ts'
 import {
   compareQuote,
   rejectSource,
@@ -30,7 +39,19 @@ export interface ReadingContext {
   readonly selection?: { readonly quote: string; readonly range: BookRange }
 }
 
-export interface SaveAnnotationInput {
+/**
+ * Who is asking. Defaults to the person, because the interface is the person;
+ * only the WebMCP handlers pass `'agent'`, and they always pass it.
+ */
+export interface CallerIdentity {
+  readonly origin?: MutationOrigin
+  /** The caller's own name for this action, for retry safety. */
+  readonly actionToken?: string
+  /** Groups several writes made for one intent. */
+  readonly actionGroupId?: string
+}
+
+export interface SaveAnnotationInput extends CallerIdentity {
   /**
    * The book the caller believes is open. Required, and checked: a mutation
    * that names the wrong book is a mutation aimed at text the caller has not
@@ -45,7 +66,9 @@ export interface SaveAnnotationInput {
   readonly id?: string
 }
 
-export interface UpsertStudyItemInput {
+export interface UpsertStudyItemInput extends CallerIdentity {
+  /** An agent revising its own block must present the token it was given. */
+  readonly updateToken?: string
   readonly payload: StudyItemPayload
   /** Required whenever `sourceRange` is present; see `SaveAnnotationInput`. */
   readonly bookId?: string
@@ -193,6 +216,8 @@ export class BookhandCommands {
       : undefined
     const annotation: Annotation = {
       id: input.id ?? this.#id('annotation'),
+      origin: input.origin ?? 'user',
+      ...(input.actionGroupId ? { actionGroupId: input.actionGroupId } : {}),
       bookId: this.#context.bookId,
       range: input.range,
       quote: input.quote,
@@ -219,7 +244,17 @@ export class BookhandCommands {
     return this.#context.client.listAnnotations(this.#context.bookId)
   }
 
-  async upsertStudyItem(input: UpsertStudyItemInput): Promise<StudyItem> {
+  /**
+   * Write a study block and hand back exactly what happened.
+   *
+   * The receipt is not a convenience. A person who did not perform an action
+   * needs to be told what it changed, what it could have reached, what it
+   * corrected, and precisely how to take it back — otherwise agent work is
+   * something that merely happens to their board.
+   *
+   * `VAL-ACTION-PROVENANCE-UNDO`.
+   */
+  async upsertStudyItem(input: UpsertStudyItemInput): Promise<MutationReceipt<StudyItem>> {
     if (input.sourceRange) {
       if (input.bookId === undefined || input.sourceQuote === undefined) {
         rejectSource(
@@ -229,13 +264,22 @@ export class BookhandCommands {
       }
       await this.#verifySource(input.bookId, input.sourceRange, input.sourceQuote)
     }
+    const origin = input.origin ?? 'user'
     const now = this.#timestamp()
     const existing = input.id
       ? (await this.listStudyItems()).find((item) => item.id === input.id)
       : undefined
+    // An id naming an item that is already there is a revision of it; an id
+    // naming nothing is a creation under a caller-chosen name. Both are honest
+    // requests, and the repository decides whether this caller may make them.
+    const operation = existing ? 'update' : 'create'
+
     const item: StudyItem = {
       id: input.id ?? this.#id('item'),
       boardId: this.#context.board.id,
+      origin: existing?.origin ?? origin,
+      revision: existing?.revision ?? 1,
+      ...(input.actionGroupId ? { actionGroupId: input.actionGroupId } : {}),
       payload: input.payload,
       ...(input.sourceRange
         ? { sourceRange: input.sourceRange }
@@ -251,9 +295,45 @@ export class BookhandCommands {
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     }
-    const saved = await this.#context.client.upsertStudyItem(item)
+
+    const mutation: StudyMutation = {
+      operation,
+      origin,
+      bookId: this.#context.bookId,
+      actionToken: input.actionToken ?? this.#id('action'),
+      actionGroupId: input.actionGroupId ?? this.#id('group'),
+      ...(input.updateToken ? { updateToken: input.updateToken } : {}),
+    }
+    const commit = await this.#context.client.commitStudyItem(item, mutation)
     this.#changed()
-    return saved
+
+    return {
+      operation,
+      origin,
+      actionGroupId: mutation.actionGroupId,
+      ...(commit.prior ? { prior: commit.prior } : {}),
+      applied: commit.item,
+      ...(commit.updateToken ? { updateToken: commit.updateToken } : {}),
+      scope: `The study board for ${this.#context.bookTitle}. Nothing outside this book is reachable.`,
+      warnings: commit.replayed
+        ? ['This action had already been performed; the earlier result was returned unchanged.']
+        : [],
+      persisted: true,
+      actions: reversalsFor(commit.item),
+    }
+  }
+
+  /**
+   * Take back one study-item write.
+   *
+   * `expectedRevision` is what the caller believes it is undoing. If the block
+   * has been edited since, the repository refuses rather than discarding that
+   * edit — an Undo that destroys newer work is not an undo.
+   */
+  async undoStudyItem(itemId: string, expectedRevision: number): Promise<StudyItem | null> {
+    const restored = await this.#context.client.undoStudyItem(itemId, expectedRevision)
+    this.#changed()
+    return restored
   }
 
   async deleteStudyItem(itemId: string): Promise<void> {
@@ -275,4 +355,17 @@ export class BookhandCommands {
     const items = await this.listStudyItems()
     return items.reduce((highest, item) => Math.max(highest, item.sortOrder + 1), 0)
   }
+}
+
+/**
+ * Return to source is offered only when there is a source to return to; the
+ * other two always apply. An action listed but not available would be worse
+ * than one not listed at all.
+ */
+function reversalsFor(item: StudyItem): readonly ReversalAction[] {
+  return [
+    UNDO_ACTION,
+    ...(item.sourceRange ? [RETURN_TO_SOURCE_ACTION] : []),
+    DELETE_ACTION,
+  ]
 }

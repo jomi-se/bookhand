@@ -3,7 +3,13 @@
 import sqlite3InitModule, { type Database } from '@sqlite.org/sqlite-wasm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import type { ImportBookInput, ReadingState, StudyItem } from '../../src/domain/index.ts'
+import type {
+  ImportBookInput,
+  ReadingState,
+  StudyItem,
+  StudyMutation,
+} from '../../src/domain/index.ts'
+import { OwnershipError } from '../../src/domain/provenance.ts'
 import { sha256BookId } from '../../src/storage/hash.ts'
 import { LibraryRepository } from '../../src/storage/library-repository.ts'
 import { initializeSchema, STORAGE_SCHEMA_VERSION } from '../../src/storage/schema.ts'
@@ -177,24 +183,48 @@ describe('official SQLite library repository', () => {
     const firstItem: StudyItem = {
       id: 'shared-item-id',
       boardId: firstBoard.id,
+      origin: 'user',
+      revision: 1,
       payload: { kind: 'prose', text: 'First book content' },
       sortOrder: 0,
       createdAt: readingState.updatedAt,
       updatedAt: readingState.updatedAt,
     }
-    repository.upsertStudyItem(firstItem)
+    repository.commitStudyItem(
+      firstItem,
+      mutation({ operation: 'create', bookId: firstBookId, actionToken: 'a' }),
+      readingState.updatedAt,
+    )
 
-    expect(() =>
-      repository.upsertStudyItem({
-        ...firstItem,
-        boardId: secondBoard.id,
-        payload: { kind: 'prose', text: 'Cross-book overwrite' },
-      }),
-    ).toThrow(/belongs to another book/)
-    expect(repository.listStudyItems(firstBoard.id)).toEqual([firstItem])
+    // The message a person sees names the problem without confirming what is on
+    // the other book's board; the detail on the Error carries the specifics.
+    try {
+      repository.commitStudyItem(
+        { ...firstItem, boardId: secondBoard.id, payload: { kind: 'prose', text: 'Overwrite' } },
+        mutation({ operation: 'create', bookId: secondBookId, actionToken: 'b' }),
+        readingState.updatedAt,
+      )
+      throw new Error('expected a rejection')
+    } catch (error) {
+      expect(error).toBeInstanceOf(OwnershipError)
+      expect((error as OwnershipError).userMessage).toMatch(/already in use/)
+    }
+    expect(repository.listStudyItems(firstBoard.id)).toEqual([
+      { ...firstItem, actionGroupId: 'group' },
+    ])
     expect(repository.listStudyItems(secondBoard.id)).toEqual([])
   })
 })
+
+function mutation(overrides: Partial<StudyMutation> & { bookId: string }): StudyMutation {
+  return {
+    operation: 'create',
+    origin: 'user',
+    actionToken: 'token',
+    actionGroupId: 'group',
+    ...overrides,
+  }
+}
 
 describe('SHA-256 book identity', () => {
   it('uses the full byte checksum as a lowercase identifier', async () => {

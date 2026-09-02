@@ -1,4 +1,10 @@
-import type { BookRange, ReaderStyle, StudyItemPayload } from '../domain/index.ts'
+import type {
+  BookRange,
+  MutationReceipt,
+  ReaderStyle,
+  StudyItem,
+  StudyItemPayload,
+} from '../domain/index.ts'
 import { ANNOTATION_COLORS, STUDY_ITEM_KINDS } from '../domain/study.ts'
 import type { BookhandCommands } from '../app/commands.ts'
 import {
@@ -41,6 +47,32 @@ const RANGE_SCHEMA = {
   },
   required: ['startCfi', 'endCfi', 'sectionIndex', 'textFingerprint'],
 } as const
+
+/**
+ * State the receipt back to the agent in the terms it needs to act on next.
+ *
+ * The update token is the only part that must be reported precisely, because
+ * nothing will hand it over again. The reversal actions are named exactly as
+ * the interface names them, so an agent describing what it did to the person
+ * describes something the person can actually find on screen.
+ */
+function describeReceipt(receipt: MutationReceipt<StudyItem>): string {
+  const lines = [
+    `${receipt.operation === 'create' ? 'Added' : 'Revised'} ${receipt.applied.payload.kind} block ${receipt.applied.id} (revision ${receipt.applied.revision}).`,
+    `Scope: ${receipt.scope}`,
+    `Attributed to: ${receipt.origin}. Action group: ${receipt.actionGroupId}.`,
+  ]
+  if (receipt.updateToken) {
+    lines.push(
+      `updateToken: ${receipt.updateToken} — keep this; it is shown once and is the only way you can revise this block later.`,
+    )
+  }
+  if (receipt.warnings.length > 0) lines.push(`Warnings: ${receipt.warnings.join(' ')}`)
+  lines.push(
+    `The person can: ${receipt.actions.map((action) => `${action.label} (${action.description})`).join(' ')}`,
+  )
+  return lines.join('\n')
+}
 
 function asRange(value: unknown): BookRange {
   const record = value as Record<string, unknown>
@@ -289,7 +321,25 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
       inputSchema: {
         type: 'object',
         properties: {
-          id: { type: 'string', description: 'Update an existing item instead of adding one.' },
+          id: {
+            type: 'string',
+            description:
+              'Revise an existing block instead of adding one. You may only revise blocks you created, and must supply the updateToken you were given when you created it.',
+          },
+          updateToken: {
+            type: 'string',
+            description: 'The token returned when you created this block. Required to revise it.',
+          },
+          actionToken: {
+            type: 'string',
+            description:
+              'Your own name for this action. Retrying with the same token and the same content returns the first result instead of writing twice.',
+          },
+          actionGroupId: {
+            type: 'string',
+            description:
+              'Group the blocks of one lesson under a shared id so the person can undo them together.',
+          },
           kind: { type: 'string', enum: [...STUDY_ITEM_KINDS] },
           text: { type: 'string', maxLength: 20_000, description: 'Prose or quotation body.' },
           attribution: { type: 'string', maxLength: 500 },
@@ -316,9 +366,15 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
       execute: (input) =>
         run('upsert_study_item', () => 'added to the study board', async () => {
           const payload = toPayload(input)
-          const saved = await commands.upsertStudyItem({
+          const receipt = await commands.upsertStudyItem({
             payload,
+            origin: 'agent',
             ...(typeof input.id === 'string' ? { id: input.id } : {}),
+            ...(typeof input.updateToken === 'string' ? { updateToken: input.updateToken } : {}),
+            ...(typeof input.actionToken === 'string' ? { actionToken: input.actionToken } : {}),
+            ...(typeof input.actionGroupId === 'string'
+              ? { actionGroupId: input.actionGroupId }
+              : {}),
             ...(input.sourceRange
               ? {
                   bookId: String(input.bookId ?? ''),
@@ -328,7 +384,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               : {}),
             ...(typeof input.sourceLabel === 'string' ? { sourceLabel: input.sourceLabel } : {}),
           })
-          return textResult(`Saved ${payload.kind} block ${saved.id} to the study board.`)
+          return textResult(describeReceipt(receipt))
         }),
     },
     {

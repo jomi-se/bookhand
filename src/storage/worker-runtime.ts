@@ -170,10 +170,24 @@ export class StorageWorkerRuntime {
             new Date().toISOString(),
           ),
         }
-      case 'upsert-study-item':
+      case 'commit-study-item':
         return {
-          type: 'study-item-saved',
-          item: this.requireRepository().upsertStudyItem(request.item),
+          type: 'study-item-committed',
+          commit: this.requireRepository().commitStudyItem(
+            request.item,
+            request.mutation,
+            new Date().toISOString(),
+          ),
+        }
+      case 'undo-study-item':
+        return {
+          type: 'study-item-undone',
+          item:
+            this.requireRepository().undoStudyItem(
+              request.itemId,
+              request.expectedRevision,
+              new Date().toISOString(),
+            ) ?? null,
         }
       case 'delete-study-item':
         this.requireRepository().deleteStudyItem(request.itemId)

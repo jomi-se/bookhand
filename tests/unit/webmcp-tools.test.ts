@@ -53,7 +53,17 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
     getReadingStyle: vi.fn(() => style),
     setReadingStyle: vi.fn(),
     resetReadingStyle: vi.fn(),
-    upsertStudyItem: vi.fn(async () => ({ id: 'item-1' })),
+    upsertStudyItem: vi.fn(async () => ({
+      operation: 'create' as const,
+      origin: 'agent' as const,
+      actionGroupId: 'group-1',
+      applied: { id: 'item-1', revision: 1, payload: { kind: 'prose', text: 'x' } },
+      updateToken: 'token-1',
+      scope: 'The study board for Calculus Made Easy.',
+      warnings: [],
+      persisted: true,
+      actions: [{ kind: 'undo' as const, label: 'Undo', description: 'Put it back.' }],
+    })),
     listStudyItems: vi.fn(async () => []),
     setStudyBoardView: vi.fn(async () => ({ view: 'expanded' })),
     ...overrides,
@@ -177,6 +187,7 @@ describe('the WebMCP tool surface', () => {
       sourceLabel: 'Chapter X',
     })
     expect(commands.upsertStudyItem).toHaveBeenCalledWith({
+      origin: 'agent',
       payload: {
         kind: 'steps',
         title: 'Finding a slope',

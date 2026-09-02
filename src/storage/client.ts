@@ -5,6 +5,8 @@ import type {
   StudyBoard,
   StudyBoardView,
   StudyItem,
+  StudyItemCommit,
+  StudyMutation,
   ReadingState,
   StorageDiagnostics,
   StoredBook,
@@ -244,10 +246,17 @@ export class StorageClient {
     ).board
   }
 
-  async upsertStudyItem(item: StudyItem): Promise<StudyItem> {
+  async commitStudyItem(item: StudyItem, mutation: StudyMutation): Promise<StudyItemCommit> {
     return expectResult(
-      await this.request({ type: 'upsert-study-item', item }),
-      'study-item-saved',
+      await this.request({ type: 'commit-study-item', item, mutation }),
+      'study-item-committed',
+    ).commit
+  }
+
+  async undoStudyItem(itemId: string, expectedRevision: number): Promise<StudyItem | null> {
+    return expectResult(
+      await this.request({ type: 'undo-study-item', itemId, expectedRevision }),
+      'study-item-undone',
     ).item
   }
 

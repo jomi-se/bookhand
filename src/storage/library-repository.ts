@@ -12,8 +12,11 @@ import type {
   StudyBoard,
   StudyBoardView,
   StudyItem,
+  StudyItemCommit,
   StudyItemPayload,
+  StudyMutation,
 } from '../domain/index.ts'
+import { canonicalize, OwnershipError } from '../domain/provenance.ts'
 
 type Row = Record<string, SqlValue>
 
@@ -195,14 +198,16 @@ export class LibraryRepository {
   saveAnnotation(annotation: Annotation): Annotation {
     const statement = this.db.prepare(`
       INSERT INTO annotations (
-        id, book_id, range_json, quote, color, note, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        id, book_id, range_json, quote, color, note, created_at, updated_at,
+        origin, action_group_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         range_json = excluded.range_json,
         quote = excluded.quote,
         color = excluded.color,
         note = excluded.note,
-        updated_at = excluded.updated_at
+        updated_at = excluded.updated_at,
+        action_group_id = excluded.action_group_id
     `)
     try {
       statement
@@ -215,6 +220,8 @@ export class LibraryRepository {
           annotation.note ?? null,
           annotation.createdAt,
           annotation.updatedAt,
+          annotation.origin,
+          annotation.actionGroupId ?? null,
         ])
         .step()
     } finally {
@@ -229,7 +236,8 @@ export class LibraryRepository {
 
   listAnnotations(bookId: string): readonly Annotation[] {
     const rows = this.db.selectObjects(
-      `SELECT id, book_id, range_json, quote, color, note, created_at, updated_at
+      `SELECT id, book_id, range_json, quote, color, note, created_at, updated_at,
+              origin, action_group_id
        FROM annotations WHERE book_id = ? ORDER BY created_at ASC`,
       [bookId],
     )
@@ -242,6 +250,10 @@ export class LibraryRepository {
       ...(row.note === null ? {} : { note: asString(row.note, 'annotation note') }),
       createdAt: asString(row.created_at, 'annotation created time'),
       updatedAt: asString(row.updated_at, 'annotation updated time'),
+      origin: asString(row.origin, 'annotation origin') as Annotation['origin'],
+      ...(row.action_group_id === null
+        ? {}
+        : { actionGroupId: asString(row.action_group_id, 'annotation action group') }),
     }))
   }
 
@@ -284,41 +296,266 @@ export class LibraryRepository {
     return boardFromRow(row)
   }
 
-  upsertStudyItem(item: StudyItem): StudyItem {
-    const statement = this.db.prepare(`
-      INSERT INTO study_items (
-        id, board_id, source_range_json, kind, payload_json, sort_order, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        source_range_json = excluded.source_range_json,
-        kind = excluded.kind,
-        payload_json = excluded.payload_json,
-        sort_order = excluded.sort_order,
-        updated_at = excluded.updated_at
-      WHERE study_items.board_id = excluded.board_id
-    `)
-    try {
-      statement
-        .bind([
-          item.id,
-          item.boardId,
-          item.sourceRange
-            ? JSON.stringify({ range: item.sourceRange, label: item.sourceLabel ?? null })
-            : null,
-          item.payload.kind,
-          JSON.stringify(item.payload),
-          item.sortOrder,
-          item.createdAt,
-          item.updatedAt,
-        ])
-        .step()
-      if (Number(this.db.changes()) !== 1) {
-        throw new Error('That study item belongs to another book')
+  /**
+   * Write one study item under a stated authority, in one transaction.
+   *
+   * Everything that decides whether a write is allowed lives here rather than
+   * at the command boundary, because "allowed" depends on rows — who made this
+   * item, which board it is on, whether this action already happened. A check
+   * performed above the database can be true when it is made and false when the
+   * write lands; a check inside the transaction cannot.
+   *
+   * `VAL-STUDY-ID-OWNERSHIP`.
+   */
+  commitStudyItem(item: StudyItem, mutation: StudyMutation, now: string): StudyItemCommit {
+    return this.db.transaction('IMMEDIATE', () => {
+      const digest = canonicalize({
+        id: item.id,
+        boardId: item.boardId,
+        payload: item.payload,
+        sourceRange: item.sourceRange ?? null,
+        sourceLabel: item.sourceLabel ?? null,
+        sortOrder: item.sortOrder,
+      })
+
+      const replay = this.#findReceipt(mutation)
+      if (replay) {
+        if (replay.operation !== mutation.operation || replay.payload_digest !== digest) {
+          throw new OwnershipError(
+            'That action was already used for a different change.',
+            `Action token reused with operation ${mutation.operation} and a different payload`,
+          )
+        }
+        return { ...(parseJson<StudyItemCommit>(replay.result_json, 'action receipt')), replayed: true }
       }
-    } finally {
-      finalize(statement)
+
+      const existing = this.#studyItemRow(item.id)
+      const commit =
+        mutation.operation === 'create'
+          ? this.#createStudyItem(item, mutation, existing)
+          : this.#updateStudyItem(item, mutation, existing, now)
+
+      this.db.exec({
+        sql: `INSERT INTO action_receipts
+              (book_id, origin, action_token, operation, payload_digest, result_json, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        bind: [
+          mutation.bookId,
+          mutation.origin,
+          mutation.actionToken,
+          mutation.operation,
+          digest,
+          JSON.stringify({ ...commit, replayed: false }),
+          now,
+        ],
+      })
+      return commit
+    })
+  }
+
+  #findReceipt(mutation: StudyMutation): Row | undefined {
+    return this.db.selectObject(
+      `SELECT operation, payload_digest, result_json FROM action_receipts
+       WHERE book_id = ? AND origin = ? AND action_token = ?`,
+      [mutation.bookId, mutation.origin, mutation.actionToken],
+    )
+  }
+
+  #studyItemRow(itemId: string): Row | undefined {
+    return this.db.selectObject(
+      `SELECT i.id, i.board_id, i.source_range_json, i.payload_json, i.sort_order,
+              i.created_at, i.updated_at, i.origin, i.update_token, i.action_group_id, i.revision,
+              b.book_id AS owning_book_id
+       FROM study_items i JOIN boards b ON b.id = i.board_id
+       WHERE i.id = ?`,
+      [itemId],
+    )
+  }
+
+  #createStudyItem(item: StudyItem, mutation: StudyMutation, existing: Row | undefined): StudyItemCommit {
+    if (existing) {
+      // Deliberately the same message whether the id collides on this board or
+      // another book's: telling a caller which would let it probe for the
+      // existence of ids it has no business knowing about.
+      throw new OwnershipError(
+        'That study block id is already in use.',
+        `create with existing id ${item.id}`,
+      )
     }
-    return item
+    // Only an agent needs a token, and only to prove later that it was the
+    // author. A person's authority comes from being the person.
+    const updateToken = mutation.origin === 'agent' ? crypto.randomUUID() : null
+    const created: StudyItem = {
+      ...item,
+      origin: mutation.origin,
+      revision: 1,
+      ...(mutation.actionGroupId ? { actionGroupId: mutation.actionGroupId } : {}),
+    }
+    this.db.exec({
+      sql: `INSERT INTO study_items (
+              id, board_id, source_range_json, kind, payload_json, sort_order,
+              created_at, updated_at, origin, update_token, action_group_id, revision
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      bind: [
+        created.id,
+        created.boardId,
+        sourceJson(created),
+        created.payload.kind,
+        JSON.stringify(created.payload),
+        created.sortOrder,
+        created.createdAt,
+        created.updatedAt,
+        created.origin,
+        updateToken,
+        mutation.actionGroupId,
+      ],
+    })
+    return { item: created, ...(updateToken ? { updateToken } : {}), replayed: false }
+  }
+
+  #updateStudyItem(
+    item: StudyItem,
+    mutation: StudyMutation,
+    existing: Row | undefined,
+    now: string,
+  ): StudyItemCommit {
+    if (!existing) {
+      throw new OwnershipError(
+        'That study block no longer exists.',
+        `update with unknown id ${item.id}`,
+      )
+    }
+    if (asString(existing.owning_book_id, 'owning book') !== mutation.bookId) {
+      throw new OwnershipError(
+        'That study block belongs to a different book.',
+        `cross-book update of ${item.id}`,
+      )
+    }
+    if (mutation.origin === 'agent') {
+      if (asString(existing.origin, 'study item origin') !== 'agent') {
+        throw new OwnershipError(
+          'An agent cannot change a block you wrote yourself.',
+          `agent update of user-origin item ${item.id}`,
+        )
+      }
+      const held = existing.update_token === null ? null : asString(existing.update_token, 'token')
+      if (!held || !mutation.updateToken || mutation.updateToken !== held) {
+        throw new OwnershipError(
+          'An agent may only revise blocks it created.',
+          `missing or wrong update token for ${item.id}`,
+        )
+      }
+    }
+
+    const prior = studyItemFromRow(existing)
+    // Keep the superseded version so Undo restores what was actually there,
+    // rather than whatever the caller happens to remember.
+    this.db.exec({
+      sql: `INSERT OR REPLACE INTO study_item_versions
+            (item_id, revision, source_range_json, kind, payload_json, sort_order, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      bind: [
+        prior.id,
+        prior.revision,
+        sourceJson(prior),
+        prior.payload.kind,
+        JSON.stringify(prior.payload),
+        prior.sortOrder,
+        prior.updatedAt,
+      ],
+    })
+
+    const updated: StudyItem = {
+      ...item,
+      boardId: prior.boardId,
+      origin: prior.origin,
+      createdAt: prior.createdAt,
+      updatedAt: now,
+      revision: prior.revision + 1,
+      ...(mutation.actionGroupId ? { actionGroupId: mutation.actionGroupId } : {}),
+    }
+    this.db.exec({
+      sql: `UPDATE study_items SET
+              source_range_json = ?, kind = ?, payload_json = ?, sort_order = ?,
+              updated_at = ?, action_group_id = ?, revision = ?
+            WHERE id = ?`,
+      bind: [
+        sourceJson(updated),
+        updated.payload.kind,
+        JSON.stringify(updated.payload),
+        updated.sortOrder,
+        updated.updatedAt,
+        mutation.actionGroupId,
+        updated.revision,
+        updated.id,
+      ],
+    })
+    return { item: updated, prior, replayed: false }
+  }
+
+  /**
+   * Take back one study-item write.
+   *
+   * Undoing a creation removes the block. Undoing an update restores the
+   * version immediately before it. Both refuse when the block has moved on
+   * since — `expectedRevision` is what the caller believes it is undoing, and a
+   * mismatch means someone edited the block in the meantime. Silently
+   * discarding that edit would make Undo destructive, which is the one thing it
+   * must never be.
+   */
+  undoStudyItem(itemId: string, expectedRevision: number, now: string): StudyItem | undefined {
+    return this.db.transaction('IMMEDIATE', () => {
+      const existing = this.#studyItemRow(itemId)
+      if (!existing) {
+        throw new OwnershipError(
+          'That study block no longer exists.',
+          `undo of unknown item ${itemId}`,
+        )
+      }
+      const current = studyItemFromRow(existing)
+      if (current.revision !== expectedRevision) {
+        throw new OwnershipError(
+          'This block changed after that action, so undoing it would discard newer work.',
+          `undo expected revision ${expectedRevision}, found ${current.revision}`,
+        )
+      }
+      if (current.revision === 1) {
+        this.db.exec({ sql: 'DELETE FROM study_items WHERE id = ?', bind: [itemId] })
+        return undefined
+      }
+      const previousRevision = current.revision - 1
+      const version = this.db.selectObject(
+        `SELECT source_range_json, kind, payload_json, sort_order, updated_at
+         FROM study_item_versions WHERE item_id = ? AND revision = ?`,
+        [itemId, previousRevision],
+      )
+      if (!version) {
+        throw new OwnershipError(
+          'The previous version of this block is no longer available.',
+          `missing version ${previousRevision} of ${itemId}`,
+        )
+      }
+      this.db.exec({
+        sql: `UPDATE study_items SET
+                source_range_json = ?, kind = ?, payload_json = ?, sort_order = ?,
+                updated_at = ?, revision = ?
+              WHERE id = ?`,
+        bind: [
+          version.source_range_json,
+          version.kind,
+          version.payload_json,
+          version.sort_order,
+          now,
+          previousRevision,
+          itemId,
+        ],
+      })
+      this.db.exec({
+        sql: 'DELETE FROM study_item_versions WHERE item_id = ? AND revision = ?',
+        bind: [itemId, previousRevision],
+      })
+      return studyItemFromRow(this.#studyItemRow(itemId)!)
+    })
   }
 
   deleteStudyItem(itemId: string): void {
@@ -327,29 +564,12 @@ export class LibraryRepository {
 
   listStudyItems(boardId: string): readonly StudyItem[] {
     const rows = this.db.selectObjects(
-      `SELECT id, board_id, source_range_json, payload_json, sort_order, created_at, updated_at
+      `SELECT id, board_id, source_range_json, payload_json, sort_order, created_at, updated_at,
+              origin, action_group_id, revision
        FROM study_items WHERE board_id = ? ORDER BY sort_order ASC, created_at ASC`,
       [boardId],
     )
-    return rows.map((row) => {
-      const source =
-        row.source_range_json === null
-          ? undefined
-          : parseJson<{ range: BookRange; label: string | null }>(
-              row.source_range_json,
-              'study item source',
-            )
-      return {
-        id: asString(row.id, 'study item id'),
-        boardId: asString(row.board_id, 'study item board id'),
-        payload: parseJson<StudyItemPayload>(row.payload_json, 'study item payload'),
-        ...(source ? { sourceRange: source.range } : {}),
-        ...(source?.label ? { sourceLabel: source.label } : {}),
-        sortOrder: Number(row.sort_order ?? 0),
-        createdAt: asString(row.created_at, 'study item created time'),
-        updatedAt: asString(row.updated_at, 'study item updated time'),
-      }
-    })
+    return rows.map(studyItemFromRow)
   }
 
   nextStudyItemOrder(boardId: string): number {
@@ -371,5 +591,41 @@ function boardFromRow(row: Row): StudyBoard {
     view: asString(row.layout_mode, 'board view') as StudyBoardView,
     createdAt: asString(row.created_at, 'board created time'),
     updatedAt: asString(row.updated_at, 'board updated time'),
+  }
+}
+
+function sourceJson(item: StudyItem): string | null {
+  return item.sourceRange
+    ? JSON.stringify({ range: item.sourceRange, label: item.sourceLabel ?? null })
+    : null
+}
+
+/**
+ * Note what is absent: `update_token` is never read into a `StudyItem`. It only
+ * ever travels outward once, in the receipt for the create that minted it, so
+ * possession of it is evidence of authorship rather than of having read a list.
+ */
+function studyItemFromRow(row: Row): StudyItem {
+  const source =
+    row.source_range_json === null || row.source_range_json === undefined
+      ? undefined
+      : parseJson<{ range: BookRange; label: string | null }>(
+          row.source_range_json,
+          'study item source',
+        )
+  return {
+    id: asString(row.id, 'study item id'),
+    boardId: asString(row.board_id, 'study item board id'),
+    origin: asString(row.origin, 'study item origin') as StudyItem['origin'],
+    ...(row.action_group_id === null || row.action_group_id === undefined
+      ? {}
+      : { actionGroupId: asString(row.action_group_id, 'study item action group') }),
+    revision: Number(row.revision ?? 1),
+    payload: parseJson<StudyItemPayload>(row.payload_json, 'study item payload'),
+    ...(source ? { sourceRange: source.range } : {}),
+    ...(source?.label ? { sourceLabel: source.label } : {}),
+    sortOrder: Number(row.sort_order ?? 0),
+    createdAt: asString(row.created_at, 'study item created time'),
+    updatedAt: asString(row.updated_at, 'study item updated time'),
   }
 }

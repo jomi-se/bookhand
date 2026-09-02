@@ -95,6 +95,8 @@ function isBookRange(value: unknown): boolean {
 function isAnnotation(value: unknown): boolean {
   return (
     isRecord(value) &&
+    ORIGINS.includes(String(value.origin)) &&
+    (value.actionGroupId === undefined || isString(value.actionGroupId, 200)) &&
     isString(value.id, 200) &&
     isString(value.bookId, 256) &&
     isBookRange(value.range) &&
@@ -129,17 +131,44 @@ function isStudyPayload(value: unknown): boolean {
   }
 }
 
+const ORIGINS = ['user', 'agent']
+
 function isStudyItem(value: unknown): boolean {
   return (
     isRecord(value) &&
     isString(value.id, 200) &&
     isString(value.boardId, 256) &&
+    ORIGINS.includes(String(value.origin)) &&
+    Number.isInteger(value.revision) &&
+    (value.actionGroupId === undefined || isString(value.actionGroupId, 200)) &&
     isStudyPayload(value.payload) &&
     (value.sourceRange === undefined || isBookRange(value.sourceRange)) &&
     isOptionalString(value.sourceLabel) &&
     Number.isInteger(value.sortOrder) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
+  )
+}
+
+function isStudyMutation(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    ['create', 'update'].includes(String(value.operation)) &&
+    ORIGINS.includes(String(value.origin)) &&
+    isString(value.bookId, 256) &&
+    isString(value.actionToken, 200) &&
+    isString(value.actionGroupId, 200) &&
+    (value.updateToken === undefined || isString(value.updateToken, 200))
+  )
+}
+
+function isStudyItemCommit(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isStudyItem(value.item) &&
+    (value.prior === undefined || isStudyItem(value.prior)) &&
+    (value.updateToken === undefined || isString(value.updateToken, 200)) &&
+    typeof value.replayed === 'boolean'
   )
 }
 
@@ -263,8 +292,11 @@ export function assertStorageWorkerRequest(value: unknown): asserts value is Sto
         return
       }
       break
-    case 'upsert-study-item':
-      if (isStudyItem(value.item)) return
+    case 'commit-study-item':
+      if (isStudyItem(value.item) && isStudyMutation(value.mutation)) return
+      break
+    case 'undo-study-item':
+      if (isString(value.itemId, 200) && Number.isInteger(value.expectedRevision)) return
       break
     case 'delete-study-item':
       if (isString(value.itemId, 200)) return
@@ -332,8 +364,11 @@ export function assertStorageWorkerResponse(
     case 'board':
       if (isBoard(result.board)) return
       break
-    case 'study-item-saved':
-      if (isStudyItem(result.item)) return
+    case 'study-item-committed':
+      if (isStudyItemCommit(result.commit)) return
+      break
+    case 'study-item-undone':
+      if (result.item === null || isStudyItem(result.item)) return
       break
     case 'study-item-deleted':
       if (isString(result.itemId, 200)) return
