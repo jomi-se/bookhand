@@ -116,6 +116,7 @@ beforeAll(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.unstubAllGlobals()
   document.body.replaceChildren()
 })
 
@@ -607,9 +608,20 @@ describe('FoliateReaderAdapter', () => {
 
   it('uses Foliate native painters for production tutor cues', async () => {
     const host = document.createElement('div')
+    const animate = vi.fn()
     const highlight = vi.fn(() => document.createElementNS('http://www.w3.org/2000/svg', 'g'))
     const underline = vi.fn(() => document.createElementNS('http://www.w3.org/2000/svg', 'g'))
-    const outline = vi.fn(() => document.createElementNS('http://www.w3.org/2000/svg', 'g'))
+    const outline = vi.fn(() => {
+      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+      Object.defineProperty(group, 'animate', { value: animate })
+      return group
+    })
+    let reducedMotion = false
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query.includes('prefers-reduced-motion') && reducedMotion,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
     document.body.append(host)
     const adapter = new FoliateReaderAdapter(host, {}, {
       loadFoliate: async () => ({
@@ -636,6 +648,17 @@ describe('FoliateReaderAdapter', () => {
     expect(highlight).not.toHaveBeenCalled()
     expect(underline).not.toHaveBeenCalled()
     expect(element).toHaveAttribute('data-bookhand-tutor-cue', 'outline')
+    expect(animate).toHaveBeenCalledWith(
+      [{ opacity: 0.15 }, { opacity: 1 }],
+      { duration: 520, easing: 'ease-out' },
+    )
+
+    reducedMotion = true
+    adapter.setTutorTarget(target, { kind: 'outline' })
+    await waitFor(() => expect(view.overlayAdd).toHaveBeenCalledTimes(2))
+    const reducedMotionDraw = view.overlayAdd.mock.calls.at(-1)?.[2] as FoliateDrawFunction
+    reducedMotionDraw([], {})
+    expect(animate).toHaveBeenCalledTimes(1)
   })
 
   it('keeps one live viewer through the React StrictMode setup and cleanup cycle', async () => {
