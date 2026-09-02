@@ -53,5 +53,45 @@ describe('durable storage request orchestration', () => {
     expect(client.claimPersistenceRequest).not.toHaveBeenCalled()
     expect(persist).not.toHaveBeenCalled()
   })
-})
 
+  it('imports the book anyway when the browser has no persist API at all', async () => {
+    const client = fakeClient('persistent', [true])
+    // Some in-app browsers expose no storage manager. That is a fact to report,
+    // not a reason to fail an import the person asked for.
+    await expect(importBookAndRequestPersistence(client, importedBook, {})).resolves.toEqual({
+      bookId: 'book-id',
+      persistence: 'unsupported',
+    })
+    expect(client.importBook).toHaveBeenCalledOnce()
+  })
+
+  it('imports the book anyway when the browser refuses', async () => {
+    const client = fakeClient('persistent', [true])
+    const persist = vi.fn().mockResolvedValue(false)
+    const outcome = await importBookAndRequestPersistence(client, importedBook, { persist })
+    expect(outcome).toEqual({ bookId: 'book-id', persistence: 'denied' })
+    expect(client.importBook).toHaveBeenCalledOnce()
+  })
+
+  it('never asks during a passive bundled-book bootstrap', async () => {
+    // Opening the app must not produce a browser permission prompt nobody
+    // asked for. Only an import the person started may spend the one request.
+    const client = fakeClient('persistent', [true])
+    const persist = vi.fn().mockResolvedValue(true)
+    const bundled: ImportBookInput = {
+      ...importedBook,
+      provenance: {
+        kind: 'bundled',
+        sourceUrl: 'https://example.invalid/book.epub',
+        retrievedAt: '2026-09-01T12:00:00.000Z',
+        removeAfterJudging: true,
+      },
+    }
+    await expect(importBookAndRequestPersistence(client, bundled, { persist })).resolves.toEqual({
+      bookId: 'book-id',
+      persistence: 'not-requested',
+    })
+    expect(persist).not.toHaveBeenCalled()
+    expect(client.claimPersistenceRequest).not.toHaveBeenCalled()
+  })
+})

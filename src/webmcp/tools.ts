@@ -132,6 +132,11 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           const context = await commands.getReadingContext()
           const lines = [
             `Book: ${context.title}`,
+            // Every source-linked mutation has to name the book. Saying it here
+            // means an agent that grounded itself already has what it needs,
+            // instead of having to go back to list_books for an id it was never
+            // told.
+            `Book id: ${context.bookId}`,
             `Chapter: ${context.chapterLabel ?? 'unknown'}`,
             `Section index: ${context.sectionIndex}`,
             `Progress: ${context.progressPercent}%`,

@@ -96,29 +96,54 @@ test('an agent reads the page, highlights it, and builds a source-linked lesson'
   ) as Record<string, unknown> | null
   expect(visibleRange).not.toBeNull()
 
+  // Grounding also tells it which book it is in, which every source-linked
+  // mutation has to name.
+  const bookId = /Book id: (\S+)/.exec(context.text)?.[1]
+  expect(bookId).toBeTruthy()
+
   // 2. Re-read that exact passage rather than trusting its own memory.
   const passage = await agentCall(page, 'get_passage', { range: visibleRange })
   expect(passage.isError).toBe(false)
   expect(passage.text).toContain('Passage')
 
+  // The quote has to be the book's own words. An agent cannot invent one.
+  const quote = /<<<BOOK\n([\s\S]*?)\nBOOK/.exec(context.text)?.[1]
+  expect(quote).toBeTruthy()
+
   // 3. Highlight it in the person's book.
   const highlighted = await agentCall(page, 'save_annotation', {
+    bookId,
     range: visibleRange,
-    quote: 'a passage the agent chose',
+    quote,
     color: 'amber',
     note: 'Worth revisiting',
   })
   expect(highlighted.isError).toBe(false)
+
+  // A fabricated quote over the same range is refused, and says why.
+  const fabricated = await agentCall(page, 'save_annotation', {
+    bookId,
+    range: visibleRange,
+    quote: 'a passage the agent chose',
+  })
+  expect(fabricated.isError).toBe(true)
+  expect(fabricated.text).toContain('does not match the text at that location')
 
   // 4. Build a source-linked lesson on the study board.
   const lesson = await agentCall(page, 'upsert_study_item', {
     kind: 'steps',
     title: 'Reading a slope',
     steps: ['Take two points on the curve', 'Divide the rise by the run'],
+    bookId,
     sourceRange: visibleRange,
+    sourceQuote: quote,
     sourceLabel: 'Chapter X',
   })
   expect(lesson.isError).toBe(false)
+  // The receipt names the person's own reversals and hands over the one-time
+  // token, which is the only way the agent can revise this block later.
+  expect(lesson.text).toContain('updateToken:')
+  expect(lesson.text).toContain('Undo')
 
   // The person sees all of it in the ordinary interface.
   await page.getByRole('button', { name: 'Study' }).click()
@@ -127,10 +152,15 @@ test('an agent reads the page, highlights it, and builds a source-linked lesson'
   await expect(page.locator('.highlight')).toHaveCount(1)
   await expect(page.getByText('Worth revisiting')).toBeVisible()
 
-  // And can see exactly what the agent did.
+  // And can see exactly what the agent did — including what it was refused.
   const activity = page.locator('.agent-calls li')
-  await expect(activity.filter({ hasText: 'save_annotation' })).toBeVisible()
-  await expect(activity.filter({ hasText: 'upsert_study_item' })).toBeVisible()
+  await expect(activity.filter({ hasText: 'save_annotation' })).toHaveCount(2)
+  await expect(activity.filter({ hasText: 'upsert_study_item' })).toHaveCount(1)
+  const refused = activity.filter({ hasText: 'save_annotation' }).and(
+    page.locator('[data-failed="true"]'),
+  )
+  await expect(refused).toHaveCount(1)
+  await expect(refused).toContainText('does not match the text at that location')
 
   // The highlight is drawn over the book itself, not merely stored.
   await expect

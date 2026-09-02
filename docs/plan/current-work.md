@@ -4,9 +4,15 @@ Last updated: 2026-09-02
 
 ## Next action
 
-Continue W1. `VAL-RANGE-OWNERSHIP` and `VAL-MATH-PASSAGE` are implemented;
-`VAL-DURABLE-STORAGE-REQUEST`, `VAL-STUDY-ID-OWNERSHIP`,
-`VAL-ACTION-PROVENANCE-UNDO`, and `VAL-MUTATION-ERRORS` remain.
+W1 is implemented. All six contracts — `VAL-RANGE-OWNERSHIP`,
+`VAL-MATH-PASSAGE`, `VAL-STUDY-ID-OWNERSHIP`, `VAL-ACTION-PROVENANCE-UNDO`,
+`VAL-MUTATION-ERRORS`, and `VAL-DURABLE-STORAGE-REQUEST` — have implementation
+and evidence. Next is W2's style parity, then W3's theme/layout primitives, then
+W5.
+
+W7 (`VAL-COMPOSITION-QUALITY`) was added on 2026-09-02 after the owner observed
+that nothing in this mission measures whether a frontier model given these
+affordances composes anything worth reading. It runs after W5.
 
 The wave order is being read as a dependency graph rather than a chain, because
 the deadline is 2026-09-03T20:00Z. W2 needs W1's error/provenance primitives,

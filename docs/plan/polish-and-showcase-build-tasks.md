@@ -60,6 +60,19 @@ wrong-book, stale-range, stale-fingerprint, partial-quote, and invented-quote
 before attempting any write. `tests/unit/source-verification.test.ts`
 re-derives the contract's normalization independently of the implementation.
 
+`VAL-STUDY-ID-OWNERSHIP`, `VAL-ACTION-PROVENANCE-UNDO`, `VAL-MUTATION-ERRORS`,
+and `VAL-DURABLE-STORAGE-REQUEST` implemented 2026-09-02. Schema version 2 with
+an in-place migration; ownership decided inside one repository transaction;
+agent create/revise with a one-time update token and no delete; retry
+idempotency scoped to book, origin, token, operation, and stated payload; undo
+guarded by expected revision; receipts returned to both callers; provenance
+mark, Undo control, and a bounded retryable error in the study board.
+
+One durable lesson from that work: deciding what a person sees by testing
+`instanceof` passes every unit test and silently fails in the product, because
+these errors cross a worker boundary that keeps only code, message, and
+retryable. The person's wording now lives in the Error's own message.
+
 `VAL-MATH-PASSAGE` implemented 2026-09-02. Passages are serialized rather than
 concatenated, preferring `data-tex`, then MathML `alttext`/TeX annotation, then
 image `alt`, then SVG title and description, each replacing its element so
