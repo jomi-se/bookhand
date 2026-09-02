@@ -15,6 +15,10 @@ export interface FoliateSection {
   readonly linear?: string
   readonly cfi?: string
   readonly createDocument?: () => Promise<Document>
+  /** Drop this section from the loader's blob-URL cache. */
+  readonly unload?: () => void
+  /** Resolve a section-relative href against the package. */
+  readonly resolveHref?: (href: string) => string
 }
 
 export interface FoliateBook {
@@ -32,6 +36,8 @@ export interface FoliateBook {
   readonly toc?: readonly FoliateTocItem[]
   readonly sections: readonly FoliateSection[]
   readonly transformTarget?: EventTarget
+  /** Read a packaged file as text. Used to recover a section's raw source. */
+  loadText?(href: string): Promise<string> | string
   getCover?(): Promise<Blob | null> | Blob | null
   resolveCFI?(cfi: string): FoliateResolvedTarget
   resolveHref?(href: string): FoliateResolvedTarget | null
@@ -62,6 +68,8 @@ export interface FoliateRenderer extends HTMLElement {
     readonly overlayer?: FoliateOverlayInstance
   }[]
   setStyles?(styles: string): void
+  /** Re-run pagination after the section content changed under the renderer. */
+  render?(): void
 }
 
 export interface FoliateOverlayInstance {

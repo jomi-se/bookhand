@@ -129,4 +129,9 @@ export interface ReaderAdapter {
   renderAnnotations(marks: readonly ReaderAnnotationMark[]): void
   /** Runtime-only verified tutor target; drawing is supplied only by a test harness until W9. */
   setTutorTarget?(passage: Passage | null): void
+  /**
+   * Reading and rewriting the book's own markup. Optional: a reader that
+   * cannot remaster documents is still a reader.
+   */
+  readonly remaster?: import('./remaster.ts').DocumentRemasterPort
 }

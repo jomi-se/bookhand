@@ -44,6 +44,12 @@ import type {
 } from './guidance.ts'
 import type { PresentationStore, StyleCommit, StylePatch } from './presentation.ts'
 import type { BoardMode, SurfaceStore } from './surface.ts'
+import type {
+  DocumentRemasterPort,
+  SectionDiagnosis,
+  SectionRewriteResult,
+  SectionSource,
+} from '../domain/remaster.ts'
 import type { ReaderPortBridge } from './reader-bridge.ts'
 import type { StorageClient } from '../storage/client.ts'
 import { DEFAULT_READER_STYLE } from '../reader/FoliateReaderAdapter.ts'
@@ -289,6 +295,86 @@ export class BookhandCommands {
 
   async controlGuidance(action: 'back' | 'stop'): Promise<GuidanceBackResult | GuidanceStopResult> {
     return action === 'back' ? this.#context.guidance.back() : this.#context.guidance.stop()
+  }
+
+  /**
+   * The remastering surface, or a refusal a person can act on.
+   *
+   * Bookhand hands an agent the book's own markup and takes edited markup
+   * back. It does not model the repair: what a broken section should become is
+   * the agent's judgement, and the recovery machinery — version history, Undo,
+   * Reset, sanitization — is what makes handing over that much freedom safe.
+   */
+  #remaster(): DocumentRemasterPort {
+    const port = this.#adapter().remaster
+    if (!port) throw new ReaderUnavailableError()
+    return port
+  }
+
+  async diagnoseSection(sectionIndex?: number): Promise<SectionDiagnosis> {
+    return this.#remaster().diagnoseSection(await this.#resolveSection(sectionIndex))
+  }
+
+  async getSectionSource(sectionIndex?: number): Promise<SectionSource> {
+    return this.#remaster().getSectionSource(await this.#resolveSection(sectionIndex))
+  }
+
+  async rewriteSection(
+    html: string,
+    options: { readonly css?: string; readonly summary?: string; readonly sectionIndex?: number } = {},
+  ): Promise<SectionRewriteResult> {
+    const index = await this.#resolveSection(options.sectionIndex)
+    const result = await this.#remaster().rewriteSection(index, html, {
+      ...(options.css === undefined ? {} : { css: options.css }),
+      ...(options.summary === undefined ? {} : { summary: options.summary }),
+    })
+    this.#changed()
+    return result
+  }
+
+  async compileSectionMath(sectionIndex?: number) {
+    const index = await this.#resolveSection(sectionIndex)
+    const report = await this.#remaster().compileSectionMath(index)
+    this.#changed()
+    return { sectionIndex: index, ...report }
+  }
+
+  async undoSectionRewrite(sectionIndex?: number) {
+    const index = await this.#resolveSection(sectionIndex)
+    const result = await this.#remaster().undoSection(index)
+    this.#changed()
+    return result ? { sectionIndex: index, ...result } : undefined
+  }
+
+  async resetSection(sectionIndex?: number): Promise<boolean> {
+    const index = await this.#resolveSection(sectionIndex)
+    const reset = await this.#remaster().resetSection(index)
+    this.#changed()
+    return reset
+  }
+
+  async showRewritten(showRewritten: boolean): Promise<number> {
+    const changed = await this.#remaster().showRewritten(showRewritten)
+    this.#changed()
+    return changed
+  }
+
+  isShowingRewritten(): boolean {
+    return this.#remaster().isShowingRewritten()
+  }
+
+  hasRewrite(sectionIndex: number): boolean {
+    return this.#remaster().hasRewrite(sectionIndex)
+  }
+
+  describeRewrite(sectionIndex: number) {
+    return this.#remaster().describeRewrite(sectionIndex)
+  }
+
+  /** Default to the section the person is actually reading. */
+  async #resolveSection(sectionIndex?: number): Promise<number> {
+    if (typeof sectionIndex === 'number') return sectionIndex
+    return this.#adapter().getLocation().sectionIndex
   }
 
   async searchBook(query: string, limit = 5): Promise<SearchResult> {

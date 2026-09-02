@@ -13,6 +13,7 @@ import type { ReaderPortBridge } from '../app/reader-bridge.ts'
 import type { GuidanceController, GuidanceSurfaceSnapshot } from '../app/guidance.ts'
 import type { RuntimePorts } from '../runtime/ports.ts'
 import type { StorageClient } from '../storage/client.ts'
+import { RemasterBar } from './RemasterBar.tsx'
 import { ContentsPanel } from './ContentsPanel.tsx'
 import { SearchPanel } from './SearchPanel.tsx'
 import { ReaderHost } from './ReaderHost.tsx'
@@ -343,6 +344,10 @@ export function ReaderScreen({
             <span className="tool-label">Text</span>
           </button>
         </div>
+        {/* Inside the chrome, not beside it: `.reader` declares exactly three
+            grid rows, and a fourth child would push the book's own surface out
+            of the `1fr` track and collapse it to nothing. */}
+        <RemasterBar commands={study.commands} sectionIndex={reader.location?.sectionIndex} />
       </header>
 
       <GuidanceIndicator controller={guidance} />
