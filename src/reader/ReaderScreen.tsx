@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Highlighter, LayoutPanelLeft, List, RotateCw, Type } from 'lucide-react'
 
 import type { BookCatalogEntry, BookRange, StudyItemPayload } from '../domain/index.ts'
@@ -41,6 +41,7 @@ export function ReaderScreen({
   const reader = useReader({ entry, client, ports, bridge })
   const study = useStudy({ entry, client, bridge })
   const [panel, setPanel] = useState<ReaderPanel>(null)
+  const panelInvoker = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     onCommandsReady(study.commands)
@@ -84,30 +85,59 @@ export function ReaderScreen({
     [reader.location, reader.selection, study.commands],
   )
 
-  const toggle = useCallback(
-    (next: Exclude<ReaderPanel, null>) => setPanel((p) => (p === next ? null : next)),
-    [],
-  )
+  const closePanel = useCallback(() => {
+    setPanel(null)
+    const invoker = panelInvoker.current
+    panelInvoker.current = null
+    window.requestAnimationFrame(() => invoker?.focus())
+  }, [])
+
+  const toggle = useCallback((next: Exclude<ReaderPanel, null>) => {
+    setPanel((current) => {
+      if (current === next) {
+        const invoker = panelInvoker.current
+        panelInvoker.current = null
+        window.requestAnimationFrame(() => invoker?.focus())
+        return null
+      }
+      panelInvoker.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && panel) setPanel(null)
+      if (event.key === 'Escape' && panel) {
+        event.preventDefault()
+        closePanel()
+        return
+      }
       if (event.target instanceof HTMLElement) {
-        const tag = event.target.tagName
-        if (tag === 'INPUT' || tag === 'TEXTAREA') return
+        if (
+          event.target.closest(
+            'button, a, input, textarea, select, summary, [contenteditable="true"]',
+          )
+        )
+          return
       }
       if (event.key === 'ArrowRight') void reader.navigate({ kind: 'relative', direction: 'next' })
       if (event.key === 'ArrowLeft') void reader.navigate({ kind: 'relative', direction: 'previous' })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [panel, reader])
+  }, [closePanel, panel, reader])
 
   const percent =
     reader.location === undefined ? undefined : Math.round(reader.location.fraction * 100)
 
   return (
-    <div className="reader" data-panel={panel ?? 'none'} data-board={expanded ? 'expanded' : 'docked'}>
+    <div
+      className="reader"
+      data-panel={panel ?? 'none'}
+      data-board={expanded ? 'expanded' : 'docked'}
+      data-reader-theme={reader.style.theme === 'publisher' ? 'light' : reader.style.theme}
+    >
       <header className="reader-chrome">
         <button type="button" className="button button-quiet button-back" onClick={onExit}>
           <ChevronLeft size={16} aria-hidden="true" />
@@ -126,7 +156,10 @@ export function ReaderScreen({
           <button
             type="button"
             className="button button-quiet"
+            aria-label="Contents"
             aria-pressed={panel === 'contents'}
+            aria-expanded={panel === 'contents'}
+            aria-controls="reader-contents-panel"
             onClick={() => toggle('contents')}
           >
             <List size={16} aria-hidden="true" />
@@ -135,7 +168,10 @@ export function ReaderScreen({
           <button
             type="button"
             className="button button-quiet"
+            aria-label="Study"
             aria-pressed={panel === 'study'}
+            aria-expanded={panel === 'study'}
+            aria-controls="reader-study-panel"
             onClick={() => toggle('study')}
           >
             <LayoutPanelLeft size={16} aria-hidden="true" />
@@ -144,7 +180,10 @@ export function ReaderScreen({
           <button
             type="button"
             className="button button-quiet"
+            aria-label="Text settings"
             aria-pressed={panel === 'text'}
+            aria-expanded={panel === 'text'}
+            aria-controls="reader-text-panel"
             onClick={() => toggle('text')}
           >
             <Type size={16} aria-hidden="true" />
@@ -162,7 +201,7 @@ export function ReaderScreen({
               void reader.navigate(target)
               if (window.matchMedia('(max-width: 860px)').matches) setPanel(null)
             }}
-            onClose={() => setPanel(null)}
+            onClose={closePanel}
           />
         ) : null}
 
@@ -171,7 +210,7 @@ export function ReaderScreen({
             style={reader.style}
             onChange={reader.applyStyle}
             onReset={reader.resetStyle}
-            onClose={() => setPanel(null)}
+            onClose={closePanel}
           />
         ) : null}
 
@@ -201,7 +240,7 @@ export function ReaderScreen({
                 ?.setStudyBoardView(study.board?.view === 'expanded' ? 'docked' : 'expanded')
                 .then(study.setBoard)
             }
-            onClose={() => setPanel(null)}
+            onClose={closePanel}
             agentActivity={
               <AgentActivity
                 status={agent.status}

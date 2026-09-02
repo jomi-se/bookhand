@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Maximize2, Minimize2, Plus, Trash2 } from 'lucide-react'
 
 import type {
@@ -59,11 +59,13 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
   const [composing, setComposing] = useState<StudyItemKind>()
   const [draft, setDraft] = useState('')
   const expanded = board?.view === 'expanded'
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => heading.current?.focus(), [])
 
   return (
-    <aside className="reader-panel study-panel" aria-label="Study">
+    <aside id="reader-study-panel" className="reader-panel study-panel" aria-label="Study">
       <header className="panel-head">
-        <h2>{board?.title ?? 'Study'}</h2>
+        <h2 ref={heading} tabIndex={-1}>{board?.title ?? 'Study'}</h2>
         <span className="panel-head-tools">
           <button
             type="button"

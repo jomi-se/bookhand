@@ -27,7 +27,7 @@
 }
 
 .add-row .button {
-  min-block-size: 34px;
+  min-block-size: var(--tap);
   padding-inline: 10px;
   font-size: var(--step--2);
   text-transform: capitalize;

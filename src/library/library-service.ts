@@ -2,6 +2,10 @@ import type { BookCatalogEntry, ImportBookInput } from '../domain/index.ts'
 import { BookUnreadableError, readBookMetadata } from '../reader/metadata.ts'
 import { sha256BookId } from '../storage/hash.ts'
 import type { StorageClient } from '../storage/client.ts'
+import {
+  importBookAndRequestPersistence,
+  type PersistenceManager,
+} from '../storage/persistence.ts'
 import type { BundledBookRegistration } from './bundled-books.ts'
 
 /** A file the person chose that Bookhand cannot accept, with a reason to show. */
@@ -29,6 +33,7 @@ export interface ImportDependencies {
   readonly fetch?: typeof globalThis.fetch
   readonly baseUrl?: string
   readonly readMetadata?: typeof readBookMetadata
+  readonly persistenceManager?: PersistenceManager
 }
 
 async function toImportInput(
@@ -82,7 +87,12 @@ export async function importEpubFile(
     }
     throw error
   }
-  return client.importBook(input)
+  const outcome = await importBookAndRequestPersistence(
+    client,
+    input,
+    dependencies.persistenceManager,
+  )
+  return outcome.bookId
 }
 
 /**

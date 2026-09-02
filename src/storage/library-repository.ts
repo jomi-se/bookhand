@@ -295,6 +295,7 @@ export class LibraryRepository {
         payload_json = excluded.payload_json,
         sort_order = excluded.sort_order,
         updated_at = excluded.updated_at
+      WHERE study_items.board_id = excluded.board_id
     `)
     try {
       statement
@@ -311,6 +312,9 @@ export class LibraryRepository {
           item.updatedAt,
         ])
         .step()
+      if (Number(this.db.changes()) !== 1) {
+        throw new Error('That study item belongs to another book')
+      }
     } finally {
       finalize(statement)
     }

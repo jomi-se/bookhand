@@ -14,7 +14,11 @@ import {
 const metadata = { title: 'A Book', authors: [{ name: 'An Author' }] }
 
 function fakeClient() {
-  return { importBook: vi.fn().mockResolvedValue('stored-id') } as unknown as StorageClient
+  return {
+    importBook: vi.fn().mockResolvedValue('stored-id'),
+    getDiagnostics: vi.fn().mockResolvedValue({ mode: 'session-only' }),
+    claimPersistenceRequest: vi.fn(),
+  } as unknown as StorageClient
 }
 
 function epubFile(name: string, bytes = new Uint8Array([1, 2, 3])) {
@@ -36,6 +40,22 @@ describe('importing a person’s own EPUB', () => {
         provenance: { kind: 'imported', originalFileName: 'slopes.epub' },
       }),
     )
+  })
+
+  it('requests durable storage through the real file-import path', async () => {
+    const client = {
+      importBook: vi.fn().mockResolvedValue('stored-id'),
+      getDiagnostics: vi.fn().mockResolvedValue({ mode: 'persistent' }),
+      claimPersistenceRequest: vi.fn().mockResolvedValue(true),
+    } as unknown as StorageClient
+    const persist = vi.fn().mockResolvedValue(true)
+
+    await importEpubFile(client, epubFile('durable.epub'), {
+      readMetadata: async () => metadata,
+      persistenceManager: { persist },
+    })
+
+    expect(persist).toHaveBeenCalledOnce()
   })
 
   it.each([

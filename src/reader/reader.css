@@ -2,6 +2,30 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   block-size: 100svh;
+  color: var(--ink);
+  background: var(--canvas);
+  color-scheme: light;
+}
+
+.reader[data-reader-theme='sepia'] {
+  --canvas: #f4efe4;
+  --ink: #29231b;
+  --muted: #655c50;
+  --rule: #d8cdbb;
+  --accent: #9b3b21;
+  --accent-quiet: #ead9ca;
+  --raised: #fffaf0;
+}
+
+.reader[data-reader-theme='dark'] {
+  --canvas: #171717;
+  --ink: #f4efe9;
+  --muted: #b8b0a7;
+  --rule: #3b3733;
+  --accent: #ff9a76;
+  --accent-quiet: #3b2922;
+  --raised: #232220;
+  color-scheme: dark;
 }
 
 .reader-chrome {
@@ -140,6 +164,12 @@
 
 .toc-item:hover {
   background: color-mix(in oklch, var(--rule) 45%, transparent);
+}
+
+.toc-item[aria-current='location'] {
+  color: var(--accent);
+  background: var(--accent-quiet);
+  font-weight: 600;
 }
 
 .control {
@@ -330,6 +360,12 @@
 
   .reader-panel {
     border-inline-end: 0;
+  }
+
+  .reader[data-panel='contents'] .reader-footer,
+  .reader[data-panel='text'] .reader-footer,
+  .reader[data-panel='study'] .reader-footer {
+    display: none;
   }
 
   .page-step {

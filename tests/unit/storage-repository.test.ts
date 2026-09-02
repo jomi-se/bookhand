@@ -3,7 +3,7 @@
 import sqlite3InitModule, { type Database } from '@sqlite.org/sqlite-wasm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import type { ImportBookInput, ReadingState } from '../../src/domain/index.ts'
+import type { ImportBookInput, ReadingState, StudyItem } from '../../src/domain/index.ts'
 import { sha256BookId } from '../../src/storage/hash.ts'
 import { LibraryRepository } from '../../src/storage/library-repository.ts'
 import { initializeSchema, STORAGE_SCHEMA_VERSION } from '../../src/storage/schema.ts'
@@ -164,6 +164,35 @@ describe('official SQLite library repository', () => {
         `SELECT count(*) FROM chunks_fts WHERE chunks_fts MATCH 'calculus'`,
       ),
     ).toBe(1)
+  })
+
+  it('rejects a study item id that already belongs to another book', async () => {
+    const firstBookId = await sha256BookId(book.epubBytes)
+    const secondBook = { ...book, epubBytes: new Uint8Array([2, 4, 6, 8]) }
+    const secondBookId = await sha256BookId(secondBook.epubBytes)
+    repository.importBook(firstBookId, book)
+    repository.importBook(secondBookId, secondBook)
+    const firstBoard = repository.getOrCreateBoard(firstBookId, readingState.updatedAt)
+    const secondBoard = repository.getOrCreateBoard(secondBookId, readingState.updatedAt)
+    const firstItem: StudyItem = {
+      id: 'shared-item-id',
+      boardId: firstBoard.id,
+      payload: { kind: 'prose', text: 'First book content' },
+      sortOrder: 0,
+      createdAt: readingState.updatedAt,
+      updatedAt: readingState.updatedAt,
+    }
+    repository.upsertStudyItem(firstItem)
+
+    expect(() =>
+      repository.upsertStudyItem({
+        ...firstItem,
+        boardId: secondBoard.id,
+        payload: { kind: 'prose', text: 'Cross-book overwrite' },
+      }),
+    ).toThrow(/belongs to another book/)
+    expect(repository.listStudyItems(firstBoard.id)).toEqual([firstItem])
+    expect(repository.listStudyItems(secondBoard.id)).toEqual([])
   })
 })
 

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { ReaderStyle, ReaderTheme } from '../domain/reader.ts'
 import { boundCustomCss } from './custom-css.ts'
 
@@ -60,11 +60,13 @@ export function TextPanel({ style, onChange, onReset, onClose }: TextPanelProps)
   const [draftCss, setDraftCss] = useState(style.customCss ?? '')
   const [removed, setRemoved] = useState<readonly string[]>([])
   const cssId = useId()
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => heading.current?.focus(), [])
 
   return (
-    <aside className="reader-panel" aria-label="Text settings">
+    <aside id="reader-text-panel" className="reader-panel" aria-label="Text settings">
       <header className="panel-head">
-        <h2>Text</h2>
+        <h2 ref={heading} tabIndex={-1}>Text</h2>
         <button type="button" className="button button-icon" onClick={onClose} aria-label="Close text settings">
           ✕
         </button>

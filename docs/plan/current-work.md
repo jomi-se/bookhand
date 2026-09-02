@@ -23,20 +23,38 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
 - The delivery order and cut order are settled in
   `docs/plan/vertical-slice-build-order.md`.
 - Slices 1, 2, and 3 are implemented. Bookhand is a working local-first reader
-  whose reading and study capabilities are registered as WebMCP tools. W7, the
-  judged-surface check, is the only Slice 1 item still open.
+  whose reading and study capabilities are registered as WebMCP tools. The
+  post-Slice 3 audit found important trust and mobile-interaction gaps before
+  the generated teaching showcase.
 - Slice 2: highlights and notes on CFI ranges drawn over the book, one study
   board per book in docked and expanded views, and prose/quotation/equation/
   steps/question blocks that each carry the source range they came from.
 - Slice 3: eleven tools registered through `document.modelContext`. `list_books`
   and `open_book` are offered from first load; a book's reading and study tools
-  join them when it opens. Every tool calls `BookhandCommands`, the same surface
-  the interface calls. Book text is returned inside an untrusted-data boundary,
-  agents can only anchor to ranges tools returned, and every call is listed in
-  the study board as it happens.
-- Evidence: 106 unit tests and 8 Playwright specs against the production build,
-  including an end-to-end agent path driven through a stand-in runtime installed
-  before the app loads.
+  join them when it opens. Every tool calls `BookhandCommands`, but style and
+  board-view tool mutations do not yet share the mounted interface's observable
+  state path. Book text is returned inside an untrusted-data boundary, but
+  exact range/quote ownership is not yet enforced before mutation. Every call
+  is listed in the study board as it happens.
+- Evidence: 110 unit tests and 7 Playwright tests against the production build,
+  including a deterministic scripted path through Chromium's genuine
+  `document.modelContext` runtime. This proves tool registration and execution;
+  it does not yet prove model-authored lesson quality.
+- The 2026-09-01 post-Slice 3 audit is recorded at
+  `docs/reviews/2026-09-01-post-slice-3-polish-audit.md`. The active mission and
+  validation contracts are `docs/plan/polish-and-showcase-mission.md` and
+  `docs/contracts/polish/`.
+- Five sequential independent contract-review passes closed every material
+  acceptance-oracle issue; the final pass approved task planning. The frozen
+  dependency waves are in `docs/plan/polish-and-showcase-build-tasks.md`.
+- First post-audit fixes are implemented: the real file-import path reaches the
+  one-time durable-storage request; SQLite rejects study-item IDs owned by a
+  different book; the unnecessary Cloudflare COOP header is removed; reader
+  themes now cover the whole shell; mobile toolbar controls retain accessible
+  names; panel focus enters and returns correctly; current TOC state is exposed;
+  hidden-book arrow navigation is guarded; and Study authoring targets meet 44
+  pixels. The larger mobile chrome/gesture redesign and remaining W1 trust work
+  are still open.
 - Bookhand naming and the approved Slice 1 visual system are committed; the
   reader/library implementation mission is now active.
 - Slice 1 scope, work topology, and reviewed validation contracts live in
@@ -116,7 +134,15 @@ The WebMCP Challenge closes 2026-09-03T20:00Z. Required and still open:
 
 ## Next actions
 
-1. Confirm the real storage mode and the hero flow in the ChatGPT **desktop**
+1. Complete the trust reset: exact source verification, observable shared
+   style/board mutations, book-scoped study IDs, real durable-storage prompting,
+   math-faithful passages, visible mutation errors, and the COOP decision.
+2. Complete the mobile reading reset: shell-wide themes, immersive navigation,
+   intentional gestures, coherent panels/focus, and mobile browser evidence.
+3. Implement local lexical retrieval and the bounded native
+   slope-microscope experience, then run an actual compatible model through the
+   deployed tool surface.
+4. Confirm the real storage mode and the hero flow in the ChatGPT **desktop**
    app's built-in browser, the judged surface under ADR 0003 and its 2026-09-01
    amendment. The Pixel 7 cannot close this: WebMCP shipped in the ChatGPT
    desktop app, not the Android one. An in-app browser may also refuse OPFS sync
@@ -128,12 +154,10 @@ The WebMCP Challenge closes 2026-09-03T20:00Z. Required and still open:
    `tests/e2e/webmcp-agent.spec.ts` exercises the production build through the
    real runtime and passes. What remains untested is that browser's presentation
    and storage policy, not the tool contract.
-2. Deploy to bookhand.dev and confirm the live URL in the judged surface.
-3. Slice 4 and 5 remain unbuilt and are the documented cut order: semantic
-   search first, then generated labs. Neither is required for the submission.
-4. Continue through the slices in order; preserve the Slice 3 submission
-   checkpoint before adding semantic retrieval or generated labs.
-5. Use the real Chapter X content from the bundled EPUB; the approved mock's
+5. Deploy to bookhand.dev and confirm the live URL in the judged surface.
+6. Keep embeddings optional and after lexical retrieval. Slice 5's first rich
+   artifact is a trusted declarative experience, not arbitrary generated code.
+7. Use the real Chapter X content from the bundled EPUB; the approved mock's
    prose and figure are illustrative and must not be copied into the reader.
 
 ## Handoff notes
