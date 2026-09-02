@@ -1,5 +1,10 @@
 .reader {
   display: grid;
+  /* The column track must be declared. An implicit `auto` column is
+     max-content sized, so every `minmax(0, 1fr)` below this element resolves
+     against the widest figure in the book rather than against the viewport.
+     See docs/reviews/2026-09-02-pixel-7-reader-diagnosis.md, defect 1. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   block-size: 100svh;
   color: var(--ink);
@@ -73,6 +78,7 @@
 .reader-stage {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  min-inline-size: 0;
   min-block-size: 0;
 }
 
@@ -234,6 +240,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: stretch;
+  min-inline-size: 0;
   min-block-size: 0;
 }
 
