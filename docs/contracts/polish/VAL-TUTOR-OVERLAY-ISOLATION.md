@@ -1,0 +1,6 @@
+# VAL-TUTOR-OVERLAY-ISOLATION: Tutor presentation cannot replace durable marks
+
+Surface: reader adapter, annotation renderer, and browser.
+Needs: `VAL-RANGE-OWNERSHIP` and the real Foliate reader fixture.
+Behavior: The reader exposes a dedicated transient tutor-overlay seam whose lifecycle and identifiers are separate from durable annotation rendering. Through a test-only adapter seam, W6 can render and remove one transient sentinel at an exact verified range in the real Foliate fixture. A durable highlight at the same CFI remains visible and stored before, during, and after repeated durable-renderer rerenders and sentinel clearing. Durable rendering cannot clear or adopt tutor state; tutor rendering cannot add, update, hide, replace, or remove durable marks. No public cue input or production-visible cue is required until `VAL-TUTOR-PASSAGE-CUE`.
+Evidence: Adapter/component ownership inspection; real-Foliate browser geometry for the exact-range sentinel and same-CFI durable highlight; repeated durable-mark rerenders and sentinel removal; storage and annotation snapshots before, during, and after tutor-layer mount, update, clear, reader detach, and reload; production bundle exclusion for the sentinel activation seam.

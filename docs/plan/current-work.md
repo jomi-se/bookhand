@@ -11,12 +11,13 @@ result without prompting tool names or arguments. Deterministic live-browser
 validation is complete; this remaining check is model behavior and must not be
 substituted with Playwright evidence.
 
-Before implementing W6, resolve the proposed amendments in
-`docs/reviews/2026-09-02-w6-contract-amendment-proposal.md` into the canonical
-contracts. The recommended direction moves exact verified `focus_passage`
-navigation into W6, anchors persisted reading position during guidance, and
-treats learner navigation as a yielded session with a quiet Back affordance.
-W9 retains transient cue rendering. No W6 implementation has started.
+The W6 amendment proposed in
+`docs/reviews/2026-09-02-w6-contract-amendment-proposal.md` is now reflected in
+the canonical contracts: exact verified `focus_passage` navigation belongs to
+W6, active guidance anchors persisted reading position, learner navigation
+yields with a quiet Back affordance, and there is one predictable session-origin
+target rather than a hidden hop stack. W9 retains transient cue rendering. No
+W6 implementation has started.
 
 ## Active product direction
 
@@ -81,18 +82,22 @@ This direction is recorded in:
 
 - W4: complete — runtime/tool truth and canonical source lifecycle.
 - W5: complete and deployed — local lexical retrieval and `search_book`.
-- W6: shared origin-aware navigation and non-persistent tutor-session core.
+- W6: shared origin-aware navigation, navigation-only `focus_passage`, and the
+  non-persistent tutor-session core.
 - W7: first-class durable lesson domain, safe math/plot, atomic lifecycle, and
   recoverable removal.
 - W8: lesson-first Study composition, diagnostics separation, responsive
   workspace, manual no-agent authoring, and visible recovery.
-- W9: source focus, Study reveal, bounded temporary explanation, Back, and Stop.
+- W9: source cue presentation, Study reveal, and bounded temporary explanation.
 - W10: combined real-model hero and evidence closure.
 - W11: repeated composition-quality evaluation showing worst and best outputs.
 
-The contracts under `docs/contracts/polish/` define acceptance. Two sequential
-independent contract-review passes were completed and incorporated on
-2026-09-02; the amended W4-through-W11 topology is frozen.
+The contracts under `docs/contracts/polish/` define acceptance. The original
+W4-through-W11 topology received two sequential reviews on 2026-09-02. Later
+runtime evidence exposed additional tutor-navigation races; the amended W6/W9
+contracts then received three sequential passes, with findings incorporated
+after the first two and a clean third verdict. The amendment is frozen. W6 may
+begin after the owner-visible ChatGPT Desktop W5 smoke above.
 
 ## Submission state
 

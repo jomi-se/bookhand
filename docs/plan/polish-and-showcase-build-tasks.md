@@ -176,13 +176,16 @@ Depends on: W4 canonical source excerpts.
 
 ## W6: shared navigation and tutor-session core
 
-Target: `VAL-TUTOR-SESSION-LIFECYCLE`.
-Depends on: W2 shared board state and W3 reader interaction.
+Targets: `VAL-TUTOR-SESSION-LIFECYCLE`, the navigation-only
+`VAL-TUTOR-PASSAGE-FOCUS`, and `VAL-TUTOR-OVERLAY-ISOLATION`.
+Depends on: W2 shared board state, W3 reader interaction, and W5 search.
 
 - Route deliberate reader movement through one origin-aware controller.
-- Add one non-persistent, revision-guarded tutor session with a ten-entry stack.
-- Implement the attributed guidance indicator, Back, Stop, manual-takeover,
-  book-close, detach, and reload semantics.
+- Add one non-persistent, revision-guarded tutor session with a single
+  predictable origin target and anchored reading-position persistence.
+- Register navigation-only `focus_passage` and `control_guidance`; implement the
+  attributed guiding/yielded indicator, Back, Stop, manual-takeover, book-close,
+  detach, opening-race, and reload semantics.
 - Spike and select a transient overlay path that cannot replace a permanent
   annotation at the same CFI.
 
@@ -224,13 +227,14 @@ Depends on: W7 and W3 theme/layout primitives.
 
 ## W9: embodied tutor interactions
 
-Targets: `VAL-TUTOR-PASSAGE-FOCUS`, `VAL-TUTOR-STUDY-REVEAL`, and
+Targets: `VAL-TUTOR-PASSAGE-CUE`, `VAL-TUTOR-STUDY-REVEAL`, and
 `VAL-TUTOR-PRESENTATION-SAFETY`.
 Depends on: W5 search, W6 session core, W7 stable lesson IDs, and W8 stable
 study destinations.
 
-- Register `focus_passage`, `reveal_study_item`, `present_explanation`, and
-  `control_guidance` through the shared commands and genuine WebMCP runtime.
+- Extend `focus_passage` with transient cue presentation and register
+  `reveal_study_item` and `present_explanation` through the shared commands and
+  genuine WebMCP runtime.
 - Prove exact source focus, permanent-highlight coexistence, semantic status,
   meaningful target focus, bounded inert explanations, Back, Stop, takeover,
   and zero persistence.

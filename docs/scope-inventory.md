@@ -7,9 +7,9 @@
   presentation controls, and restore.
 - Persistent highlights, notes, one board per book, docked/expanded Study, and
   native prose, quotation, equation, steps, and question items.
-- Twelve dynamically registered tools through Chromium's genuine
+- Thirteen dynamically registered tools through Chromium's genuine
   `document.modelContext`: library/open, reading context/TOC/passage/navigation,
-  annotation/style, and study item/view operations.
+  lexical search, annotation/style, and study item/view operations.
 - A deployed Cloudflare Worker surface and a production browser/live-check
   harness. The WebMCP agent test is deterministic orchestration, not yet a
   genuine model-authored lesson run.
@@ -76,6 +76,8 @@ for the hackathon proof of concept.
 - Slice 3: real WebMCP tools for library access, context, navigation,
   annotation, presentation, and study-board construction; first credible
   submission checkpoint.
+- Slice 4 lexical milestone: local FTS5 indexing, lifecycle truth, ordinary
+  Search, and current-book `search_book` with exact citations.
 
 ## Active polish and showcase mission
 
@@ -126,7 +128,8 @@ Atomic inventory IDs map to contracts as follows:
 - `P-STUDY-RECOVERY` -> `VAL-STUDY-LOAD-RECOVERY`
 - `P-WEBMCP-CONTRACTS` -> `VAL-WEBMCP-TOOL-CONTRACTS`
 - `P-TUTOR-SESSION` -> `VAL-TUTOR-SESSION-LIFECYCLE`
-- `P-TUTOR-FOCUS` -> `VAL-TUTOR-PASSAGE-FOCUS`
+- `P-TUTOR-FOCUS` -> `VAL-TUTOR-PASSAGE-FOCUS`,
+  `VAL-TUTOR-OVERLAY-ISOLATION`, `VAL-TUTOR-PASSAGE-CUE`
 - `P-TUTOR-REVEAL` -> `VAL-TUTOR-STUDY-REVEAL`
 - `P-TUTOR-PRESENT` -> `VAL-TUTOR-PRESENTATION-SAFETY`
 - `P-HERO-MODEL` -> `VAL-HERO-MODEL-RUN`
@@ -144,10 +147,10 @@ The runtime delivery shape and the explicit boundary between EPUB CSS, native
 Study rendering, and future application-shell worlds are in
 `docs/plan/agent-facing-design-guidance.md`.
 
-## Unbuilt slices
+## Unbuilt slices and options
 
-- Slice 4: FTS5 lexical search, optional local embeddings, packed vector BLOBs,
-  exact semantic scan, hybrid retrieval, and retrieval WebMCP tools.
+- Remaining Slice 4 option: local embeddings, packed vector BLOBs, exact
+  semantic scan, and hybrid retrieval. Lexical retrieval must earn this cost.
 - Slice 5: bounded generated labs and the polished end-to-end tutor scenario.
 
 ## Deferred
