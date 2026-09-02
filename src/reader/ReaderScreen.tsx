@@ -8,6 +8,7 @@ import { AgentActivity } from '../webmcp/AgentActivity.tsx'
 import type { useWebMcpTools } from '../webmcp/useWebMcpTools.ts'
 import type { BookhandCommands } from '../app/commands.ts'
 import { splitTitle } from '../library/progress.ts'
+import type { DesignStateStore } from '../app/design-state.ts'
 import type { ReaderPortBridge } from '../app/reader-bridge.ts'
 import type { RuntimePorts } from '../runtime/ports.ts'
 import type { StorageClient } from '../storage/client.ts'
@@ -26,6 +27,8 @@ export interface ReaderScreenProps {
   readonly onExit: () => void
   /** Lets the composition root offer this book's tools to an agent. */
   readonly onCommandsReady: (commands: BookhandCommands | undefined) => void
+  /** Published for `get_design_context`; nothing renders from it. */
+  readonly designState: DesignStateStore
   readonly agent: ReturnType<typeof useWebMcpTools>
 }
 
@@ -36,6 +39,7 @@ export function ReaderScreen({
   bridge,
   onExit,
   onCommandsReady,
+  designState,
   agent,
 }: ReaderScreenProps) {
   const reader = useReader({ entry, client, ports, bridge })
@@ -49,6 +53,17 @@ export function ReaderScreen({
   }, [onCommandsReady, study.commands])
   const { title } = splitTitle(entry.metadata)
   const expanded = study.board?.view === 'expanded' && panel === 'study'
+
+  // What an agent asking for design context should be told is on screen. This
+  // writes to a plain store rather than lifting state, so a style change does
+  // not re-register the tool set.
+  useEffect(() => {
+    designState.set({
+      surface: panel === 'study' ? 'study' : 'reader',
+      ...(study.board?.view ? { boardView: study.board.view } : {}),
+    })
+    return () => designState.clear()
+  }, [designState, panel, study.board?.view])
 
   // Stored highlights are drawn whenever the set changes or a section renders.
   useEffect(() => {

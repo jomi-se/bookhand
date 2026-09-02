@@ -2,6 +2,8 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
 import { defineConfig, normalizePath, type Plugin } from 'vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
+// @ts-expect-error -- build-time only, shared with the unit-test runner.
+import { designContextSource } from './scripts/vite-design-context-plugin.mjs'
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -51,6 +53,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     testControlBoundary(mode),
+    designContextSource(),
     viteStaticCopy({
       targets: [
         {

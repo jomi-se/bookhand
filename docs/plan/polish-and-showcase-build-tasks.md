@@ -9,10 +9,32 @@ browser-agent design-context requirement. Three sequential review rounds
 resolved the amended contract and ownership issues, and a final clean
 verification passed; this topology is frozen again.
 
-## W0: browser-agent design context foundation
+## W0: browser-agent design context foundation — implemented 2026-09-02
 
 Targets: `VAL-AGENT-DESIGN-CONTEXT`.
 Depends on: none.
+
+Implemented as `get_design_context`, registered from first load beside the
+library tools. The guidance half is frozen into the bundle at build time by
+`scripts/vite-design-context-plugin.mjs`, which reads the marked block in
+`DESIGN.md`; the version is a SHA-256 of exactly those bytes, and both the unit
+test and the browser test recompute it independently rather than importing the
+build helper. Live state is read at call time through `src/app/design-state.ts`
+so a style change does not re-register the tool set. Evidence:
+`tests/unit/webmcp-design-context.test.ts` and
+`tests/e2e/webmcp-design-context.spec.ts`, the latter through genuine
+`document.modelContext`.
+
+Two things W0 could not fix and left for their owning waves:
+
+- A tool style mutation does not reach React state, so the design context reads
+  the adapter rather than the interface. W2 (`VAL-STYLE-PARITY`) owns closing
+  that; until it does, the two paths agree only because W0 reads the lower one.
+- The reading tools register as soon as the study board exists, which is before
+  `useReader` has finished restoring the stored style. A style mutation landing
+  in that window is silently overwritten by the restore. W2 owns the shared
+  command path where this becomes fixable; the browser test documents the race
+  by waiting the reader out.
 
 - Add the compact versioned runtime design artifact and globally available
   `get_design_context`.

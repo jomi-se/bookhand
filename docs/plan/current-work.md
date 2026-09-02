@@ -2,6 +2,15 @@
 
 Last updated: 2026-09-02
 
+## Next action
+
+W1 (source and persistence trust), then W2 (one observable mutation surface).
+W0 is done. A separate Pixel 7 diagnosis is parked at
+`docs/reviews/2026-09-02-pixel-7-reader-diagnosis.md`: it found that `.reader`
+declares no grid columns, so the reading surface is max-content sized and the
+whole app blows out horizontally on a phone. That is W3's territory and it is
+the largest single mobile defect found so far.
+
 ## Goal
 
 Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
@@ -67,7 +76,11 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
   page-owned `get_design_context` surface, version handshake, mutation receipts,
   and semantic-rendering integration are planned in
   `docs/plan/agent-facing-design-guidance.md` and
-  `VAL-AGENT-DESIGN-CONTEXT`. Impeccable
+  `VAL-AGENT-DESIGN-CONTEXT`. W0 of that plan is implemented: browser agents now
+  discover the composition guidance, live surface state, mutation scopes, and
+  reversal actions from the page itself, versioned by a digest of the canonical
+  `DESIGN.md` block. The version handshake, mutation receipts, and study
+  composition remain with W2 and W5. Impeccable
   stays code-first by default to conserve image-generation tokens and latency;
   a task may explicitly use a visual comp when that reference would materially
   improve a novel surface.

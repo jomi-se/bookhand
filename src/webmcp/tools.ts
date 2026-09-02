@@ -224,7 +224,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     {
       name: 'set_reading_style',
       description:
-        'Change how the book is presented: text size, line height, measure, paragraph spacing, theme, or custom book CSS. Every change is reversible by the person with one action.',
+        'Change how the book is presented: text size, line height, measure, paragraph spacing, theme, or custom book CSS. Every change is reversible by the person with one action. Picking a shipped theme or adjusting size needs nothing else; before writing custom CSS, call get_design_context for the semantic roles, contrast floors, and what this CSS can and cannot reach.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -233,7 +233,12 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           measureCh: { type: 'number', minimum: 40, maximum: 110 },
           paragraphSpacingEm: { type: 'number', minimum: 0, maximum: 2 },
           theme: { type: 'string', enum: ['publisher', 'light', 'sepia', 'dark'] },
-          customCss: { type: 'string', maxLength: 20_000 },
+          customCss: {
+            type: 'string',
+            maxLength: 20_000,
+            description:
+              'CSS applied inside the EPUB document only; it cannot style the library, reader chrome, panels, or Study. Call get_design_context first.',
+          },
           reset: { type: 'boolean', description: 'Restore every presentation default.' },
         },
         additionalProperties: false,
@@ -267,7 +272,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     {
       name: 'upsert_study_item',
       description:
-        'Put a study block on this book’s board, or update one you created. Blocks are prose, quotation, equation, steps, or question. Attach the source range so the person can jump back to where it came from.',
+        'Put a study block on this book’s board, or update one you created. Blocks are prose, quotation, equation, steps, or question. Attach the source range so the person can jump back to where it came from. One ordinary block needs nothing else; before composing several blocks into one piece of teaching, call get_design_context for the composition hierarchy this board expects.',
       inputSchema: {
         type: 'object',
         properties: {
