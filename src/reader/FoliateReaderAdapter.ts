@@ -33,6 +33,17 @@ import type {
   FoliateTocItem,
   FoliateView,
 } from './foliate-types.ts'
+import { diagnoseSection, type SectionDiagnosis } from '../remaster/diagnose.ts'
+import { remasterDocument } from '../remaster/document.ts'
+import type { RemasterReport } from '../domain/remaster.ts'
+import {
+  readSection,
+  restoreOriginal,
+  writeSection,
+  type RewriteResult,
+  type SectionRewrite,
+  type SectionSource,
+} from '../remaster/rewrite.ts'
 import { boundCustomCss } from './custom-css.ts'
 import { isInteractiveTarget, tapZone, type TapZone } from './tap-intent.ts'
 import { localized, mapMetadata } from './metadata.ts'
@@ -101,6 +112,17 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   #marks: readonly ReaderAnnotationMark[] = []
   #overlayer: FoliateModule['Overlayer']
   #disposedViews = new WeakSet<FoliateView>()
+  /**
+   * Rewrites an agent has made, by section index.
+   *
+   * Nothing is rewritten until something asks. Each entry keeps the
+   * publisher's own markup beside the agent's, so undo and reset always have
+   * somewhere to go — and so a section the reader leaves and returns to comes
+   * back as they left it. Foliate serves sections from its own blob-URL cache,
+   * which knows nothing about any of this.
+   */
+  #rewrites = new Map<number, SectionRewrite>()
+  #showRewritten = true
 
   constructor(
     host: HTMLElement,
@@ -366,6 +388,11 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     const onLoad = (event: Event) => {
       while (sectionCleanups.length) sectionCleanups.pop()?.()
       const detail = (event as CustomEvent<{ doc: Document; index: number }>).detail
+      // Foliate serves a section from its own blob-URL cache, which knows
+      // nothing about any rewrite, so a section the reader returns to arrives
+      // as the publisher shipped it. Put the agent's version back.
+      const rewrite = this.#rewrites.get(detail.index)
+      if (rewrite && this.#showRewritten) restoreOriginal(detail.doc, rewrite.html)
       const onSelectionChange = () => this.#captureSelection(view, detail.doc, detail.index)
       detail.doc.addEventListener('selectionchange', onSelectionChange)
       sectionCleanups.push(() =>
@@ -544,6 +571,149 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#options.onSelectionChange?.(structuredClone(this.#selection))
   }
 
+  /**
+   * Report what a section's markup contains, without judging it.
+   *
+   * Facts only: how many blocks, headings and images there are, what each
+   * image carries, and what the block structure is under its class names.
+   * Classifying an image as an equation, or a bold paragraph as a heading, is
+   * the agent's call — so this does not pre-empt it with heuristics that would
+   * be wrong on the next book.
+   */
+  async diagnoseSection(sectionIndex: number): Promise<SectionDiagnosis> {
+    const create = this.#sectionSource(sectionIndex)
+    return diagnoseSection(await create(), sectionIndex)
+  }
+
+  /**
+   * Hand an agent the section's real HTML and CSS.
+   *
+   * This is the rendered document, not the packaged file, so the image URLs in
+   * it are the `blob:` URLs Foliate rewrote them to. An agent that keeps those
+   * URLs keeps the book's figures working.
+   */
+  async getSectionSource(sectionIndex: number): Promise<SectionSource> {
+    const rendered = this.#renderedSection(sectionIndex)
+    const options = {
+      ...(this.#sectionLabel(sectionIndex) === undefined
+        ? {}
+        : { label: this.#sectionLabel(sectionIndex)! }),
+      rewritten: this.#rewrites.has(sectionIndex),
+    }
+    if (rendered) return readSection(rendered.doc, sectionIndex, options)
+    const create = this.#sectionSource(sectionIndex)
+    return readSection(await create(), sectionIndex, options)
+  }
+
+  /**
+   * Replace a section's markup with an agent's.
+   *
+   * The agent decides what the document should be. Bookhand archives the
+   * publisher's version first, sanitizes what comes back, and reports what the
+   * sanitizer refused — so a proposal that was partly rejected is visible
+   * rather than silently thinned.
+   */
+  rewriteSection(sectionIndex: number, html: string, summary?: string): RewriteResult {
+    const rendered = this.#renderedSection(sectionIndex)
+    if (!rendered) throw new ReaderSectionLoadError(sectionIndex, this.#sectionLabel(sectionIndex))
+    const existing = this.#rewrites.get(sectionIndex)
+    const original = existing?.original ?? rendered.doc.body?.innerHTML ?? ''
+    const result = writeSection(rendered.doc, sectionIndex, html)
+    this.#rewrites.set(sectionIndex, {
+      sectionIndex,
+      html: rendered.doc.body?.innerHTML ?? '',
+      original,
+      ...(summary === undefined ? {} : { summary }),
+      at: Date.now(),
+    })
+    this.#showRewritten = true
+    if (this.#marks.length > 0) this.renderAnnotations(this.#marks)
+    return result
+  }
+
+  /**
+   * The deterministic bulk repair, offered as a tool rather than imposed.
+   *
+   * A TeX-derived EPUB carries its own LaTeX in `data-tex`, and compiling that
+   * to MathML is mechanical — chapter III of the bundled book has 161 of them.
+   * An agent can call this instead of rewriting several hundred images by
+   * hand, then edit the result like any other markup. It is a power tool the
+   * agent chooses, never something that happens to a book on its own.
+   */
+  compileSectionMath(sectionIndex: number): RemasterReport {
+    const rendered = this.#renderedSection(sectionIndex)
+    if (!rendered) throw new ReaderSectionLoadError(sectionIndex, this.#sectionLabel(sectionIndex))
+    const existing = this.#rewrites.get(sectionIndex)
+    const original = existing?.original ?? rendered.doc.body?.innerHTML ?? ''
+    const report = remasterDocument(rendered.doc, { idPrefix: `s${sectionIndex}` })
+    this.#rewrites.set(sectionIndex, {
+      sectionIndex,
+      html: rendered.doc.body?.innerHTML ?? '',
+      original,
+      summary: `Compiled ${report.restored} of ${report.found} equation images to MathML`,
+      at: Date.now(),
+    })
+    this.#showRewritten = true
+    if (this.#marks.length > 0) this.renderAnnotations(this.#marks)
+    return report
+  }
+
+  /** Whether the reader is showing rewritten sections or the publisher's. */
+  isShowingRewritten(): boolean {
+    return this.#showRewritten
+  }
+
+  hasRewrite(sectionIndex: number): boolean {
+    return this.#rewrites.has(sectionIndex)
+  }
+
+  listRewrites(): readonly SectionRewrite[] {
+    return [...this.#rewrites.values()].sort((a, b) => a.sectionIndex - b.sectionIndex)
+  }
+
+  /**
+   * Flip every rendered section between the publisher's markup and the
+   * agent's. The originals are archived, so this is a swap rather than a
+   * reload: the reader keeps their place.
+   */
+  showRewritten(showRewritten: boolean): number {
+    this.#showRewritten = showRewritten
+    let changed = 0
+    for (const content of this.#active?.view.renderer.getContents() ?? []) {
+      const rewrite = this.#rewrites.get(content.index)
+      if (!rewrite) continue
+      restoreOriginal(content.doc, showRewritten ? rewrite.html : rewrite.original)
+      changed += 1
+    }
+    if (this.#marks.length > 0) this.renderAnnotations(this.#marks)
+    return changed
+  }
+
+  /** Throw an agent's work away and put the publisher's section back. */
+  resetSection(sectionIndex: number): boolean {
+    const rewrite = this.#rewrites.get(sectionIndex)
+    if (!rewrite) return false
+    this.#rewrites.delete(sectionIndex)
+    const rendered = this.#renderedSection(sectionIndex)
+    if (rendered) restoreOriginal(rendered.doc, rewrite.original)
+    if (this.#marks.length > 0) this.renderAnnotations(this.#marks)
+    return true
+  }
+
+  #renderedSection(sectionIndex: number) {
+    return this.#active?.view.renderer
+      .getContents()
+      .find((entry) => entry.index === sectionIndex)
+  }
+
+  #sectionSource(sectionIndex: number): () => Promise<Document> {
+    const { book } = this.#requireActive()
+    if (!this.#isValidSection(sectionIndex)) throw new ReaderSectionLoadError(sectionIndex)
+    const create = book.sections[sectionIndex]?.createDocument
+    if (!create) throw new ReaderSectionLoadError(sectionIndex, this.#sectionLabel(sectionIndex))
+    return create
+  }
+
   async #createSectionDocument(sectionIndex: number): Promise<Document> {
     const { book } = this.#requireActive()
     if (!this.#isValidSection(sectionIndex)) throw new ReaderSectionLoadError(sectionIndex)
@@ -551,7 +721,14 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       await this.#options.faults?.beforeSectionLoad?.(sectionIndex)
       const create = book.sections[sectionIndex]?.createDocument
       if (!create) throw new Error('The EPUB section has no document source')
-      return await create()
+      const document = await create()
+      // Extraction reads the rewritten document whenever one exists, so what
+      // Bookhand indexes and what the reader sees stay the same book. Foliate
+      // reaches a section two different ways — the loader for rendering and
+      // `createDocument` for extraction — and neither knows about the other.
+      const rewrite = this.#rewrites.get(sectionIndex)
+      if (rewrite) restoreOriginal(document, rewrite.html)
+      return document
     } catch (error) {
       const wrapped = new ReaderSectionLoadError(sectionIndex, this.#sectionLabel(sectionIndex), error)
       this.#options.onSectionError?.(wrapped)
@@ -635,6 +812,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#location = undefined
     this.#selection = null
     this.#marks = []
+    this.#rewrites.clear()
   }
 }
 

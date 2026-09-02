@@ -18,7 +18,14 @@
  * `assertOneForOne` states it as an assertion rather than a hope.
  */
 
+import type {
+  RemasterKind,
+  RemasterReport,
+  RemasterResidue,
+} from '../domain/remaster.ts'
 import { compileTex, isDisplayTex, TexUnsupportedError } from './tex.ts'
+
+export type { RemasterKind, RemasterReport, RemasterResidue }
 
 /** Provenance attributes, so a single element can be reverted in place. */
 export const REMASTER_ATTRIBUTE = 'data-bookhand-remaster'
@@ -27,30 +34,6 @@ export const ORIGINAL_ALT_ATTRIBUTE = 'data-bookhand-original-alt'
 export const ORIGINAL_STYLE_ATTRIBUTE = 'data-bookhand-original-style'
 export const TEX_ATTRIBUTE = 'data-bookhand-tex'
 export const TARGET_ATTRIBUTE = 'data-bookhand-target'
-
-export type RemasterKind = 'math'
-
-/** One element the transform could not restore, and why. */
-export interface RemasterResidue {
-  /** Stable within a section: the id an agent names when proposing a repair. */
-  readonly targetId: string
-  readonly kind: RemasterKind
-  /** The TeX the book supplied, verbatim. */
-  readonly source: string
-  /** The book's own alternative text, which is all a reader has without this. */
-  readonly alt?: string
-  /** The construct the compiler declined, e.g. `\\underline`. */
-  readonly reason: string
-}
-
-export interface RemasterReport {
-  /** How many elements of each pathology the section contained. */
-  readonly found: number
-  /** How many were restored deterministically. */
-  readonly restored: number
-  /** The ones that were left as they were, named so they can be repaired. */
-  readonly residues: readonly RemasterResidue[]
-}
 
 export const EMPTY_REPORT: RemasterReport = { found: 0, restored: 0, residues: [] }
 
