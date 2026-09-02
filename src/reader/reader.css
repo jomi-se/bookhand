@@ -630,3 +630,57 @@
   font-family: var(--serif);
   line-height: 1.5;
 }
+
+/*
+ * The remastering control.
+ *
+ * It sits between the chrome and the book because that is where a statement
+ * about *this chapter* belongs — not in a panel a reader has to go find. It
+ * appears only when an agent has actually changed something, so an untouched
+ * book carries no trace of the capability.
+ */
+.remaster-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  border-block-end: 1px solid var(--rule);
+  background: var(--surface-quiet, var(--surface));
+  font-size: 0.85rem;
+  min-inline-size: 0;
+}
+
+.remaster-bar-note {
+  margin: 0;
+  color: var(--ink-quiet);
+  min-inline-size: 0;
+}
+
+.remaster-bar-tools {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* One control, two states: the segmented pair reads as a switch, not as two
+   unrelated buttons that happen to sit together. */
+.remaster-switch {
+  display: inline-flex;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.remaster-switch .button {
+  border: 0;
+  border-radius: 0;
+  padding-block: 0.25rem;
+}
+
+.remaster-switch .button[aria-pressed='true'] {
+  background: var(--accent-quiet);
+  color: var(--accent);
+  font-weight: 600;
+}

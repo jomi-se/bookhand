@@ -127,4 +127,9 @@ export interface ReaderAdapter {
   getStyle(): ReaderStyle
   resetStyle(): void
   renderAnnotations(marks: readonly ReaderAnnotationMark[]): void
+  /**
+   * Reading and rewriting the book's own markup. Optional: a reader that
+   * cannot remaster documents is still a reader.
+   */
+  readonly remaster?: import('./remaster.ts').DocumentRemasterPort
 }

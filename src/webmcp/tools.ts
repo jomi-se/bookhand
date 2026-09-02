@@ -44,6 +44,17 @@ const ACTION_GROUP_SCHEMA = {
     'Correlate writes from one intent for provenance. Existing blocks are undone one item at a time.',
 } as const
 
+function describeRefusals(sanitized: {
+  readonly removedElements: Readonly<Record<string, number>>
+  readonly removedAttributes: Readonly<Record<string, number>>
+}): string {
+  const parts = [
+    ...Object.entries(sanitized.removedElements).map(([name, count]) => `${count} <${name}>`),
+    ...Object.entries(sanitized.removedAttributes).map(([name, count]) => `${count} ${name}`),
+  ]
+  return parts.join(', ')
+}
+
 /** Every tool call is an agent acting; the interface is how a person acts. */
 function caller(input: Record<string, unknown>) {
   return {
@@ -637,6 +648,180 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               .map((item) => `${item.id} · ${item.payload.kind} · ${JSON.stringify(item.payload)}`)
               .join('\n'),
             { items },
+          )
+        }),
+    },
+    {
+      name: 'get_section_source',
+      description:
+        "Read the book's own markup for one section: the rendered XHTML and its CSS, exactly as it is. This is a source file, not a summary — treat it the way you would treat a file you are about to edit. Image URLs are blob: URLs Foliate rewrote the book's files to; keep them exactly as they are or the figures stop loading. Use this together with diagnose_section when you want counts first, and rewrite_section when you are ready to write.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sectionIndex: {
+            type: 'number',
+            description: 'Defaults to the section the person is reading.',
+          },
+        },
+        additionalProperties: false,
+      },
+      execute: (input) =>
+        run('get_section_source', () => 'read this chapter’s markup', async () => {
+          const source = await commands.getSectionSource(
+            typeof input.sectionIndex === 'number' ? input.sectionIndex : undefined,
+          )
+          return textResult(
+            `Section ${source.sectionIndex}${source.label ? ` (${source.label})` : ''}: ${source.bytes} bytes of HTML${source.rewritten ? ', currently showing your rewrite' : ''}.`,
+            { ...source },
+          )
+        }),
+    },
+    {
+      name: 'diagnose_section',
+      description:
+        "Facts about a section's markup: how many blocks, headings and images it has, what each image carries (its data-tex, alt text and source), and the block structure under its class names. Bookhand classifies none of it — deciding that an image is an equation rather than an illustration, or that a bold paragraph is really a heading, is your call.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sectionIndex: {
+            type: 'number',
+            description: 'Defaults to the section the person is reading.',
+          },
+        },
+        additionalProperties: false,
+      },
+      execute: (input) =>
+        run('diagnose_section', () => 'examined this chapter', async () => {
+          const diagnosis = await commands.diagnoseSection(
+            typeof input.sectionIndex === 'number' ? input.sectionIndex : undefined,
+          )
+          const { counts } = diagnosis
+          return textResult(
+            `Section ${diagnosis.sectionIndex}: ${counts.blocks} blocks, ${counts.headings} headings, ${counts.images} images (${counts.imagesWithTex} carrying LaTeX).`,
+            { ...diagnosis },
+          )
+        }),
+    },
+    {
+      name: 'rewrite_section',
+      description:
+        "Replace a section's markup with markup you wrote. This is the whole document body: rewrite the structure, the headings, the equations, the figures and captions, the accessibility, and the CSS together, however you judge best. Nothing is off limits to you except what could run code or reach the network — Bookhand strips scripts, event handlers, and off-origin URLs, and tells you exactly what it removed. Every edit is a new version: the person can Undo one step, Reset to the publisher's original, or flip between the two at any time, so write the chapter you think it should be.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          html: {
+            type: 'string',
+            description:
+              "The section body's complete new markup. Semantic HTML5 and MathML both render natively.",
+          },
+          summary: {
+            type: 'string',
+            description:
+              'What you changed, in a sentence the person will see beside the Undo control.',
+          },
+          sectionIndex: {
+            type: 'number',
+            description: 'Defaults to the section the person is reading.',
+          },
+        },
+        required: ['html'],
+        additionalProperties: false,
+      },
+      execute: (input) =>
+        run('rewrite_section', () => 'rewrote this chapter', async () => {
+          if (typeof input.html !== 'string' || input.html.trim().length === 0) {
+            return errorResult('Send the section markup you want to apply as `html`.')
+          }
+          const result = await commands.rewriteSection(
+            input.html,
+            typeof input.summary === 'string' ? input.summary : undefined,
+            typeof input.sectionIndex === 'number' ? input.sectionIndex : undefined,
+          )
+          const refused = result.sanitized.modified
+            ? ` Removed: ${describeRefusals(result.sanitized)}.`
+            : ''
+          return textResult(
+            `Rewrote section ${result.sectionIndex}: ${result.before.elements} elements became ${result.after.elements}.${refused}`,
+            { ...result },
+          )
+        }),
+    },
+    {
+      name: 'compile_section_math',
+      description:
+        "A shortcut, not the method. If a section's equations are images that still carry their original LaTeX in data-tex, this compiles all of them to MathML in one call, deterministically. Use it when the mathematics is the only thing wrong and you would otherwise be transcribing hundreds of identical images by hand; then edit the result with rewrite_section like any other markup. It reports what it could not compile so you can write those yourself.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sectionIndex: {
+            type: 'number',
+            description: 'Defaults to the section the person is reading.',
+          },
+        },
+        additionalProperties: false,
+      },
+      execute: (input) =>
+        run('compile_section_math', () => 'compiled this chapter’s equations', async () => {
+          const report = await commands.compileSectionMath(
+            typeof input.sectionIndex === 'number' ? input.sectionIndex : undefined,
+          )
+          return textResult(
+            `Compiled ${report.restored} of ${report.found} equation images to MathML${report.residues.length > 0 ? `; ${report.residues.length} need writing by hand` : ''}.`,
+            { ...report },
+          )
+        }),
+    },
+    {
+      name: 'set_section_view',
+      description:
+        "Show the person the publisher's original markup or your rewrite, or step your own work back. \"original\" and \"rewritten\" flip what is on screen without discarding anything; \"undo\" steps back one revision; \"reset\" throws away every revision for the section and returns to the book as published.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          view: {
+            type: 'string',
+            enum: ['original', 'rewritten', 'undo', 'reset'],
+          },
+          sectionIndex: {
+            type: 'number',
+            description: 'Defaults to the section the person is reading.',
+          },
+        },
+        required: ['view'],
+        additionalProperties: false,
+      },
+      execute: (input) =>
+        run('set_section_view', () => 'changed what the chapter shows', async () => {
+          const sectionIndex =
+            typeof input.sectionIndex === 'number' ? input.sectionIndex : undefined
+          if (input.view === 'undo') {
+            const undone = await commands.undoSectionRewrite(sectionIndex)
+            if (!undone) {
+              return textResult('There is no rewrite to undo in this section.', { undone: false })
+            }
+            return textResult(
+              undone.versions === 0
+                ? 'Stepped back to the publisher’s original.'
+                : `Stepped back one revision; ${undone.versions} of yours remain.`,
+              { ...undone },
+            )
+          }
+          if (input.view === 'reset') {
+            const reset = await commands.resetSection(sectionIndex)
+            return textResult(
+              reset
+                ? 'Reset this section to the book as published.'
+                : 'This section has no rewrite to reset.',
+              { reset },
+            )
+          }
+          if (input.view !== 'original' && input.view !== 'rewritten') {
+            return errorResult('Choose one of: original, rewritten, undo, reset.')
+          }
+          const changed = commands.showRewritten(input.view === 'rewritten')
+          return textResult(
+            `Now showing the ${input.view === 'rewritten' ? 'rewritten' : 'published'} text${changed > 0 ? ` in ${changed} section${changed === 1 ? '' : 's'}` : ''}.`,
+            { view: input.view, changed },
           )
         }),
     },

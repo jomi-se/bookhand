@@ -35,8 +35,9 @@ import type {
 } from './foliate-types.ts'
 import { diagnoseSection, type SectionDiagnosis } from '../remaster/diagnose.ts'
 import { remasterDocument } from '../remaster/document.ts'
-import type { RemasterReport } from '../domain/remaster.ts'
+import type { DocumentRemasterPort, RemasterReport } from '../domain/remaster.ts'
 import {
+  currentHtml,
   readSection,
   restoreOriginal,
   writeSection,
@@ -122,6 +123,8 @@ export class FoliateReaderAdapter implements ReaderAdapter {
    * which knows nothing about any of this.
    */
   #rewrites = new Map<number, SectionRewrite>()
+  /** The publisher's markup for each section seen, captured before any edit. */
+  #originals = new Map<number, string>()
   #showRewritten = true
 
   constructor(
@@ -391,8 +394,9 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       // Foliate serves a section from its own blob-URL cache, which knows
       // nothing about any rewrite, so a section the reader returns to arrives
       // as the publisher shipped it. Put the agent's version back.
+      this.#captureOriginal(detail.index, detail.doc)
       const rewrite = this.#rewrites.get(detail.index)
-      if (rewrite && this.#showRewritten) restoreOriginal(detail.doc, rewrite.html)
+      if (rewrite && this.#showRewritten) restoreOriginal(detail.doc, currentHtml(rewrite))
       const onSelectionChange = () => this.#captureSelection(view, detail.doc, detail.index)
       detail.doc.addEventListener('selectionchange', onSelectionChange)
       sectionCleanups.push(() =>
@@ -572,6 +576,14 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   }
 
   /**
+   * The remastering surface. The adapter is its own port: these are reader
+   * capabilities, not a separate subsystem bolted beside one.
+   */
+  get remaster(): DocumentRemasterPort {
+    return this
+  }
+
+  /**
    * Report what a section's markup contains, without judging it.
    *
    * Facts only: how many blocks, headings and images there are, what each
@@ -616,18 +628,9 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   rewriteSection(sectionIndex: number, html: string, summary?: string): RewriteResult {
     const rendered = this.#renderedSection(sectionIndex)
     if (!rendered) throw new ReaderSectionLoadError(sectionIndex, this.#sectionLabel(sectionIndex))
-    const existing = this.#rewrites.get(sectionIndex)
-    const original = existing?.original ?? rendered.doc.body?.innerHTML ?? ''
+    this.#captureOriginal(sectionIndex, rendered.doc)
     const result = writeSection(rendered.doc, sectionIndex, html)
-    this.#rewrites.set(sectionIndex, {
-      sectionIndex,
-      html: rendered.doc.body?.innerHTML ?? '',
-      original,
-      ...(summary === undefined ? {} : { summary }),
-      at: Date.now(),
-    })
-    this.#showRewritten = true
-    if (this.#marks.length > 0) this.renderAnnotations(this.#marks)
+    this.#commit(sectionIndex, rendered.doc, summary)
     return result
   }
 
@@ -643,18 +646,13 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   compileSectionMath(sectionIndex: number): RemasterReport {
     const rendered = this.#renderedSection(sectionIndex)
     if (!rendered) throw new ReaderSectionLoadError(sectionIndex, this.#sectionLabel(sectionIndex))
-    const existing = this.#rewrites.get(sectionIndex)
-    const original = existing?.original ?? rendered.doc.body?.innerHTML ?? ''
+    this.#captureOriginal(sectionIndex, rendered.doc)
     const report = remasterDocument(rendered.doc, { idPrefix: `s${sectionIndex}` })
-    this.#rewrites.set(sectionIndex, {
+    this.#commit(
       sectionIndex,
-      html: rendered.doc.body?.innerHTML ?? '',
-      original,
-      summary: `Compiled ${report.restored} of ${report.found} equation images to MathML`,
-      at: Date.now(),
-    })
-    this.#showRewritten = true
-    if (this.#marks.length > 0) this.renderAnnotations(this.#marks)
+      rendered.doc,
+      `Compiled ${report.restored} of ${report.found} equation images to MathML`,
+    )
     return report
   }
 
@@ -682,7 +680,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     for (const content of this.#active?.view.renderer.getContents() ?? []) {
       const rewrite = this.#rewrites.get(content.index)
       if (!rewrite) continue
-      restoreOriginal(content.doc, showRewritten ? rewrite.html : rewrite.original)
+      restoreOriginal(content.doc, showRewritten ? currentHtml(rewrite) : rewrite.original)
       changed += 1
     }
     if (this.#marks.length > 0) this.renderAnnotations(this.#marks)
@@ -698,6 +696,55 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     if (rendered) restoreOriginal(rendered.doc, rewrite.original)
     if (this.#marks.length > 0) this.renderAnnotations(this.#marks)
     return true
+  }
+
+  /**
+   * Remember the publisher's markup for a section, once, before anything
+   * touches it. Everything about recovery depends on this being the untouched
+   * original rather than whatever the last edit left behind.
+   */
+  #captureOriginal(sectionIndex: number, document_: Document): void {
+    if (this.#rewrites.has(sectionIndex) || this.#originals.has(sectionIndex)) return
+    this.#originals.set(sectionIndex, document_.body?.innerHTML ?? '')
+  }
+
+  /**
+   * Record what the document now says as the next version of this section.
+   *
+   * Version zero is the publisher's markup and is captured once, before the
+   * first edit, so Reset is exact no matter how many revisions follow.
+   */
+  #commit(sectionIndex: number, document_: Document, summary?: string): void {
+    const existing = this.#rewrites.get(sectionIndex)
+    const html = document_.body?.innerHTML ?? ''
+    this.#rewrites.set(sectionIndex, {
+      sectionIndex,
+      original: existing?.original ?? this.#originals.get(sectionIndex) ?? '',
+      versions: [
+        ...(existing?.versions ?? []),
+        { html, ...(summary === undefined ? {} : { summary }), at: Date.now() },
+      ],
+    })
+    this.#showRewritten = true
+    if (this.#marks.length > 0) this.renderAnnotations(this.#marks)
+  }
+
+  /** Step back one revision. Returns what is now being shown, if anything. */
+  undoSection(sectionIndex: number): { readonly versions: number } | undefined {
+    const existing = this.#rewrites.get(sectionIndex)
+    if (!existing || existing.versions.length === 0) return undefined
+    const versions = existing.versions.slice(0, -1)
+    const rendered = this.#renderedSection(sectionIndex)
+    if (versions.length === 0) {
+      this.#rewrites.delete(sectionIndex)
+      if (rendered) restoreOriginal(rendered.doc, existing.original)
+    } else {
+      const next = { ...existing, versions }
+      this.#rewrites.set(sectionIndex, next)
+      if (rendered) restoreOriginal(rendered.doc, currentHtml(next))
+    }
+    if (this.#marks.length > 0) this.renderAnnotations(this.#marks)
+    return { versions: versions.length }
   }
 
   #renderedSection(sectionIndex: number) {
@@ -727,7 +774,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       // reaches a section two different ways — the loader for rendering and
       // `createDocument` for extraction — and neither knows about the other.
       const rewrite = this.#rewrites.get(sectionIndex)
-      if (rewrite) restoreOriginal(document, rewrite.html)
+      if (rewrite) restoreOriginal(document, currentHtml(rewrite))
       return document
     } catch (error) {
       const wrapped = new ReaderSectionLoadError(sectionIndex, this.#sectionLabel(sectionIndex), error)
@@ -813,6 +860,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#selection = null
     this.#marks = []
     this.#rewrites.clear()
+    this.#originals.clear()
   }
 }
 

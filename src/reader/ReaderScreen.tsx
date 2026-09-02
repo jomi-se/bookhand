@@ -14,6 +14,7 @@ import type { ReaderPanel, SurfaceStore } from '../app/surface.ts'
 import type { ReaderPortBridge } from '../app/reader-bridge.ts'
 import type { RuntimePorts } from '../runtime/ports.ts'
 import type { StorageClient } from '../storage/client.ts'
+import { RemasterBar } from './RemasterBar.tsx'
 import { ContentsPanel } from './ContentsPanel.tsx'
 import { SearchPanel } from './SearchPanel.tsx'
 import { ReaderHost } from './ReaderHost.tsx'
@@ -298,6 +299,7 @@ export function ReaderScreen({
           </button>
         </div>
       </header>
+      <RemasterBar commands={study.commands} sectionIndex={reader.location?.sectionIndex} />
 
       <div className="reader-stage">
         {panel === 'contents' ? (

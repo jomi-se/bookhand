@@ -23,14 +23,29 @@ export interface SectionSource {
   readonly bytes: number
 }
 
-export interface SectionRewrite {
-  readonly sectionIndex: number
-  /** The sanitized markup now being shown. */
+export interface SectionVersion {
+  /** The sanitized markup of this version. */
   readonly html: string
-  /** The publisher's own markup, kept for undo. */
-  readonly original: string
+  /** What the agent said it was doing, in its own words. */
   readonly summary?: string
   readonly at: number
+}
+
+/**
+ * A section's edit history.
+ *
+ * The publisher's own markup is version zero and is never overwritten, so
+ * Reset is always exact. Each agent edit appends, so Undo steps back one
+ * revision at a time rather than throwing the whole session away.
+ */
+export interface SectionRewrite {
+  readonly sectionIndex: number
+  readonly original: string
+  readonly versions: readonly SectionVersion[]
+}
+
+export function currentHtml(rewrite: SectionRewrite): string {
+  return rewrite.versions.at(-1)?.html ?? rewrite.original
 }
 
 /** Read a rendered section back out as source an agent can work on. */

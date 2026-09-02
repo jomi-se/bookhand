@@ -3,6 +3,12 @@
 Branch: `feat/document-remaster` — isolated worktree, based on `4780220`.
 Status: contract for a vertical slice. Written before implementation.
 
+> **Superseded in part on 2026-09-02.** The first draft of this document made
+> a deterministic TeX compiler the architecture. It is not. It is an optional
+> shortcut. The feature is a coding harness for the EPUB itself: the agent gets
+> read access to the section's real XHTML and CSS and a whole-section write
+> tool, and decides everything. See *The architecture* below.
+
 ## What this is
 
 Actual EPUB **document restoration**, not styling. Broken section XHTML is
@@ -25,6 +31,68 @@ speech-shaped `alt` and the real LaTeX parked in a data attribute:
 That is a mathematics textbook whose mathematics is not text. It cannot be
 selected, cannot be searched as mathematics, does not reflow, inverts wrongly
 in a dark theme, and reaches a screen reader as `30 Superscript ring`.
+
+## The architecture: a coding harness inside a reader
+
+An agent reads a section's real markup and writes it back. That is the whole
+shape of it. Bookhand does not model the repair, restrict it to a vocabulary of
+structural verbs, or limit it to mathematics.
+
+The model is free to rewrite document structure, headings, MathML, figures,
+captions, accessibility, and CSS **together**, in one pass, because those are
+not separable problems: an equation image is also a missing heading level is
+also a figure that lost its caption. Anything that constrained the agent to one
+of those at a time would produce a worse chapter than a person would.
+
+The reason this is the right shape is not a preference. It is what these models
+already are. An agent with a read tool and an edit tool refactors applications,
+migrates databases, and rewrites legacy code every day. A section of Gutenberg
+XHTML is a smaller version of exactly that task. Building a compiler to do it
+would be building a worse agent, and it would break on the first book whose
+pathology nobody anticipated.
+
+So the tools are:
+
+| Tool | What it is for |
+| --- | --- |
+| `get_section_source` | The section's rendered XHTML and CSS, as source to edit. |
+| `diagnose_section` | Counts and structure — facts, with nothing classified. |
+| `rewrite_section` | The agent's markup for the whole section body. |
+| `compile_section_math` | An optional shortcut, described below. |
+| `set_section_view` | `original`, `rewritten`, `undo`, `reset`. |
+
+`diagnose_section` deliberately classifies nothing. It reports how many blocks,
+headings and images a section has and what each image carries; deciding that an
+image is an equation rather than an illustration, or that a bold paragraph is
+really a heading, is the judgement the agent is there to make. A heuristic that
+guessed would be wrong on the next book and would quietly cap the ceiling of
+every agent that trusted it.
+
+### Guardrails, not a boundary
+
+Freedom this wide needs recovery, not restriction:
+
+- **Version history.** Every rewrite appends. The publisher's markup is version
+  zero and is captured before the first edit, so it is never overwritten.
+- **Undo** steps back one revision. **Reset** returns to the book as published.
+- **Original / Rewritten** flips what is on screen without discarding anything.
+- **Sanitization** is the one thing code keeps for itself. Agent-authored
+  markup is untrusted input exactly as book-authored markup is: scripts, event
+  handlers, off-origin URLs, and `@import` are removed, and every removal is
+  reported back to the agent so a partly refused proposal is visible rather
+  than silently thinned. This is a sanity check on the way in, not a
+  vocabulary the agent must write within.
+
+### The deterministic compiler, in its actual place
+
+`compile_section_math` compiles `data-tex` to MathML locally, covering 99.9% of
+the bundled book's 3,687 equation images with no model call. It is a **shortcut
+the agent may choose**, for when the mathematics is the only thing wrong and
+the alternative is transcribing several hundred identical images by hand. Its
+output is an ordinary rewrite: the same Undo puts the images back.
+
+It is not the architecture, not a boundary on what an agent may do, and never
+something that happens to a book on its own.
 
 ## The seam
 
@@ -50,83 +118,25 @@ hookable.
 A transform installed in only one of these produces a reader whose visible text
 and whose indexed text disagree. Both are wired, from one pure function.
 
-## The 1:1 invariant
+## What a rewrite costs, stated plainly
 
-**The transform replaces each pathological element with exactly one element in
-the same position. It never adds, removes, or reorders siblings, and never
-touches a text node.**
+A whole-section rewrite changes the document's element structure, and EPUB CFI
+addresses elements positionally. So a highlight or a study item anchored inside
+a rewritten section can stop resolving.
 
-This is not tidiness. EPUB CFI addresses element children by position, so a
-node-for-node swap leaves every existing CFI — every stored highlight, every
-study item's source range, every search hit — resolving to the same place in
-the remastered document as in the original. Violating the invariant silently
-invalidates persisted user data. Every transform is asserted against it.
+This is a real cost and it is not hidden:
 
-## Deterministic first, agent second
+- The publisher's markup is archived, so **Reset restores the exact structure**
+  those anchors were made against. Nothing is lost permanently.
+- The optional `compile_section_math` shortcut is one-for-one by construction —
+  one element replaced by one element in the same position — so it does not
+  disturb anchors at all. Its `replaceOneForOne` asserts this rather than
+  assuming it.
+- A free-form rewrite is the agent's to make and the person's to keep or throw
+  away, which is what Undo, Reset and the Original/Rewritten flip are for.
 
-`data-tex` restoration is a **deterministic** compilation, not a model call. A
-bounded TeX subset compiles to MathML locally, with no network, no tokens, and
-identical output on every run. The corpus vocabulary is small and measured:
-`\frac`/`\dfrac`/`\tfrac` (2,382), `\left`/`\right` (954), `\sqrt` (357),
-`\int` (205), the named operators (`\log`, `\sin`, `\cos`, `\tan`, ...), the
-Greek letters, `\text`, `\cdot`, `\times`, `\pm`, spacing commands.
-
-What the compiler cannot parse is **left alone**, counted, and reported. It is
-never guessed at and never silently dropped. Those residues are what a
-connected agent is for: it inspects the report, proposes corrected **TeX** for
-a named element, and Bookhand compiles that TeX through the same validated
-compiler. The agent never supplies markup, and no book- or agent-authored
-string is ever evaluated, `innerHTML`-ed, or executed. MathML is constructed
-node by node through `createElementNS`.
-
-## Reversibility
-
-- The imported EPUB bytes in SQLite are never rewritten. The transform is
-  in-memory, per section load.
-- Every restored element carries its own original: `data-bookhand-remaster`,
-  `data-bookhand-original-src`, `data-bookhand-original-alt`, and the source
-  TeX. A single element can therefore be reverted in place, with no reload.
-- Presentation mode is a user-visible **Original / Restored** control. Because
-  the transform is 1:1 and self-describing, switching modes walks the live
-  rendered documents and swaps them in place — instant, and reversible in both
-  directions.
-- Foliate's loader caches one blob URL per section href, so the cached copy is
-  **always** the restored one; `original` mode is applied as a live revert on
-  each rendered document. This keeps the two modes from depending on load order.
-
-## Extraction follows the restored document, always
-
-Search, chunking, and passage extraction use the restored document regardless
-of presentation mode. Restored text is strictly more truthful than the
-original: `src/reader/text.ts:50-52` currently emits the raw `\({x+d x}\)`
-source as the passage text for a `data-tex` element. After restoration the same
-passage carries a readable linear form (`x + dx`) via `alttext`, with the TeX
-preserved in `<annotation encoding="application/x-tex">`. Making the index
-follow a presentation toggle would mean re-indexing the book on every flip, for
-a strictly worse index. Recorded here so it is a decision and not an accident.
-
-## Human sovereignty, approval, and persistence
-
-The deterministic `data-tex` pass and the agent's structural proposals are not
-the same kind of change, and they must not be governed the same way.
-
-- **Deterministic math restoration is free and repeatable.** It costs no
-  tokens, produces identical output every run, and is derived entirely from
-  ground truth the publisher already shipped in the file. It runs on load, and
-  caching it would buy nothing.
-- **Agent-proposed structural repair is neither.** It costs tokens, it is a
-  judgement about a document, and it must not touch the reader until a person
-  approves it. So it follows: **propose -> in-place Before/After -> Approve or
-  Discard**. Only on approval is the repaired section written to SQLite and
-  re-indexed through FTS5, after which re-reading that chapter costs nothing
-  forever. The original section text stays archived beside it, so
-  **Revert to original** remains available permanently.
-
-Agent structural repair is a bounded vocabulary of validated operations over
-named elements — promote this element to a heading, wrap this equation and its
-number in a `figure`, mark this block as a footnote — not a blob of HTML the
-agent authored. The allow-list is the security boundary: an operation Bookhand
-does not model is rejected with a structured error, never applied hopefully.
+Persisting rewrites and re-anchoring existing annotations across them is the
+first piece of work after this slice, and it is named in *Slice boundary*.
 
 ## Demo arc this slice must serve
 
@@ -155,28 +165,36 @@ demo than the true one, which is already strong.
 
 In:
 
-- `src/remaster/tex.ts` — bounded TeX → MathML AST → DOM, plus a linear text
-  form. Pure, deterministic, DOM-constructing, never string-injecting.
-- `src/remaster/document.ts` — `remasterDocument(doc)` / `revertDocument(doc)`
-  with a `RemasterReport`, enforcing the 1:1 invariant.
-- Render wiring on `transformTarget`, extraction wiring in
-  `#createSectionDocument`, live mode swap over `renderer.getContents()`.
-- A visible Original / Restored control stating what was restored.
-- WebMCP: `get_document_restoration` (inspect), `set_document_restoration`
-  (trigger), `restore_math_element` (bounded propose-and-compile).
-- Deterministic unit tests over the compiler, the invariant, the report, and a
-  real-fixture test proving one bundled-book section is restored and then
-  consumed by extraction.
+- `src/remaster/sanitize.ts` — the allow-list sanitizer, with every refusal
+  counted and reported.
+- `src/remaster/rewrite.ts` — reading a section as source, writing one back,
+  and the version history Undo and Reset walk.
+- `src/remaster/diagnose.ts` — facts about a section, classifying nothing.
+- `src/remaster/tex.ts`, `src/remaster/document.ts` — the optional shortcut.
+- Adapter wiring on both Foliate paths, so the rendered book and the indexed
+  book stay the same book.
+- A visible Original / Rewritten control with Undo and Reset.
+- The five WebMCP tools above.
 
-Out (named so it is deferred, not forgotten): span-soup de-crufting, figure and
-caption reunification, footnote roles, persistence of the mode across reloads,
-and remaster caching in SQLite. The seam and the report generalize to all of
-them; none is needed to prove the capability.
+Out (named so it is deferred, not forgotten): persisting rewrites into SQLite
+so a repaired chapter survives a reload and costs nothing to re-read, and
+re-running FTS5 indexing over a rewritten section. Both are storage work on top
+of a seam that already exists; neither is needed to prove the capability.
 
 ## Security posture
 
-Hackathon-grade, but with the sharp edges closed rather than deferred:
-book-authored TeX and agent-proposed TeX are both untrusted input to a parser
-with a fixed command table and a depth and length bound; output is built as DOM
-nodes; unknown commands fail the element rather than the section; a failed
-element keeps its original image. No backend, no network, no eval.
+Hackathon-grade, with the sharp edges closed rather than deferred.
+
+Agent-authored markup is untrusted input in exactly the way book-authored
+markup is, and it meets the same allow-list: only known-safe elements and
+attributes survive, never an `on*` handler, and URLs may only be `blob:`, a
+`data:` image, or a fragment — so a rewritten section cannot run code, cannot
+fetch, and cannot leak what a person is reading. Sanitization happens in an
+inert document, before anything is inserted. Every refusal is counted and
+returned to the agent.
+
+The optional TeX path has its own bounds: a fixed command table, limits on
+length, depth and node count, output built as DOM nodes rather than parsed from
+a string, and unknown commands that fail one element rather than a section.
+
+No backend, no network, no eval.

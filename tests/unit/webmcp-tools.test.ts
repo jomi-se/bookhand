@@ -132,6 +132,11 @@ describe('the WebMCP tool surface', () => {
       'set_reading_style',
       'upsert_study_item',
       'list_study_items',
+      'get_section_source',
+      'diagnose_section',
+      'rewrite_section',
+      'compile_section_math',
+      'set_section_view',
       'set_study_board_view',
     ])
     for (const tool of tools) {
