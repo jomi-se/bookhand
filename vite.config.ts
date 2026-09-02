@@ -78,13 +78,13 @@ function testControlBoundary(mode: string): Plugin {
       }
       if (id !== resolvedTestControlModuleId) return
       if (mode !== 'test-harness') {
-        return 'export const prepareRuntimePorts = ports => ports; export const prepareStorageClient = client => client'
+        return 'export const prepareRuntimePorts = ports => ports; export const prepareStorageClient = client => client; export const prepareReaderOptions = options => options'
       }
 
       const implementation = normalizePath(
         resolve('tests/support/browser-test-controls.ts'),
       )
-      return `export { prepareRuntimePorts, prepareStorageClient } from ${JSON.stringify(`/@fs/${implementation}`)}`
+      return `export { prepareRuntimePorts, prepareStorageClient, prepareReaderOptions } from ${JSON.stringify(`/@fs/${implementation}`)}`
     },
   }
 }

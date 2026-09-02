@@ -122,9 +122,11 @@ export interface ReaderAdapter {
   getSectionSnapshot(sectionIndex: number): Promise<BookSectionSnapshot>
   /** Serializable, exact-CFI chunks for the local lexical index. */
   getSectionChunks(sectionIndex: number): Promise<readonly import('./search.ts').SectionChunk[]>
-  navigate(target: BookTarget): Promise<void>
+  navigate(target: BookTarget, navigationId?: number): Promise<void>
   applyStyle(style: ReaderStyle): void
   getStyle(): ReaderStyle
   resetStyle(): void
   renderAnnotations(marks: readonly ReaderAnnotationMark[]): void
+  /** Runtime-only verified tutor target; drawing is supplied only by a test harness until W9. */
+  setTutorTarget?(passage: Passage | null): void
 }

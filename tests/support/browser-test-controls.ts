@@ -1,6 +1,7 @@
 import type { RuntimePorts } from '../../src/runtime/ports.ts'
 import type { IndexChunk, IndexCursor, IndexState } from '../../src/domain/search.ts'
 import type { StorageClient } from '../../src/storage/client.ts'
+import type { FoliateReaderAdapterOptions } from '../../src/reader/FoliateReaderAdapter.ts'
 import {
   createControlledRuntime,
   TEST_CONTROL_NAMES,
@@ -67,4 +68,29 @@ export function prepareRuntimePorts(ports: RuntimePorts): RuntimePorts {
     indexFailBeforeChunk: (chunkId) => { failBeforeChunk = chunkId },
   }
   return controlledRuntime.ports
+}
+
+export function prepareReaderOptions(
+  options: FoliateReaderAdapterOptions,
+): FoliateReaderAdapterOptions {
+  return {
+    ...options,
+    tutorOverlayRenderer: (rects) => {
+      const svg = 'http://www.w3.org/2000/svg'
+      const group = document.createElementNS(svg, 'g')
+      group.setAttribute('data-bookhand-tutor-sentinel', '')
+      for (const rect of rects) {
+        const outline = document.createElementNS(svg, 'rect')
+        outline.setAttribute('x', String(rect.x))
+        outline.setAttribute('y', String(rect.y))
+        outline.setAttribute('width', String(rect.width))
+        outline.setAttribute('height', String(rect.height))
+        outline.setAttribute('fill', 'none')
+        outline.setAttribute('stroke', '#7c3aed')
+        outline.setAttribute('stroke-width', '2')
+        group.append(outline)
+      }
+      return group
+    },
+  }
 }

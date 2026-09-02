@@ -12,6 +12,7 @@ import type { DesignStateStore } from '../app/design-state.ts'
 import type { PresentationStore } from '../app/presentation.ts'
 import type { ReaderPanel, SurfaceStore } from '../app/surface.ts'
 import type { ReaderPortBridge } from '../app/reader-bridge.ts'
+import type { GuidanceController, GuidanceSurfaceSnapshot } from '../app/guidance.ts'
 import type { RuntimePorts } from '../runtime/ports.ts'
 import type { StorageClient } from '../storage/client.ts'
 import { ContentsPanel } from './ContentsPanel.tsx'
@@ -22,6 +23,8 @@ import { DEFAULT_READER_STYLE } from './FoliateReaderAdapter.ts'
 import { useReader } from './useReader.ts'
 import { useReaderChrome } from './useReaderChrome.ts'
 import { useBookIndex } from './useBookIndex.ts'
+import { GuidanceIndicator } from './GuidanceIndicator.tsx'
+import { prepareReaderOptionsForBrowser } from '../runtime/test-control-bridge.ts'
 
 export type { ReaderPanel }
 
@@ -48,6 +51,7 @@ export interface ReaderScreenProps {
   readonly presentation: PresentationStore
   /** Which panel is open. Shared, so a tool can open, focus, and close it. */
   readonly surface: SurfaceStore
+  readonly guidance: GuidanceController
   readonly agent: ReturnType<typeof useWebMcpTools>
 }
 
@@ -61,17 +65,64 @@ export function ReaderScreen({
   designState,
   presentation,
   surface,
+  guidance,
   agent,
 }: ReaderScreenProps) {
-  const reader = useReader({ entry, client, ports, bridge, presentation })
-  const bookIndex = useBookIndex({ bookId: entry.id, phase: reader.phase, client, bridge })
-  const study = useStudy({ entry, client, bridge, presentation, surface })
   // Panel visibility is shared state, not local state: a tool can open, focus,
   // and close the study board, and the person can do the same, and neither may
   // act on a copy the other has already moved past. `VAL-BOARD-VIEW-PARITY`.
   const bookHost = useRef<HTMLDivElement>(null)
+  const panelInvoker = useRef<HTMLElement | null>(null)
   const [surfaceState, setSurfaceState] = useState(surface.state)
   useEffect(() => surface.subscribe(setSurfaceState), [surface])
+  const study = useStudy({ entry, client, bridge, presentation, surface, guidance })
+  const studyRef = useRef(study)
+  useEffect(() => { studyRef.current = study }, [study])
+
+  const captureGuidanceSurface = useCallback((): GuidanceSurfaceSnapshot => ({
+    panel: surface.state.panel,
+    ...(studyRef.current.board ? { boardView: studyRef.current.board.view } : {}),
+    ...(document.activeElement instanceof HTMLElement
+      ? { focusTarget: document.activeElement }
+      : {}),
+  }), [surface])
+  const restoreGuidanceSurface = useCallback(async (
+    snapshot: GuidanceSurfaceSnapshot,
+    isCurrent: () => boolean,
+  ) => {
+    const panelAtRestore = surface.state.panel
+    if (
+      snapshot.boardView &&
+      studyRef.current.commands &&
+      studyRef.current.board?.view !== snapshot.boardView
+    ) {
+      const restored = await studyRef.current.commands.restoreStudyBoardView(
+        snapshot.boardView,
+        isCurrent,
+      )
+      if (!restored || !isCurrent() || surface.state.panel !== panelAtRestore) return
+    }
+    if (!isCurrent()) return
+    surface.setPanel(snapshot.panel as ReaderPanel)
+    window.requestAnimationFrame(() => {
+      if (!isCurrent() || surface.state.panel !== snapshot.panel) return
+      if (snapshot.focusTarget?.isConnected) snapshot.focusTarget.focus()
+      else bookHost.current?.focus({ preventScroll: true })
+    })
+  }, [surface])
+
+  const reader = useReader({
+    entry,
+    client,
+    ports,
+    bridge,
+    presentation,
+    guidance,
+    captureGuidanceSurface,
+    revealReadingSurface: () => surface.setPanel(null),
+    restoreGuidanceSurface,
+  })
+  const bookIndex = useBookIndex({ bookId: entry.id, phase: reader.phase, client, bridge })
 
   // Both stores outlive any one book, and this screen is keyed by book, so
   // this runs exactly once per book opened. Without it a second book inherits
@@ -82,7 +133,6 @@ export function ReaderScreen({
   }, [presentation, surface])
   const panel = surfaceState.panel
   const setPanel = useCallback((next: ReaderPanel) => surface.setPanel(next), [surface])
-  const panelInvoker = useRef<HTMLElement | null>(null)
   const chrome = useReaderChrome({ panelOpen: panel !== null })
 
   useEffect(() => {
@@ -299,6 +349,8 @@ export function ReaderScreen({
         </div>
       </header>
 
+      <GuidanceIndicator controller={guidance} />
+
       <div className="reader-stage">
         {panel === 'contents' ? (
           <ContentsPanel
@@ -485,12 +537,14 @@ export function ReaderScreen({
             className="reader-surface"
             onReady={reader.attach}
             onDispose={reader.detach}
-            options={{
+            options={prepareReaderOptionsForBrowser({
               onLocationChange: reader.onLocationChange,
+              onNavigationIntent: reader.onNavigationIntent,
+              onNavigationRequest: reader.onNavigationRequest,
               onSelectionChange: reader.onSelectionChange,
               onSectionError: reader.onSectionError,
               onTap: onBookTap,
-            }}
+            })}
           />
 
           <button

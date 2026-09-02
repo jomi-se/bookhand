@@ -44,6 +44,7 @@ export interface FoliateResolvedTarget {
 }
 
 export interface FoliateRelocation {
+  readonly reason?: string
   readonly cfi?: string
   readonly range?: Range
   readonly fraction?: number
@@ -58,8 +59,21 @@ export interface FoliateRenderer extends HTMLElement {
   getContents(): readonly {
     readonly index: number
     readonly doc: Document
+    readonly overlayer?: FoliateOverlayInstance
   }[]
   setStyles?(styles: string): void
+}
+
+export interface FoliateOverlayInstance {
+  readonly element?: Element
+  add(
+    key: string,
+    range: Range,
+    draw: FoliateDrawFunction,
+    options?: Record<string, unknown>,
+  ): unknown
+  remove(key: string): unknown
+  redraw?(): unknown
 }
 
 /** The shape Foliate hands back through its `draw-annotation` event. */

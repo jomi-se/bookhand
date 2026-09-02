@@ -22,6 +22,7 @@ import {
 import type { RuntimePorts } from '../runtime/ports.ts'
 import type { PresentationStore, PresentationView } from '../app/presentation.ts'
 import type { ReaderPortBridge } from '../app/reader-bridge.ts'
+import type { GuidanceController, GuidanceSurfaceSnapshot } from '../app/guidance.ts'
 import type { StorageClient } from '../storage/client.ts'
 import { DEFAULT_READER_STYLE } from './FoliateReaderAdapter.ts'
 
@@ -46,6 +47,13 @@ export interface UseReaderOptions {
   readonly bridge: ReaderPortBridge
   /** The one owner of the reading presentation; the UI and tools both write it. */
   readonly presentation: PresentationStore
+  readonly guidance: GuidanceController
+  readonly captureGuidanceSurface: () => GuidanceSurfaceSnapshot
+  readonly revealReadingSurface: () => void
+  readonly restoreGuidanceSurface: (
+    snapshot: GuidanceSurfaceSnapshot,
+    isCurrent: () => boolean,
+  ) => void | Promise<void>
   readonly clock?: RuntimeClock
   readonly persistDelayMs?: number
 }
@@ -61,6 +69,10 @@ export function useReader({
   ports,
   bridge,
   presentation,
+  guidance,
+  captureGuidanceSurface,
+  revealReadingSurface,
+  restoreGuidanceSurface,
   clock = systemClock,
   persistDelayMs = 900,
 }: UseReaderOptions) {
@@ -74,6 +86,7 @@ export function useReader({
   const adapterRef = useRef<ReaderAdapter>(null)
   const alive = useRef(true)
   const pendingSave = useRef<ReturnType<typeof setTimeout>>(null)
+  const writeQueue = useRef<Promise<void>>(Promise.resolve())
   const latest = useRef<{ location?: ReaderLocation; style: ReaderStyle }>({
     style: presentation.committed,
   })
@@ -92,7 +105,9 @@ export function useReader({
       style: latest.current.style,
       updatedAt: new Date().toISOString(),
     }
-    await client.putReadingState(record)
+    const write = () => client.putReadingState(record).then(() => undefined)
+    writeQueue.current = writeQueue.current.then(write, write)
+    await writeQueue.current
   }, [client, entry.id])
 
   const schedulePersist = useCallback(() => {
@@ -104,7 +119,10 @@ export function useReader({
     alive.current = true
     return () => {
       alive.current = false
-      if (pendingSave.current) clearTimeout(pendingSave.current)
+      if (pendingSave.current) {
+        clearTimeout(pendingSave.current)
+        pendingSave.current = null
+      }
       void persistNow().catch(() => undefined)
     }
   }, [persistNow])
@@ -138,6 +156,23 @@ export function useReader({
     (adapter: ReaderAdapter) => {
       adapterRef.current = adapter
       bridge.attach(adapter)
+      guidance.bind({
+        bookId: entry.id,
+        adapter,
+        currentLocation: () => safeLocation(adapter),
+        acceptLocation: (location) => { latest.current.location = structuredClone(location) },
+        persistLocation: async (location) => {
+          latest.current.location = structuredClone(location)
+          if (pendingSave.current) {
+            clearTimeout(pendingSave.current)
+            pendingSave.current = null
+          }
+          await persistNow()
+        },
+        captureSurface: captureGuidanceSurface,
+        revealReadingSurface,
+        restoreSurface: restoreGuidanceSurface,
+      })
 
       void (async () => {
         try {
@@ -179,29 +214,38 @@ export function useReader({
             location: safeLocation(adapter),
           }))
           latest.current.location = safeLocation(adapter)
+          guidance.markReady(adapter)
         } catch (error) {
           if (alive.current) setState((p) => ({ ...p, phase: 'error', error: describe(error) }))
         }
       })()
     },
-    [bridge, clock, client, entry.id, ports, presentation],
+    [bridge, captureGuidanceSurface, clock, client, entry.id, guidance, ports, presentation, revealReadingSurface, restoreGuidanceSurface],
   )
 
   const detach = useCallback(
     (adapter: ReaderAdapter) => {
+      guidance.unbind(adapter)
+      if (pendingSave.current) {
+        clearTimeout(pendingSave.current)
+        pendingSave.current = null
+      }
+      void persistNow().catch(() => undefined)
       bridge.detach(adapter)
       if (adapterRef.current === adapter) adapterRef.current = null
     },
-    [bridge],
+    [bridge, guidance, persistNow],
   )
 
   const onLocationChange = useCallback(
-    (location: ReaderLocation) => {
-      latest.current.location = location
+    (location: ReaderLocation, navigationId?: number) => {
+      if (!guidance.observeLocation(location, navigationId)) return false
+      latest.current.location = guidance.persistenceLocation(location)
       setState((p) => ({ ...p, location }))
       schedulePersist()
+      return true
     },
-    [schedulePersist],
+    [guidance, schedulePersist],
   )
 
   const onSelectionChange = useCallback((selection: ReaderSelection | null) => {
@@ -217,11 +261,11 @@ export function useReader({
     if (!adapter) return
     setState((p) => ({ ...p, sectionError: undefined }))
     try {
-      await adapter.navigate(target)
+      await guidance.navigateLearner(target)
     } catch (error) {
       setState((p) => ({ ...p, sectionError: describe(error) }))
     }
-  }, [])
+  }, [guidance])
 
   return {
     ...state,
@@ -232,6 +276,8 @@ export function useReader({
     onLocationChange,
     onSelectionChange,
     onSectionError,
+    onNavigationIntent: guidance.noteLearnerIntent.bind(guidance),
+    onNavigationRequest: navigate,
   }
 }
 

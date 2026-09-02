@@ -109,6 +109,7 @@ function App() {
         designState={designState}
         presentation={runtime.presentation}
         surface={runtime.surface}
+        guidance={runtime.guidance}
         agent={agent}
       />
     )

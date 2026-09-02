@@ -12,6 +12,7 @@ import { SourceVerificationError } from '../../src/domain/source-verification.ts
 import { PresentationStore } from '../../src/app/presentation.ts'
 import { ReaderPortBridge } from '../../src/app/reader-bridge.ts'
 import { SurfaceStore } from '../../src/app/surface.ts'
+import { GuidanceController } from '../../src/app/guidance.ts'
 import { DEFAULT_READER_STYLE } from '../../src/reader/FoliateReaderAdapter.ts'
 import type { StorageClient } from '../../src/storage/client.ts'
 
@@ -120,11 +121,24 @@ function setup(overrides: Partial<ReaderAdapter> = {}) {
   let counter = 0
   const presentation = new PresentationStore(DEFAULT_READER_STYLE)
   const surface = new SurfaceStore()
+  const guidance = new GuidanceController()
+  guidance.bind({
+    bookId: 'book-1',
+    adapter,
+    currentLocation: () => adapter.getLocation(),
+    acceptLocation: () => undefined,
+    persistLocation: async () => undefined,
+    captureSurface: () => ({ panel: null }),
+    revealReadingSurface: () => undefined,
+    restoreSurface: () => undefined,
+  })
+  guidance.markReady(adapter)
   const commands = new BookhandCommands({
     client,
     bridge,
     presentation,
     surface,
+    guidance,
     designContextVersion: 'sha256:test',
     bookId: 'book-1',
     bookTitle: 'Calculus Made Easy',
@@ -132,7 +146,7 @@ function setup(overrides: Partial<ReaderAdapter> = {}) {
     now: () => new Date('2026-09-01T12:00:00.000Z'),
     newId: () => `generated-${++counter}`,
   })
-  return { commands, client, bridge, adapter, annotations, items, presentation, surface }
+  return { commands, client, bridge, adapter, annotations, items, presentation, surface, guidance }
 }
 
 describe('the shared command surface', () => {
@@ -145,7 +159,146 @@ describe('the shared command surface', () => {
       sectionIndex: 3,
       progressPercent: 29,
       visible: { text: 'Visible text' },
+      guidance: { state: 'absent', canBack: false },
     })
+  })
+
+  it('verifies a complete source before beginning temporary guidance', async () => {
+    const { commands, adapter } = setup()
+    await expect(commands.focusPassage({
+      bookId: 'book-1',
+      sectionIndex: range.sectionIndex,
+      startCfi: range.startCfi,
+      endCfi: range.endCfi,
+      textFingerprint: range.textFingerprint,
+      quote: 'Alpha exact',
+      indicatorMessage: 'This is the hinge of the argument.',
+    })).resolves.toMatchObject({ outcome: 'applied', guidance: { state: 'guiding', canBack: true } })
+    expect(adapter.navigate).toHaveBeenCalledWith(
+      { kind: 'cfi', cfi: range.startCfi },
+      expect.any(Number),
+    )
+  })
+
+  it('does not apply persistent excerpt limits to a verified temporary focus', async () => {
+    const segments = Array.from({ length: 65 }, () => ({ kind: 'text' as const, text: 'x' }))
+    const quote = segments.map((segment) => segment.text).join('')
+    const { commands } = setup({
+      getPassage: vi.fn(async () => ({
+        text: quote,
+        range,
+        chapterBreadcrumb: ['Chapter X'],
+        segments,
+      })),
+    })
+
+    await expect(commands.focusPassage({
+      bookId: 'book-1',
+      sectionIndex: range.sectionIndex,
+      startCfi: range.startCfi,
+      endCfi: range.endCfi,
+      textFingerprint: range.textFingerprint,
+      quote,
+    })).resolves.toMatchObject({ outcome: 'applied' })
+  })
+
+  it('lets the newest focus request win when source verification resolves in reverse order', async () => {
+    let resolveFirst!: (value: Awaited<ReturnType<ReaderAdapter['getPassage']>>) => void
+    let resolveSecond!: (value: Awaited<ReturnType<ReaderAdapter['getPassage']>>) => void
+    const firstPassage = new Promise<Awaited<ReturnType<ReaderAdapter['getPassage']>>>((resolve) => { resolveFirst = resolve })
+    const secondPassage = new Promise<Awaited<ReturnType<ReaderAdapter['getPassage']>>>((resolve) => { resolveSecond = resolve })
+    const { commands } = setup({
+      getPassage: vi.fn()
+        .mockReturnValueOnce(firstPassage)
+        .mockReturnValueOnce(secondPassage),
+    })
+    const input = {
+      bookId: 'book-1',
+      sectionIndex: range.sectionIndex,
+      startCfi: range.startCfi,
+      endCfi: range.endCfi,
+      textFingerprint: range.textFingerprint,
+    }
+    const older = commands.focusPassage({ ...input, quote: 'Older' })
+    const newer = commands.focusPassage({ ...input, quote: 'Newer' })
+    resolveFirst({ text: 'Older', range, chapterBreadcrumb: ['Chapter X'] })
+    resolveSecond({ text: 'Newer', range, chapterBreadcrumb: ['Chapter X'] })
+    await expect(older).resolves.toMatchObject({ outcome: 'superseded' })
+    await expect(newer).resolves.toMatchObject({ outcome: 'applied' })
+  })
+
+  it('does not let a rejected newer request cancel an older verified focus', async () => {
+    let resolveFirst!: (value: Awaited<ReturnType<ReaderAdapter['getPassage']>>) => void
+    let resolveSecond!: (value: Awaited<ReturnType<ReaderAdapter['getPassage']>>) => void
+    const firstPassage = new Promise<Awaited<ReturnType<ReaderAdapter['getPassage']>>>((resolve) => { resolveFirst = resolve })
+    const secondPassage = new Promise<Awaited<ReturnType<ReaderAdapter['getPassage']>>>((resolve) => { resolveSecond = resolve })
+    const { commands } = setup({
+      getPassage: vi.fn()
+        .mockReturnValueOnce(firstPassage)
+        .mockReturnValueOnce(secondPassage),
+    })
+    const input = {
+      bookId: 'book-1',
+      sectionIndex: range.sectionIndex,
+      startCfi: range.startCfi,
+      endCfi: range.endCfi,
+      textFingerprint: range.textFingerprint,
+    }
+    const older = commands.focusPassage({ ...input, quote: 'Older' })
+    const rejected = commands.focusPassage({ ...input, quote: 'Invented' })
+    resolveFirst({ text: 'Older', range, chapterBreadcrumb: ['Chapter X'] })
+    resolveSecond({ text: 'Actual source', range, chapterBreadcrumb: ['Chapter X'] })
+
+    await expect(rejected).resolves.toMatchObject({ outcome: 'rejected' })
+    await expect(older).resolves.toMatchObject({ outcome: 'applied' })
+  })
+
+  it('cannot apply an old-book focus after guidance rebinds during verification', async () => {
+    let resolvePassage!: (value: Awaited<ReturnType<ReaderAdapter['getPassage']>>) => void
+    const pendingPassage = new Promise<Awaited<ReturnType<ReaderAdapter['getPassage']>>>((resolve) => { resolvePassage = resolve })
+    const { commands, guidance, adapter } = setup({ getPassage: vi.fn(() => pendingPassage) })
+    const pending = commands.focusPassage({
+      bookId: 'book-1',
+      sectionIndex: range.sectionIndex,
+      startCfi: range.startCfi,
+      endCfi: range.endCfi,
+      textFingerprint: range.textFingerprint,
+      quote: 'Alpha exact',
+    })
+    guidance.unbind(adapter)
+    const next = fakeAdapter()
+    guidance.bind({
+      bookId: 'book-2',
+      adapter: next,
+      currentLocation: () => next.getLocation(),
+      acceptLocation: () => undefined,
+      persistLocation: async () => undefined,
+      captureSurface: () => ({ panel: null }),
+      revealReadingSurface: () => undefined,
+      restoreSurface: () => undefined,
+    })
+    guidance.markReady(next)
+    resolvePassage({ text: 'Alpha exact', range, chapterBreadcrumb: ['Chapter X'] })
+
+    await expect(pending).resolves.toMatchObject({ outcome: 'superseded' })
+    expect(next.navigate).not.toHaveBeenCalled()
+  })
+
+  it('rejects invented tutor grounding without moving or creating a session', async () => {
+    const { commands, adapter } = setup()
+    await expect(commands.focusPassage({
+      bookId: 'book-1',
+      sectionIndex: range.sectionIndex,
+      startCfi: range.startCfi,
+      endCfi: range.endCfi,
+      textFingerprint: range.textFingerprint,
+      quote: 'Words the book never said',
+    })).resolves.toMatchObject({
+      outcome: 'rejected',
+      code: 'invented-quote',
+      guidance: { state: 'absent', canBack: false },
+    })
+    expect(adapter.navigate).not.toHaveBeenCalled()
   })
 
   it('includes the live selection when there is one', async () => {
@@ -230,7 +383,10 @@ describe('the shared command surface', () => {
   it('navigates and reports where that left the reader', async () => {
     const { commands, adapter } = setup()
     const context = await commands.navigateBook({ kind: 'section', sectionIndex: 3 })
-    expect(adapter.navigate).toHaveBeenCalledWith({ kind: 'section', sectionIndex: 3 })
+    expect(adapter.navigate).toHaveBeenCalledWith(
+      { kind: 'section', sectionIndex: 3 },
+      expect.any(Number),
+    )
     expect(context.sectionIndex).toBe(3)
   })
 })
@@ -612,6 +768,33 @@ describe('the reading presentation', () => {
 })
 
 describe('the study board view', () => {
+  it('compensates a stale guidance layout write before a queued learner view change', async () => {
+    const { commands, client } = setup()
+    let release!: () => void
+    const firstWrite = new Promise<void>((resolve) => { release = resolve })
+    let calls = 0
+    vi.mocked(client.setBoardView).mockImplementation(async (_id, view) => {
+      calls += 1
+      if (calls === 1) await firstWrite
+      return { ...board, view }
+    })
+    let current = true
+    const restoring = commands.restoreStudyBoardView('expanded', () => current)
+    await Promise.resolve()
+    current = false
+    const learner = commands.setStudyBoardView('docked')
+    release()
+
+    await expect(restoring).resolves.toBe(false)
+    await learner
+    expect(vi.mocked(client.setBoardView).mock.calls.map((call) => call[1])).toEqual([
+      'expanded',
+      'docked',
+      'docked',
+    ])
+    expect(commands.studyBoard.view).toBe('docked')
+  })
+
   it('opens the board and stores the preference for docked and expanded', async () => {
     const { commands, client, surface } = setup()
     const receipt = await commands.setStudyBoardView('expanded', { origin: 'agent' })

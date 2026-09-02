@@ -1,7 +1,9 @@
 import type { RuntimePorts } from './ports.ts'
 import { prepareRuntimePorts } from 'virtual:bookhand-test-controls'
 import { prepareStorageClient } from 'virtual:bookhand-test-controls'
+import { prepareReaderOptions } from 'virtual:bookhand-test-controls'
 import type { StorageClient } from '../storage/client.ts'
+import type { FoliateReaderAdapterOptions } from '../reader/FoliateReaderAdapter.ts'
 
 /**
  * Composition-root seam for browser validation builds. The production virtual
@@ -14,4 +16,10 @@ export function prepareRuntimePortsForBrowser(ports: RuntimePorts): RuntimePorts
 
 export function prepareStorageClientForBrowser(client: StorageClient): StorageClient {
   return prepareStorageClient(client)
+}
+
+export function prepareReaderOptionsForBrowser(
+  options: FoliateReaderAdapterOptions,
+): FoliateReaderAdapterOptions {
+  return prepareReaderOptions(options)
 }

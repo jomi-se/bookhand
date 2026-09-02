@@ -33,7 +33,15 @@ import {
   rejectSource,
   verifyBookOwnership,
   verifyFingerprint,
+  SourceVerificationError,
 } from '../domain/source-verification.ts'
+import type {
+  FocusPassageResult,
+  GuidanceBackResult,
+  GuidanceController,
+  GuidanceStopResult,
+  GuidanceView,
+} from './guidance.ts'
 import type { PresentationStore, StyleCommit, StylePatch } from './presentation.ts'
 import type { BoardMode, SurfaceStore } from './surface.ts'
 import type { ReaderPortBridge } from './reader-bridge.ts'
@@ -48,7 +56,27 @@ export interface ReadingContext {
   readonly progressPercent: number
   readonly visible: Passage
   readonly selection?: { readonly quote: string; readonly range: BookRange }
+  readonly guidance: GuidanceView
 }
+
+export interface FocusPassageInput {
+  readonly bookId: string
+  readonly sectionIndex: number
+  readonly startCfi: string
+  readonly endCfi: string
+  readonly textFingerprint: string
+  readonly quote: string
+  readonly indicatorMessage?: string
+}
+
+export type FocusPassageCommandResult =
+  | FocusPassageResult
+  | {
+      readonly outcome: 'rejected'
+      readonly guidance: GuidanceView
+      readonly code: string
+      readonly detail: string
+    }
 
 /**
  * Who is asking. Defaults to the person, because the interface is the person;
@@ -130,6 +158,7 @@ export interface CommandContext {
   readonly presentation: PresentationStore
   /** Which panel is open, shared so a tool can open, focus, and close it. */
   readonly surface: SurfaceStore
+  readonly guidance: GuidanceController
   /** The guidance version an agent must echo before writing custom book CSS. */
   readonly designContextVersion: string
   readonly bookId: string
@@ -158,6 +187,7 @@ export class BookhandCommands {
   /** The live board, so a toggle never reads a preference from a stale render. */
   #board: StudyBoard
   #boardView: StudyBoardView
+  #boardViewWrites: Promise<void> = Promise.resolve()
 
   constructor(context: CommandContext) {
     this.#context = context
@@ -209,6 +239,7 @@ export class BookhandCommands {
       progressPercent: Math.round(location.fraction * 100),
       visible,
       ...(selection ? { selection: { quote: selection.quote, range: selection.range } } : {}),
+      guidance: this.#context.guidance.view,
     }
   }
 
@@ -221,8 +252,43 @@ export class BookhandCommands {
   }
 
   async navigateBook(target: BookTarget): Promise<ReadingContext> {
-    await this.#adapter().navigate(target)
+    await this.#context.guidance.navigateOrdinary(target)
     return this.getReadingContext()
+  }
+
+  async focusPassage(input: FocusPassageInput): Promise<FocusPassageCommandResult> {
+    const range: BookRange = {
+      startCfi: input.startCfi,
+      endCfi: input.endCfi,
+      sectionIndex: input.sectionIndex,
+      textFingerprint: input.textFingerprint,
+    }
+    const request = this.#context.guidance.captureFocusRequest(this.#context.bookId)
+    if (!request) return { outcome: 'unavailable', guidance: this.#context.guidance.view }
+    try {
+      const passage = await this.#verifyPassage(input.bookId, range, input.quote)
+      return this.#context.guidance.focus(passage, input.indicatorMessage, request)
+    } catch (error) {
+      this.#context.guidance.rejectFocusRequest(request)
+      if (error instanceof SourceVerificationError) {
+        return {
+          outcome: 'rejected',
+          guidance: this.#context.guidance.view,
+          code: error.code,
+          detail: error.userMessage,
+        }
+      }
+      return {
+        outcome: 'rejected',
+        guidance: this.#context.guidance.view,
+        code: 'unresolvable',
+        detail: 'That passage could not be resolved.',
+      }
+    }
+  }
+
+  async controlGuidance(action: 'back' | 'stop'): Promise<GuidanceBackResult | GuidanceStopResult> {
+    return action === 'back' ? this.#context.guidance.back() : this.#context.guidance.stop()
   }
 
   async searchBook(query: string, limit = 5): Promise<SearchResult> {
@@ -313,6 +379,16 @@ export class BookhandCommands {
     range: BookRange,
     quote: string,
   ): Promise<SourceExcerpt> {
+    const resolved = await this.#verifyPassage(bookId, range, quote)
+    return createSourceExcerpt(this.#context.bookId, resolved)
+  }
+
+  /**
+   * Temporary guidance verifies the same source facts as a persistent write,
+   * but it must not inherit storage-envelope limits. A large viewport can
+   * legitimately contain more semantic runs than a stored excerpt permits.
+   */
+  async #verifyPassage(bookId: string, range: BookRange, quote: string): Promise<Passage> {
     verifyBookOwnership(bookId, this.#context.bookId)
     let resolved
     try {
@@ -325,7 +401,7 @@ export class BookhandCommands {
     }
     verifyFingerprint(range.textFingerprint, resolved.range.textFingerprint)
     compareQuote(quote, resolved.text)
-    return createSourceExcerpt(this.#context.bookId, resolved)
+    return resolved
   }
 
   async saveAnnotation(input: SaveAnnotationInput): Promise<Annotation> {
@@ -636,6 +712,31 @@ export class BookhandCommands {
     return this.#board
   }
 
+  /** Restore captured guidance layout without opening or closing any panel. */
+  async restoreStudyBoardView(view: StudyBoardView, isCurrent: () => boolean): Promise<boolean> {
+    return this.#withBoardViewWrite(async () => {
+      if (!isCurrent()) return false
+      const priorView = this.#boardView
+      const restored = await this.#context.client.setBoardView(this.#context.board.id, view)
+      if (!isCurrent()) {
+        // The whole restore/compensation pair holds the board-write queue. A
+        // learner view change that arrived meanwhile runs after this pair and
+        // therefore remains the final authority.
+        const compensated = await this.#context.client.setBoardView(
+          this.#context.board.id,
+          priorView,
+        )
+        this.#board = compensated
+        this.#boardView = compensated.view
+        return false
+      }
+      this.#board = restored
+      this.#boardView = restored.view
+      this.#changed()
+      return true
+    })
+  }
+
   /** Flip the persistent layout, read from current state rather than a render. */
   async toggleStudyBoardView(
     caller: CallerIdentity = {},
@@ -671,9 +772,17 @@ export class BookhandCommands {
   }
 
   async #storeBoardView(view: StudyBoardView): Promise<void> {
-    const board = await this.#context.client.setBoardView(this.#context.board.id, view)
-    this.#board = board
-    this.#boardView = board.view
+    await this.#withBoardViewWrite(async () => {
+      const board = await this.#context.client.setBoardView(this.#context.board.id, view)
+      this.#board = board
+      this.#boardView = board.view
+    })
+  }
+
+  #withBoardViewWrite<T>(operation: () => Promise<T>): Promise<T> {
+    const pending = this.#boardViewWrites.then(operation, operation)
+    this.#boardViewWrites = pending.then(() => undefined, () => undefined)
+    return pending
   }
 
   #boardSnapshot(): StudyBoardSnapshot {

@@ -1,5 +1,6 @@
 export const LIBRARY_LOAD_DEADLINE_MS = 5_000
 export const BOOK_OPEN_DEADLINE_MS = 10_000
+export const READER_NAVIGATION_DEADLINE_MS = 5_000
 
 /**
  * Importing a book copies whole EPUB bytes across the worker boundary and into
@@ -53,4 +54,3 @@ export function withDeadline<T>(
     )
   })
 }
-

@@ -49,6 +49,7 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
       progressPercent: 29,
       visible: { text: 'The slope of a curve.', range, chapterBreadcrumb: ['Chapter X'] },
       selection: { quote: 'the slope', range },
+      guidance: { state: 'absent' as const, canBack: false, revision: 2 },
     })),
     getTableOfContents: vi.fn(() => [
       { id: 'a', label: 'Chapter X', target: { kind: 'href', href: 'x.xhtml' }, children: [] },
@@ -65,6 +66,7 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
       sectionIndex: 4,
       progressPercent: 33,
       visible: { text: '', range, chapterBreadcrumb: [] },
+      guidance: { state: 'absent' as const, canBack: false, revision: 3 },
     })),
     searchBook: vi.fn(async (query: string, limit: number) => ({
       query,
@@ -72,6 +74,15 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
       outcome: 'results' as const,
       hits: [{ id: 'chunk-1', bookId: 'book-1', sectionIndex: 3, sectionTitle: 'Chapter X', text: 'The slope of a curve.', startCfi: range.startCfi, endCfi: range.endCfi, textFingerprint: range.textFingerprint }].slice(0, limit),
     })),
+    focusPassage: vi.fn(async () => ({
+      outcome: 'applied' as const,
+      guidance: { state: 'guiding' as const, canBack: true, revision: 4 },
+    })),
+    controlGuidance: vi.fn(async (action: 'back' | 'stop') =>
+      action === 'back'
+        ? { outcome: 'restored' as const, guidance: { state: 'absent' as const, canBack: false, revision: 5 } }
+        : { outcome: 'cleared' as const, wasActive: true, guidance: { state: 'absent' as const, canBack: false, revision: 5 } },
+    ),
     saveAnnotation: vi.fn(async () => ({ id: 'annotation-1' })),
     getReadingStyle: vi.fn(() => style),
     setReadingStyle: vi.fn(async () => styleReceipt),
@@ -128,6 +139,8 @@ describe('the WebMCP tool surface', () => {
       'get_passage',
       'navigate_book',
       'search_book',
+      'focus_passage',
+      'control_guidance',
       'save_annotation',
       'set_reading_style',
       'upsert_study_item',
@@ -142,6 +155,65 @@ describe('the WebMCP tool surface', () => {
         required: ['ok', 'message'],
       })
     }
+  })
+
+  it('offers exact temporary guidance tools without durable mutation fields', async () => {
+    const { tool, commands } = setup()
+    const focus = tool('focus_passage')
+    expect(focus.inputSchema).toMatchObject({
+      required: ['bookId', 'sectionIndex', 'startCfi', 'endCfi', 'textFingerprint', 'quote'],
+      additionalProperties: false,
+    })
+    const output = focus.outputSchema as {
+      properties: {
+        focus: { oneOf: readonly { required: readonly string[]; additionalProperties: boolean }[] }
+        control: { oneOf: readonly { required: readonly string[]; additionalProperties: boolean }[] }
+        readingContext: { properties: { guidance: { additionalProperties: boolean } } }
+      }
+    }
+    expect(output.properties.focus.oneOf.map((branch) => branch.required)).toEqual([
+      ['outcome', 'guidance'],
+      ['outcome', 'guidance', 'code', 'detail'],
+    ])
+    expect(output.properties.control.oneOf.map((branch) => branch.required)).toEqual([
+      ['outcome', 'guidance'],
+      ['outcome', 'wasActive', 'guidance'],
+    ])
+    expect(output.properties.focus.oneOf.every((branch) => branch.additionalProperties === false)).toBe(true)
+    expect(output.properties.control.oneOf.every((branch) => branch.additionalProperties === false)).toBe(true)
+    expect(output.properties.readingContext.properties.guidance.additionalProperties).toBe(false)
+    const result = await focus.execute({
+      bookId: 'book-1',
+      sectionIndex: range.sectionIndex,
+      startCfi: range.startCfi,
+      endCfi: range.endCfi,
+      textFingerprint: range.textFingerprint,
+      quote: 'The slope of a curve.',
+      indicatorMessage: 'Notice how the two quantities change together.',
+    })
+    expect(commands.focusPassage).toHaveBeenCalledWith(expect.objectContaining({
+      bookId: 'book-1',
+      startCfi: range.startCfi,
+    }))
+    expect(result.structuredContent).toEqual({
+      ok: true,
+      message: 'Showing that passage. The person can go Back or Stop guidance at any time.',
+      focus: {
+        outcome: 'applied',
+        guidance: { state: 'guiding', canBack: true, revision: 4 },
+      },
+    })
+
+    const stopped = await tool('control_guidance').execute({ action: 'stop' })
+    expect(stopped.structuredContent).toEqual({
+      ok: true,
+      message: 'Stopped guidance and stayed at the current passage.',
+      control: {
+        outcome: 'cleared',
+        wasActive: true,
+        guidance: { state: 'absent', canBack: false, revision: 5 },
+      },
+    })
   })
 
   it('marks book text as untrusted data rather than instructions', async () => {

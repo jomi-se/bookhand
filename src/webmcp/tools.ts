@@ -219,6 +219,10 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               `Selected range: ${JSON.stringify(context.selection.range)}`,
             )
           }
+          lines.push(
+            '',
+            `Guidance: ${context.guidance.state}; Back ${context.guidance.canBack ? 'available' : 'unavailable'}; revision ${context.guidance.revision}.`,
+          )
           return textResult(lines.join('\n'), { readingContext: context })
         }),
     },
@@ -346,6 +350,98 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               ? 'Local search is not ready yet. The person can keep reading while the index prepares.'
               : `No passages found for “${result.query}”.`
           return textResult(`Availability: ${result.availability}. Outcome: ${result.outcome}.\n\n${summary}`, { search: result })
+        }),
+    },
+    {
+      name: 'focus_passage',
+      description:
+        'Temporarily guide the person to an exact passage returned by Bookhand. This verifies the source, moves the visible reader, and shows Back and Stop without creating a highlight, annotation, study block, or saved tutor state. Use this to point at the book; use navigate_book for ordinary navigation.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          bookId: BOOK_ID_SCHEMA,
+          sectionIndex: { type: 'integer', minimum: 0 },
+          startCfi: { type: 'string', minLength: 1 },
+          endCfi: { type: 'string', minLength: 1 },
+          textFingerprint: { type: 'string', minLength: 1 },
+          quote: {
+            type: 'string',
+            minLength: 1,
+            maxLength: 32_000,
+            description: 'The complete exact text covered by this range.',
+          },
+          indicatorMessage: {
+            type: 'string',
+            maxLength: 1_000,
+            description: 'A short plain-text explanation of why this passage is being shown.',
+          },
+        },
+        required: [
+          'bookId',
+          'sectionIndex',
+          'startCfi',
+          'endCfi',
+          'textFingerprint',
+          'quote',
+        ],
+        additionalProperties: false,
+      },
+      execute: (input) =>
+        run('focus_passage', (value) => {
+          const result = (value as ToolResult).structuredContent?.focus as { outcome?: string } | undefined
+          return result?.outcome === 'applied' ? 'guided the reader to a passage' : 'could not guide the reader'
+        }, async () => {
+          const result = await commands.focusPassage({
+            bookId: String(input.bookId ?? ''),
+            sectionIndex: Number(input.sectionIndex),
+            startCfi: String(input.startCfi ?? ''),
+            endCfi: String(input.endCfi ?? ''),
+            textFingerprint: String(input.textFingerprint ?? ''),
+            quote: String(input.quote ?? ''),
+            ...(typeof input.indicatorMessage === 'string'
+              ? { indicatorMessage: input.indicatorMessage }
+              : {}),
+          })
+          const copy =
+            result.outcome === 'applied'
+              ? 'Showing that passage. The person can go Back or Stop guidance at any time.'
+              : result.outcome === 'superseded'
+                ? 'A newer reader action superseded this guidance.'
+                : result.outcome === 'unavailable'
+                  ? 'The reader is not ready for guidance yet.'
+                  : 'detail' in result
+                    ? result.detail
+                    : 'That passage could not be shown.'
+          return textResult(copy, { focus: result })
+        }),
+    },
+    {
+      name: 'control_guidance',
+      description:
+        'End temporary tutor guidance. Back returns to the one reading position from before guidance; Stop stays at the current passage. Both are safe to call repeatedly and never alter annotations, study material, or styles.',
+      inputSchema: {
+        type: 'object',
+        properties: { action: { type: 'string', enum: ['back', 'stop'] } },
+        required: ['action'],
+        additionalProperties: false,
+      },
+      execute: (input) =>
+        run('control_guidance', () => 'changed tutor guidance', async () => {
+          if (input.action !== 'back' && input.action !== 'stop') {
+            return errorResult('action must be back or stop.')
+          }
+          const result = await commands.controlGuidance(input.action)
+          const copy =
+            result.outcome === 'restored'
+              ? 'Returned to the passage from before guidance.'
+              : result.outcome === 'unresolvable'
+                ? 'The earlier passage could not be restored. The reader remains where it is.'
+                : result.outcome === 'no_back_target'
+                  ? 'There is no earlier guidance passage to return to.'
+                  : result.outcome === 'cleared' && result.wasActive
+                    ? 'Stopped guidance and stayed at the current passage.'
+                    : 'Guidance was already stopped.'
+          return textResult(copy, { control: result })
         }),
     },
     {

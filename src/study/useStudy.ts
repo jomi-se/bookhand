@@ -12,6 +12,7 @@ import { BookhandCommands } from '../app/commands.ts'
 import type { PresentationStore } from '../app/presentation.ts'
 import type { ReaderPortBridge } from '../app/reader-bridge.ts'
 import type { SurfaceStore } from '../app/surface.ts'
+import type { GuidanceController } from '../app/guidance.ts'
 import { DESIGN_CONTEXT_VERSION } from '../webmcp/design-context.ts'
 import { splitTitle } from '../library/progress.ts'
 import type { StorageClient } from '../storage/client.ts'
@@ -48,9 +49,10 @@ export interface UseStudyOptions {
   readonly bridge: ReaderPortBridge
   readonly presentation: PresentationStore
   readonly surface: SurfaceStore
+  readonly guidance: GuidanceController
 }
 
-export function useStudy({ entry, client, bridge, presentation, surface }: UseStudyOptions) {
+export function useStudy({ entry, client, bridge, presentation, surface, guidance }: UseStudyOptions) {
   const [board, setBoard] = useState<StudyBoard>()
   const [commands, setCommands] = useState<BookhandCommands>()
   const [annotations, setAnnotations] = useState<readonly Annotation[]>([])
@@ -71,6 +73,7 @@ export function useStudy({ entry, client, bridge, presentation, surface }: UseSt
             bridge,
             presentation,
             surface,
+            guidance,
             designContextVersion: DESIGN_CONTEXT_VERSION,
             bookId: entry.id,
             bookTitle: splitTitle(entry.metadata).title,
@@ -84,7 +87,7 @@ export function useStudy({ entry, client, bridge, presentation, surface }: UseSt
     return () => {
       alive = false
     }
-  }, [bridge, client, entry.id, entry.metadata, presentation, surface])
+  }, [bridge, client, entry.id, entry.metadata, guidance, presentation, surface])
 
   const reload = useCallback(async () => {
     if (!commands) return

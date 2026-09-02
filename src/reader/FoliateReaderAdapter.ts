@@ -14,6 +14,8 @@ import type {
 } from '../domain/reader.ts'
 import {
   BOOK_OPEN_DEADLINE_MS,
+  DeadlineExceededError,
+  READER_NAVIGATION_DEADLINE_MS,
   systemClock,
   withDeadline,
   type RuntimeClock,
@@ -27,6 +29,7 @@ import {
 import type {
   FoliateBook,
   FoliateDrawDetail,
+  FoliateDrawFunction,
   FoliateModule,
   FoliateRelocation,
   FoliateResolvedTarget,
@@ -46,7 +49,8 @@ import {
 import { buildSectionChunks } from './chunking.ts'
 
 export interface ReaderAdapterEvents {
-  readonly onLocationChange?: (location: ReaderLocation) => void
+  /** Return false to reject a retired relocation from the adapter snapshot. */
+  readonly onLocationChange?: (location: ReaderLocation, navigationId?: number) => boolean | void
   readonly onSelectionChange?: (selection: ReaderSelection | null) => void
   readonly onSectionError?: (error: ReaderSectionLoadError) => void
   /** A drawn highlight was activated in the book. */
@@ -56,6 +60,10 @@ export interface ReaderAdapterEvents {
    * means, so the reading surface stays free of policy.
    */
   readonly onTap?: (zone: TapZone) => void
+  /** Fired before Foliate handles a swipe or an in-book link. */
+  readonly onNavigationIntent?: () => void
+  /** Routes in-book links through the same serialized learner navigation path. */
+  readonly onNavigationRequest?: (target: BookTarget) => void
 }
 
 export interface ReaderFaultHooks {
@@ -66,7 +74,10 @@ export interface ReaderFaultHooks {
 export interface FoliateReaderAdapterOptions extends ReaderAdapterEvents {
   readonly clock?: RuntimeClock
   readonly openDeadlineMs?: number
+  readonly navigationDeadlineMs?: number
   readonly faults?: ReaderFaultHooks
+  /** Supplied only by the browser test harness until W9 owns production cues. */
+  readonly tutorOverlayRenderer?: FoliateDrawFunction
 }
 
 interface FoliateReaderDependencies {
@@ -101,6 +112,19 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   #marks: readonly ReaderAnnotationMark[] = []
   #overlayer: FoliateModule['Overlayer']
   #disposedViews = new WeakSet<FoliateView>()
+  #tutorTarget: Passage | undefined
+  #tutorGeneration = 0
+  #navigationQueue: Promise<void> = Promise.resolve()
+  #activeNavigation: {
+    readonly operationId: number
+    readonly id?: number
+    readonly learnerEpoch: number
+    readonly relative: boolean
+  } | undefined
+  #navigationSequence = 0
+  #learnerIntentEpoch = 0
+  readonly #relocationProvenance: (number | undefined)[] = []
+  #suppressRelocations = 0
 
   constructor(
     host: HTMLElement,
@@ -254,29 +278,60 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     return chunks
   }
 
-  async navigate(target: BookTarget): Promise<void> {
-    const active = this.#requireActive()
-    this.#clearSelection()
-    try {
-      if (target.kind === 'relative') {
-        await (target.direction === 'previous'
-          ? active.view.renderer.prev()
-          : active.view.renderer.next())
-        return
+  async navigate(target: BookTarget, navigationId?: number): Promise<void> {
+    const revision = this.#revision
+    const operation = this.#navigationQueue.then(async () => {
+      if (revision !== this.#revision) throw new ReaderClosedError()
+      const active = this.#requireActive()
+      const operationId = ++this.#navigationSequence
+      this.#clearSelection()
+      this.#activeNavigation = {
+        operationId,
+        ...(navigationId === undefined ? {} : { id: navigationId }),
+        learnerEpoch: this.#learnerIntentEpoch,
+        relative: target.kind === 'relative',
       }
+      try {
+        await withDeadline(
+          this.#navigateActive(active, target),
+          this.#options.navigationDeadlineMs ?? READER_NAVIGATION_DEADLINE_MS,
+          this.#options.clock ?? systemClock,
+        )
+      } catch (error) {
+        if (error instanceof DeadlineExceededError) {
+          if (this.#activeNavigation?.operationId === operationId) {
+            this.#activeNavigation = undefined
+          }
+          await this.#recoverStalledView(active, revision)
+        }
+        if (error instanceof ReaderSectionLoadError || error instanceof ReaderNavigationError) throw error
+        throw new ReaderNavigationError(target, error)
+      } finally {
+        if (this.#activeNavigation?.operationId === operationId) {
+          this.#activeNavigation = undefined
+        }
+      }
+    })
+    this.#navigationQueue = operation.catch(() => undefined)
+    return operation
+  }
 
-      const navigationTarget =
-        target.kind === 'section' ? target.sectionIndex : target.kind === 'cfi' ? target.cfi : target.href
-      const resolved = active.view.resolveNavigation(navigationTarget)
-      if (!resolved || !this.#isValidSection(resolved.index)) {
-        throw new ReaderNavigationError(target)
-      }
-      await this.#loadResolvedTarget(resolved)
-      active.view.history.pushState(navigationTarget)
-    } catch (error) {
-      if (error instanceof ReaderSectionLoadError || error instanceof ReaderNavigationError) throw error
-      throw new ReaderNavigationError(target, error)
+  async #navigateActive(active: ActiveReader, target: BookTarget): Promise<void> {
+    if (target.kind === 'relative') {
+      await (target.direction === 'previous'
+        ? active.view.renderer.prev()
+        : active.view.renderer.next())
+      return
     }
+
+    const navigationTarget =
+      target.kind === 'section' ? target.sectionIndex : target.kind === 'cfi' ? target.cfi : target.href
+    const resolved = active.view.resolveNavigation(navigationTarget)
+    if (!resolved || !this.#isValidSection(resolved.index)) {
+      throw new ReaderNavigationError(target)
+    }
+    await this.#loadResolvedTarget(active, resolved)
+    active.view.history.pushState(navigationTarget)
   }
 
   applyStyle(style: ReaderStyle): void {
@@ -312,6 +367,13 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     }
   }
 
+  setTutorTarget(passage: Passage | null): void {
+    this.#tutorGeneration += 1
+    this.#clearTutorOverlay()
+    this.#tutorTarget = passage ? structuredClone(passage) : undefined
+    if (passage) void this.#renderTutorOverlay(this.#tutorGeneration)
+  }
+
   async #openAtRevision(blob: Blob, revision: number): Promise<BookMetadata> {
     await this.#options.faults?.beforeOpen?.(blob)
     this.#assertCurrent(revision)
@@ -340,6 +402,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     try {
       await view.open(book)
       this.#assertCurrent(revision)
+      cleanups.push(this.#listenForRendererRelocations(view))
       this.#toc = mapToc(book.toc ?? [])
       this.#sections = mapSections(book.sections, this.#toc)
       view.renderer.setStyles?.(makeReaderCss(this.#style, this.#shellPalette()))
@@ -389,19 +452,36 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     }
     // A newly rendered section has a fresh overlay, so stored marks are drawn
     // again rather than only existing on the section that was open when saved.
-    const onCreateOverlay = () => this.renderAnnotations(this.#marks)
+    const onCreateOverlay = () => {
+      this.renderAnnotations(this.#marks)
+      const generation = this.#tutorGeneration
+      queueMicrotask(() => void this.#renderTutorOverlay(generation))
+    }
+    const onLink = (event: Event) => {
+      const href = (event as CustomEvent<{ href?: string }>).detail?.href
+      if (href && this.#options.onNavigationRequest) {
+        event.preventDefault()
+        this.#learnerIntentEpoch += 1
+        this.#options.onNavigationRequest({ kind: 'href', href })
+        return
+      }
+      this.#learnerIntentEpoch += 1
+      this.#options.onNavigationIntent?.()
+    }
 
     view.addEventListener('relocate', onRelocate)
     view.addEventListener('load', onLoad)
     view.addEventListener('draw-annotation', onDrawAnnotation)
     view.addEventListener('show-annotation', onShowAnnotation)
     view.addEventListener('create-overlay', onCreateOverlay)
+    view.addEventListener('link', onLink)
     return [
       () => view.removeEventListener('relocate', onRelocate),
       () => view.removeEventListener('load', onLoad),
       () => view.removeEventListener('draw-annotation', onDrawAnnotation),
       () => view.removeEventListener('show-annotation', onShowAnnotation),
       () => view.removeEventListener('create-overlay', onCreateOverlay),
+      () => view.removeEventListener('link', onLink),
       () => {
         while (sectionCleanups.length) sectionCleanups.pop()?.()
       },
@@ -426,6 +506,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
    */
   #listenForTaps(doc: Document): readonly (() => void)[] {
     let start: { x: number; y: number; at: number; hadSelection: boolean } | undefined
+    let swipeAnnounced = false
 
     const onStart = (event: TouchEvent) => {
       const touch = event.changedTouches[0]
@@ -439,11 +520,22 @@ export class FoliateReaderAdapter implements ReaderAdapter {
               at: event.timeStamp,
               hadSelection: Boolean(selection && !selection.isCollapsed),
             }
+      swipeAnnounced = false
+    }
+
+    const onMove = (event: TouchEvent) => {
+      const touch = event.changedTouches[0]
+      if (!start || !touch || swipeAnnounced) return
+      if (Math.abs(touch.clientX - start.x) < 12) return
+      swipeAnnounced = true
+      this.#learnerIntentEpoch += 1
+      this.#options.onNavigationIntent?.()
     }
 
     const onEnd = (event: TouchEvent) => {
       const began = start
       start = undefined
+      swipeAnnounced = false
       const touch = event.changedTouches[0]
       if (!began || !touch || isInteractiveTarget(event.target)) return
       const zone = tapZone(began, {
@@ -464,10 +556,12 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
     doc.addEventListener('touchstart', onStart, { capture: true, passive: true })
     doc.addEventListener('touchend', onEnd, { capture: true })
+    doc.addEventListener('touchmove', onMove, { capture: true, passive: true })
     doc.addEventListener('touchcancel', onCancel, { capture: true, passive: true })
     return [
       () => doc.removeEventListener('touchstart', onStart, { capture: true }),
       () => doc.removeEventListener('touchend', onEnd, { capture: true }),
+      () => doc.removeEventListener('touchmove', onMove, { capture: true }),
       () => doc.removeEventListener('touchcancel', onCancel, { capture: true }),
     ]
   }
@@ -510,8 +604,9 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
   #captureRelocation(detail?: FoliateRelocation): void {
     if (!detail?.cfi) return
+    if (this.#suppressRelocations > 0) return
     const sectionIndex = detail.section?.current ?? this.#active?.view.renderer.getContents()[0]?.index ?? 0
-    this.#location = {
+    const location: ReaderLocation = {
       cfi: detail.cfi,
       sectionIndex,
       fraction: Number.isFinite(detail.fraction)
@@ -520,7 +615,28 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       chapterLabel: localized(detail.tocItem?.label) || this.#sectionLabel(sectionIndex),
       textFingerprint: detail.range ? fingerprintText(detail.range.toString()) : undefined,
     }
-    this.#options.onLocationChange?.(structuredClone(this.#location))
+    const navigationId = this.#relocationProvenance.shift()
+    const accepted = this.#options.onLocationChange?.(structuredClone(location), navigationId)
+    if (accepted !== false) this.#location = location
+  }
+
+  #listenForRendererRelocations(view: FoliateView): () => void {
+    const onRelocate = (event: Event) => {
+      // Capture phase runs before Foliate converts the renderer event into the
+      // public view relocation. Because adapter navigation is serialized,
+      // this is exact provenance rather than a guess based on visible geometry.
+      const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason
+      const active = this.#activeNavigation
+      const unchangedLearnerEpoch = active?.learnerEpoch === this.#learnerIntentEpoch
+      const issuedRelocation =
+        active &&
+        (reason === 'navigation' ||
+          (unchangedLearnerEpoch && reason == null) ||
+          (active.relative && unchangedLearnerEpoch && reason === 'page'))
+      this.#relocationProvenance.push(issuedRelocation ? active.id : undefined)
+    }
+    view.renderer.addEventListener('relocate', onRelocate, { capture: true })
+    return () => view.renderer.removeEventListener('relocate', onRelocate, { capture: true })
   }
 
   #captureSelection(view: FoliateView, document: Document, sectionIndex: number): void {
@@ -544,6 +660,46 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#options.onSelectionChange?.(structuredClone(this.#selection))
   }
 
+  async #renderTutorOverlay(generation: number): Promise<void> {
+    const renderer = this.#options.tutorOverlayRenderer
+    const target = this.#tutorTarget
+    const active = this.#active
+    if (!renderer || !target || !active || generation !== this.#tutorGeneration) return
+    const content = active.view.renderer
+      .getContents()
+      .find((candidate) => candidate.index === target.range.sectionIndex)
+    if (!content?.overlayer) return
+    try {
+      const start = this.#resolveCfi(active.book, target.range.startCfi, content.doc, target.range.sectionIndex)
+      const end = this.#resolveCfi(active.book, target.range.endCfi, content.doc, target.range.sectionIndex)
+      const range = content.doc.createRange()
+      range.setStart(start.startContainer, start.startOffset)
+      range.setEnd(end.endContainer, end.endOffset)
+      const resolved = passageFromRange(
+        range,
+        target.range.sectionIndex,
+        target.chapterBreadcrumb,
+        (value) => active.view.getCFI(target.range.sectionIndex, value),
+      )
+      if (
+        generation !== this.#tutorGeneration ||
+        this.#active !== active ||
+        normalizeBookText(resolved.text) !== normalizeBookText(target.text)
+      ) return
+      content.overlayer.add('bookhand-tutor-overlay', range, renderer, {
+        color: 'currentColor',
+      })
+    } catch {
+      // A transient teaching cue must never make the book unreadable.
+    }
+  }
+
+  #clearTutorOverlay(): void {
+    for (const content of this.#active?.view.renderer.getContents() ?? []) {
+      content.overlayer?.remove('bookhand-tutor-overlay')
+    }
+  }
+
   async #createSectionDocument(sectionIndex: number): Promise<Document> {
     const { book } = this.#requireActive()
     if (!this.#isValidSection(sectionIndex)) throw new ReaderSectionLoadError(sectionIndex)
@@ -559,10 +715,10 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     }
   }
 
-  async #loadResolvedTarget(target: FoliateResolvedTarget): Promise<void> {
+  async #loadResolvedTarget(active: ActiveReader, target: FoliateResolvedTarget): Promise<void> {
     try {
       await this.#options.faults?.beforeSectionLoad?.(target.index)
-      await this.#requireActive().view.renderer.goTo(target)
+      await active.view.renderer.goTo(target)
     } catch (error) {
       const wrapped = new ReaderSectionLoadError(target.index, this.#sectionLabel(target.index), error)
       this.#options.onSectionError?.(wrapped)
@@ -576,7 +732,8 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       throw new ReaderNavigationError({ kind: 'cfi', cfi })
     }
     const value = target.anchor(document)
-    if (!(value instanceof Range)) throw new ReaderNavigationError({ kind: 'cfi', cfi })
+    const RangeConstructor = document.defaultView?.Range ?? Range
+    if (!(value instanceof RangeConstructor)) throw new ReaderNavigationError({ kind: 'cfi', cfi })
     return value
   }
 
@@ -609,6 +766,51 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#options.onSelectionChange?.(null)
   }
 
+  async #recoverStalledView(stalled: ActiveReader, revision: number): Promise<void> {
+    if (revision !== this.#revision || this.#active !== stalled) return
+    const { book } = stalled
+    this.#active = undefined
+    this.#dispose(stalled, false)
+
+    const view = document.createElement('foliate-view') as FoliateView
+    const cleanups = [...this.#listen(view), configureForViewport(view)]
+    const replacement: ActiveReader = { book, view, cleanups }
+    this.#active = replacement
+    this.#host.replaceChildren(view)
+    this.#suppressRelocations += 1
+    try {
+      await withDeadline(
+        view.open(book),
+        this.#options.openDeadlineMs ?? BOOK_OPEN_DEADLINE_MS,
+        this.#options.clock ?? systemClock,
+      )
+      if (revision !== this.#revision || this.#active !== replacement) throw new ReaderClosedError()
+      cleanups.push(this.#listenForRendererRelocations(view))
+      view.renderer.setStyles?.(makeReaderCss(this.#style, this.#shellPalette()))
+      await withDeadline(
+        view.init({
+          ...(this.#location?.cfi ? { lastLocation: this.#location.cfi } : {}),
+          showTextStart: true,
+        }),
+        this.#options.openDeadlineMs ?? BOOK_OPEN_DEADLINE_MS,
+        this.#options.clock ?? systemClock,
+      )
+      if (revision !== this.#revision || this.#active !== replacement) throw new ReaderClosedError()
+      this.renderAnnotations(this.#marks)
+      if (this.#tutorTarget) void this.#renderTutorOverlay(this.#tutorGeneration)
+    } catch (error) {
+      if (this.#active === replacement) {
+        this.#active = undefined
+        this.#dispose(replacement)
+        this.#host.replaceChildren()
+      }
+      throw error
+    } finally {
+      this.#suppressRelocations = Math.max(0, this.#suppressRelocations - 1)
+      this.#relocationProvenance.length = 0
+    }
+  }
+
   #destroyActive(): void {
     const active = this.#active
     this.#active = undefined
@@ -620,16 +822,23 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#host.replaceChildren()
   }
 
-  #dispose(active: ActiveReader): void {
+  #dispose(active: ActiveReader, destroyBook = true): void {
     if (this.#disposedViews.has(active.view)) return
     this.#disposedViews.add(active.view)
     for (const cleanup of active.cleanups) cleanup()
     active.view.close()
     active.view.remove()
-    active.book.destroy?.()
+    if (destroyBook) active.book.destroy?.()
   }
 
   #resetSnapshots(): void {
+    this.#tutorGeneration += 1
+    this.#tutorTarget = undefined
+    this.#relocationProvenance.length = 0
+    this.#activeNavigation = undefined
+    this.#learnerIntentEpoch = 0
+    this.#suppressRelocations = 0
+    this.#navigationQueue = Promise.resolve()
     this.#toc = []
     this.#sections = []
     this.#location = undefined

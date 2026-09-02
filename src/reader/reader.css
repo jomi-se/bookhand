@@ -5,7 +5,12 @@
      against the widest figure in the book rather than against the viewport.
      See docs/reviews/2026-09-02-pixel-7-reader-diagnosis.md, defect 1. */
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'chrome'
+    'guidance'
+    'stage'
+    'footer';
   block-size: 100svh;
   color: var(--ink);
   background: var(--canvas);
@@ -140,11 +145,63 @@
 }
 
 .reader-chrome {
+  grid-area: chrome;
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 10px max(14px, env(safe-area-inset-right)) 10px max(14px, env(safe-area-inset-left));
   border-block-end: 1px solid var(--rule);
+}
+
+.guidance-indicator {
+  grid-area: guidance;
+  display: flex;
+  min-inline-size: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left));
+  border-block-end: 1px solid var(--rule);
+  background: var(--accent-quiet);
+  color: var(--ink);
+}
+
+.guidance-indicator[hidden] {
+  display: none;
+}
+
+.guidance-message,
+.guidance-error {
+  display: -webkit-box;
+  min-inline-size: 0;
+  margin: 0;
+  font-size: var(--step--1);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.guidance-attribution {
+  margin-inline-end: 10px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.guidance-error {
+  color: var(--ink);
+}
+
+.guidance-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.guidance-actions .button {
+  min-block-size: 36px;
+  padding-inline: 10px;
 }
 
 .reader-identity {
@@ -182,6 +239,7 @@
 }
 
 .reader-stage {
+  grid-area: stage;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   min-inline-size: 0;
@@ -438,6 +496,7 @@
 }
 
 .reader-footer {
+  grid-area: footer;
   display: flex;
   gap: 14px;
   align-items: center;
@@ -493,6 +552,21 @@
  * `COMPACT_QUERY` in FoliateReaderAdapter.ts and useReaderChrome.ts.
  */
 @media (max-width: 860px), (pointer: coarse) {
+  .guidance-indicator {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .guidance-message,
+  .guidance-error {
+    -webkit-line-clamp: 3;
+  }
+
+  .guidance-actions .button {
+    min-block-size: var(--tap);
+  }
+
   .tool-label {
     display: none;
   }

@@ -6,6 +6,8 @@ declare module 'virtual:bookhand-test-controls' {
   export function prepareRuntimePorts(ports: RuntimePorts): RuntimePorts
   import type { StorageClient } from './storage/client.ts'
   export function prepareStorageClient(client: StorageClient): StorageClient
+  import type { FoliateReaderAdapterOptions } from './reader/FoliateReaderAdapter.ts'
+  export function prepareReaderOptions(options: FoliateReaderAdapterOptions): FoliateReaderAdapterOptions
 }
 
 declare module 'virtual:bookhand-worker-test-controls' {

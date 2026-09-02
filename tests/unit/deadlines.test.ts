@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   BOOK_OPEN_DEADLINE_MS,
+  READER_NAVIGATION_DEADLINE_MS,
   DeadlineExceededError,
   LIBRARY_LOAD_DEADLINE_MS,
   withDeadline,
@@ -12,6 +13,7 @@ describe('runtime deadlines', () => {
   it('publishes the deterministic Slice 1 deadlines', () => {
     expect(LIBRARY_LOAD_DEADLINE_MS).toBe(5_000)
     expect(BOOK_OPEN_DEADLINE_MS).toBe(10_000)
+    expect(READER_NAVIGATION_DEADLINE_MS).toBe(5_000)
   })
 
   it('can reach an unresolved-operation deadline with a shared fake clock', async () => {

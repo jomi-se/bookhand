@@ -20,6 +20,8 @@ const FORWARDED: { readonly [K in keyof Required<ReaderAdapterEvents>]: true } =
   onSectionError: true,
   onAnnotationActivate: true,
   onTap: true,
+  onNavigationIntent: true,
+  onNavigationRequest: true,
 }
 
 const EVENT_NAMES = Object.keys(FORWARDED) as (keyof ReaderAdapterEvents)[]
@@ -32,7 +34,7 @@ export function bindLatestOptions(
       name,
       (...args: unknown[]) => {
         const handler = latest()?.[name] as ((...values: unknown[]) => void) | undefined
-        handler?.(...args)
+        return handler?.(...args)
       },
     ]),
   ) as ReaderAdapterEvents
@@ -45,8 +47,14 @@ export function bindLatestOptions(
     get openDeadlineMs() {
       return latest()?.openDeadlineMs
     },
+    get navigationDeadlineMs() {
+      return latest()?.navigationDeadlineMs
+    },
     get faults() {
       return latest()?.faults
+    },
+    get tutorOverlayRenderer() {
+      return latest()?.tutorOverlayRenderer
     },
   }
 }

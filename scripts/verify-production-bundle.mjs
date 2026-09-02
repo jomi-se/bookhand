@@ -16,6 +16,7 @@ const forbiddenTokens = [
   'Injected OPFS initialization failure',
   'Injected library-list failure',
   'Injected section-load failure',
+  'data-bookhand-tutor-sentinel',
 ]
 
 async function filesBelow(directory) {

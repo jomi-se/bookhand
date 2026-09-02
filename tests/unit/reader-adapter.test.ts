@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createElement, StrictMode } from 'react'
-import { render } from '@testing-library/react'
+import { render, waitFor } from '@testing-library/react'
 import type { BookMetadata, ReaderSelection } from '../../src/domain/reader.ts'
 import {
   FoliateReaderAdapter,
@@ -32,13 +32,22 @@ class FakeFoliateView extends HTMLElement implements FoliateView {
     section: { current: number }
     tocItem: { label: string }
   }
+  readonly overlayAdd = vi.fn()
+  readonly overlayRemove = vi.fn()
 
   constructor() {
     super()
     const renderer = document.createElement('div') as unknown as FoliateRenderer
     let current = 0
     let currentDocument = makeDocument(sectionMarkup[current])
-    renderer.getContents = () => [{ index: current, doc: currentDocument }]
+    renderer.getContents = () => [{
+      index: current,
+      doc: currentDocument,
+      overlayer: {
+        add: this.overlayAdd,
+        remove: this.overlayRemove,
+      },
+    }]
     renderer.setStyles = vi.fn()
     renderer.goTo = vi.fn(async (target: FoliateResolvedTarget) => {
       current = target.index
@@ -56,8 +65,11 @@ class FakeFoliateView extends HTMLElement implements FoliateView {
     this.append(this.renderer)
   }
 
-  async init() {
-    await this.renderer.goTo({ index: 0 })
+  async init(options?: { lastLocation?: string; showTextStart?: boolean }) {
+    const target = options?.lastLocation
+      ? this.resolveNavigation(options.lastLocation) ?? { index: 0 }
+      : { index: 0 }
+    await this.renderer.goTo(target)
   }
 
   close = vi.fn(() => this.replaceChildren())
@@ -83,6 +95,9 @@ class FakeFoliateView extends HTMLElement implements FoliateView {
   private relocate(index: number, doc: Document) {
     const range = doc.createRange()
     range.selectNodeContents(doc.querySelector('p')!)
+    this.renderer.dispatchEvent(new CustomEvent('relocate', {
+      detail: { reason: 'navigation', range, index },
+    }))
     this.lastLocation = {
       cfi: `fixture:${index}:0:0`,
       range,
@@ -104,6 +119,172 @@ afterEach(() => {
 })
 
 describe('FoliateReaderAdapter', () => {
+  it('attributes programmatic relocations and removes failed navigation identities', async () => {
+    const relocations: { sectionIndex: number; navigationId?: number }[] = []
+    let failSection = false
+    const adapter = makeAdapter(document.createElement('div'), {
+      onLocationChange: (location, navigationId) => {
+        relocations.push({
+          sectionIndex: location.sectionIndex,
+          ...(navigationId === undefined ? {} : { navigationId }),
+        })
+      },
+      faults: {
+        beforeSectionLoad: async (sectionIndex) => {
+          if (failSection && sectionIndex === 1) throw new Error('blocked')
+        },
+      },
+    })
+    await adapter.open(new Blob(['fixture']))
+
+    await adapter.navigate({ kind: 'href', href: 'chapter-2.xhtml' }, 41)
+    expect(relocations.at(-1)).toEqual({ sectionIndex: 1, navigationId: 41 })
+    await adapter.navigate({ kind: 'relative', direction: 'previous' }, 42)
+    expect(relocations.at(-1)).toEqual({ sectionIndex: 0, navigationId: 42 })
+
+    failSection = true
+    await expect(adapter.navigate({ kind: 'section', sectionIndex: 1 }, 43)).rejects.toBeInstanceOf(
+      ReaderSectionLoadError,
+    )
+    failSection = false
+    await adapter.navigate({ kind: 'section', sectionIndex: 1 })
+    expect(relocations.at(-1)).toEqual({ sectionIndex: 1 })
+  })
+
+  it('does not publish a retired relocation as the adapter location', async () => {
+    const adapter = makeAdapter(document.createElement('div'), {
+      onLocationChange: (_location, navigationId) => navigationId !== 41,
+    })
+    await adapter.open(new Blob(['fixture']))
+    expect(adapter.getLocation().sectionIndex).toBe(0)
+
+    await adapter.navigate({ kind: 'section', sectionIndex: 1 }, 41)
+
+    expect(adapter.getLocation().sectionIndex).toBe(0)
+  })
+
+  it('serializes an in-book link behind an unsettled issued navigation with exact identities', async () => {
+    const relocations: (number | undefined)[] = []
+    let adapter!: FoliateReaderAdapter
+    let linkNavigation!: Promise<void>
+    adapter = makeAdapter(document.createElement('div'), {
+      onLocationChange: (_location, navigationId) => { relocations.push(navigationId) },
+      onNavigationRequest: (target) => { linkNavigation = adapter.navigate(target, 52) },
+    })
+    await adapter.open(new Blob(['fixture']))
+    await adapter.navigate({ kind: 'section', sectionIndex: 1 })
+    relocations.length = 0
+    const view = document.querySelector('foliate-view') as FakeFoliateView
+    const originalGoTo = view.renderer.goTo.bind(view.renderer)
+    let release!: () => void
+    const barrier = new Promise<void>((resolve) => { release = resolve })
+    let first = true
+    view.renderer.goTo = vi.fn(async (target: FoliateResolvedTarget) => {
+      if (first) {
+        first = false
+        await barrier
+      }
+      await originalGoTo(target)
+    })
+
+    const issued = adapter.navigate({ kind: 'section', sectionIndex: 1 }, 51)
+    await Promise.resolve()
+    const link = new CustomEvent('link', {
+      detail: { href: 'chapter-1.xhtml' },
+      cancelable: true,
+    })
+    view.dispatchEvent(link)
+    expect(link.defaultPrevented).toBe(true)
+    release()
+    await issued
+    await linkNavigation
+
+    expect(relocations).toEqual([51, 52])
+    expect(adapter.getLocation().sectionIndex).toBe(0)
+  })
+
+  it('replaces a stalled Foliate view and lets the queued learner link proceed', async () => {
+    const relocations: (number | undefined)[] = []
+    let adapter!: FoliateReaderAdapter
+    let linkNavigation!: Promise<void>
+    adapter = makeAdapter(document.createElement('div'), {
+      navigationDeadlineMs: 10,
+      onLocationChange: (_location, navigationId) => { relocations.push(navigationId) },
+      onNavigationRequest: (target) => { linkNavigation = adapter.navigate(target, 72) },
+    })
+    await adapter.open(new Blob(['fixture']))
+    await adapter.navigate({ kind: 'section', sectionIndex: 1 }, 70)
+    expect(adapter.getLocation().sectionIndex).toBe(1)
+    relocations.length = 0
+    const stalledView = document.querySelector('foliate-view') as FakeFoliateView
+    stalledView.renderer.goTo = vi.fn(async () => new Promise<void>(() => undefined))
+
+    const stalled = adapter.navigate({ kind: 'section', sectionIndex: 0 }, 71)
+    await Promise.resolve()
+    const link = new CustomEvent('link', {
+      detail: { href: 'chapter-1.xhtml' },
+      cancelable: true,
+    })
+    stalledView.dispatchEvent(link)
+
+    await expect(stalled).rejects.toBeInstanceOf(ReaderNavigationError)
+    await linkNavigation
+    const replacement = document.querySelector('foliate-view') as FakeFoliateView
+    expect(replacement).not.toBe(stalledView)
+    expect(adapter.getLocation().sectionIndex).toBe(0)
+    expect(relocations).toEqual([72])
+  })
+
+  it('does not let an incidental anchor reflow consume an issued navigation identity', async () => {
+    const relocations: (number | undefined)[] = []
+    const adapter = makeAdapter(document.createElement('div'), {
+      onLocationChange: (_location, navigationId) => { relocations.push(navigationId) },
+    })
+    await adapter.open(new Blob(['fixture']))
+    relocations.length = 0
+    const view = document.querySelector('foliate-view') as FakeFoliateView
+    const originalGoTo = view.renderer.goTo.bind(view.renderer)
+    let release!: () => void
+    const barrier = new Promise<void>((resolve) => { release = resolve })
+    view.renderer.goTo = vi.fn(async (target: FoliateResolvedTarget) => {
+      await barrier
+      await originalGoTo(target)
+    })
+
+    const issued = adapter.navigate({ kind: 'section', sectionIndex: 1 }, 61)
+    await Promise.resolve()
+    const current = view.lastLocation!
+    view.renderer.dispatchEvent(new CustomEvent('relocate', {
+      detail: { reason: 'anchor', range: current.range, index: 0 },
+    }))
+    view.dispatchEvent(new CustomEvent('relocate', { detail: current }))
+    release()
+    await issued
+
+    expect(relocations).toEqual([undefined, 61])
+  })
+
+  it('attributes a fixed-layout-shaped relocation with no reason to its issued move', async () => {
+    const relocations: (number | undefined)[] = []
+    const adapter = makeAdapter(document.createElement('div'), {
+      onLocationChange: (_location, navigationId) => { relocations.push(navigationId) },
+    })
+    await adapter.open(new Blob(['fixture']))
+    relocations.length = 0
+    const view = document.querySelector('foliate-view') as FakeFoliateView
+    const current = view.lastLocation!
+    view.renderer.goTo = vi.fn(async () => {
+      view.renderer.dispatchEvent(new CustomEvent('relocate', {
+        detail: { range: null, index: 0 },
+      }))
+      view.dispatchEvent(new CustomEvent('relocate', { detail: current }))
+    })
+
+    await adapter.navigate({ kind: 'section', sectionIndex: 1 }, 62)
+
+    expect(relocations).toEqual([62])
+  })
+
   it('publishes fixture-grounded metadata, nested TOC, sections, location, and text snapshots', async () => {
     const host = document.createElement('div')
     const adapter = makeAdapter(host)
@@ -355,6 +536,69 @@ describe('FoliateReaderAdapter', () => {
 
     await adapter.navigate({ kind: 'relative', direction: 'next' })
     expect(adapter.getSelection()).toBeNull()
+  })
+
+  it('announces in-book link and swipe intent before Foliate owns the move', async () => {
+    const host = document.createElement('div')
+    const onNavigationIntent = vi.fn()
+    const adapter = makeAdapter(host, { onNavigationIntent })
+    await adapter.open(new Blob(['fixture']))
+    const view = host.querySelector('foliate-view') as unknown as FakeFoliateView
+
+    view.dispatchEvent(new Event('link'))
+    expect(onNavigationIntent).toHaveBeenCalledTimes(1)
+
+    const doc = view.renderer.getContents()[0]!.doc
+    const start = new Event('touchstart', { bubbles: true })
+    Object.defineProperties(start, {
+      changedTouches: { value: [{ clientX: 100, clientY: 20 }] },
+      touches: { value: [{ clientX: 100, clientY: 20 }] },
+      timeStamp: { value: 1 },
+    })
+    doc.dispatchEvent(start)
+    const move = new Event('touchmove', { bubbles: true })
+    Object.defineProperties(move, {
+      changedTouches: { value: [{ clientX: 70, clientY: 20 }] },
+      touches: { value: [{ clientX: 70, clientY: 20 }] },
+      timeStamp: { value: 2 },
+    })
+    doc.dispatchEvent(move)
+    expect(onNavigationIntent).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the verified tutor overlay in a namespace durable annotation rerenders cannot clear', async () => {
+    const host = document.createElement('div')
+    const drawTutor = vi.fn(() => document.createElementNS('http://www.w3.org/2000/svg', 'g'))
+    const adapter = makeAdapter(host, { tutorOverlayRenderer: drawTutor })
+    await adapter.open(new Blob(['fixture']))
+    const view = host.querySelector('foliate-view') as unknown as FakeFoliateView
+    const target = await adapter.getPassage({
+      startCfi: 'fixture:0:0:0',
+      endCfi: 'fixture:0:11:11',
+      sectionIndex: 0,
+      textFingerprint: 'ignored-until-resolved',
+    }).catch(async () => adapter.getPassageAtLocation!({
+      startCfi: 'fixture:0:0:0',
+      endCfi: 'fixture:0:11:11',
+      sectionIndex: 0,
+      textFingerprint: 'ignored-until-resolved',
+    }))
+
+    adapter.setTutorTarget(target)
+    await waitFor(() => expect(view.overlayAdd).toHaveBeenCalledWith(
+      'bookhand-tutor-overlay',
+      expect.any(Range),
+      drawTutor,
+      expect.any(Object),
+    ))
+    view.overlayRemove.mockClear()
+
+    adapter.renderAnnotations([{ id: 'durable', cfi: 'fixture:0:0:11', color: '#c24a2b' }])
+    adapter.renderAnnotations([{ id: 'durable', cfi: 'fixture:0:0:11', color: '#c24a2b' }])
+    expect(view.overlayRemove).not.toHaveBeenCalledWith('bookhand-tutor-overlay')
+
+    adapter.setTutorTarget(null)
+    expect(view.overlayRemove).toHaveBeenCalledWith('bookhand-tutor-overlay')
   })
 
   it('keeps one live viewer through the React StrictMode setup and cleanup cycle', async () => {

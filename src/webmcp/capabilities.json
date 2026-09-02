@@ -3,12 +3,14 @@
   "scopes": {
     "applicationWorlds": false,
     "epubCss": true,
-    "nativeStudyItems": true
+    "nativeStudyItems": true,
+    "tutorGuidance": true
   },
   "reversals": {
     "boardView": ["undo"],
     "readingStyle": ["preview", "apply", "cancel", "undo", "reset"],
-    "studyItem": ["undo", "delete", "return-to-source"]
+    "studyItem": ["undo", "delete", "return-to-source"],
+    "guidance": ["back", "stop"]
   },
   "study": {
     "agentObservabilityInStudy": false,

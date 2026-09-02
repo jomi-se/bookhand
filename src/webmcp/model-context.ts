@@ -45,6 +45,66 @@ export function isWebMcpAvailable(): boolean {
   return getModelContext() !== undefined
 }
 
+const GUIDANCE_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    state: { type: 'string', enum: ['absent', 'guiding', 'yielded'] },
+    canBack: { type: 'boolean' },
+    revision: { type: 'integer', minimum: 0 },
+  },
+  required: ['state', 'canBack', 'revision'],
+  additionalProperties: false,
+} as const
+
+const FOCUS_OUTPUT_SCHEMA = {
+  oneOf: [
+    {
+      type: 'object',
+      properties: {
+        outcome: { type: 'string', enum: ['applied', 'superseded', 'unavailable'] },
+        guidance: GUIDANCE_OUTPUT_SCHEMA,
+      },
+      required: ['outcome', 'guidance'],
+      additionalProperties: false,
+    },
+    {
+      type: 'object',
+      properties: {
+        outcome: { const: 'rejected' },
+        guidance: GUIDANCE_OUTPUT_SCHEMA,
+        code: { type: 'string' },
+        detail: { type: 'string', maxLength: 1_000 },
+      },
+      required: ['outcome', 'guidance', 'code', 'detail'],
+      additionalProperties: false,
+    },
+  ],
+} as const
+
+const CONTROL_OUTPUT_SCHEMA = {
+  oneOf: [
+    {
+      type: 'object',
+      properties: {
+        outcome: { type: 'string', enum: ['restored', 'no_back_target', 'unresolvable'] },
+        guidance: GUIDANCE_OUTPUT_SCHEMA,
+      },
+      required: ['outcome', 'guidance'],
+      additionalProperties: false,
+    },
+    {
+      type: 'object',
+      properties: {
+        outcome: { const: 'cleared' },
+        wasActive: { type: 'boolean' },
+        guidance: GUIDANCE_OUTPUT_SCHEMA,
+      },
+      required: ['outcome', 'wasActive', 'guidance'],
+      additionalProperties: false,
+    },
+  ],
+} as const
+
 export const TOOL_OUTPUT_SCHEMA = {
   type: 'object',
   properties: {
@@ -56,7 +116,12 @@ export const TOOL_OUTPUT_SCHEMA = {
       required: ['message'],
       additionalProperties: false,
     },
-    readingContext: { type: 'object' },
+    readingContext: {
+      type: 'object',
+      properties: { guidance: GUIDANCE_OUTPUT_SCHEMA },
+      required: ['guidance'],
+      additionalProperties: true,
+    },
     tableOfContents: { type: 'array' },
     passage: { type: 'object' },
     destination: { type: 'object' },
@@ -71,6 +136,8 @@ export const TOOL_OUTPUT_SCHEMA = {
     surface: { type: 'string' },
     guidanceVersion: { type: 'string' },
     code: { type: 'string' },
+    focus: FOCUS_OUTPUT_SCHEMA,
+    control: CONTROL_OUTPUT_SCHEMA,
   },
   required: ['ok', 'message'],
   additionalProperties: true,

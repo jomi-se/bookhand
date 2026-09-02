@@ -1,4 +1,4 @@
-import type { BookMetadata, ReaderAdapter } from '../domain/reader.ts'
+import type { BookMetadata, BookTarget, ReaderAdapter } from '../domain/reader.ts'
 
 /**
  * The reader adapter only exists once a reader surface has mounted, but the
@@ -7,6 +7,11 @@ import type { BookMetadata, ReaderAdapter } from '../domain/reader.ts'
  */
 export class ReaderPortBridge {
   #adapter: ReaderAdapter | undefined
+  readonly #navigate?: (target: BookTarget) => Promise<void>
+
+  constructor(navigate?: (target: BookTarget) => Promise<void>) {
+    this.#navigate = navigate
+  }
 
   attach(adapter: ReaderAdapter): void {
     this.#adapter = adapter
@@ -28,6 +33,8 @@ export class ReaderPortBridge {
   openBook = (blob: Blob): Promise<BookMetadata> => this.require().open(blob)
 
   loadSection = async (sectionIndex: number): Promise<void> => {
-    await this.require().navigate({ kind: 'section', sectionIndex })
+    const target = { kind: 'section' as const, sectionIndex }
+    if (this.#navigate) await this.#navigate(target)
+    else await this.require().navigate(target)
   }
 }

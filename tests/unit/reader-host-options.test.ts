@@ -10,27 +10,29 @@ describe('reader host option binding', () => {
   it('delivers events to the latest options rather than the ones bound first', () => {
     const seen: string[] = []
     let current: FoliateReaderAdapterOptions = {
-      onLocationChange: () => seen.push('first'),
+      onLocationChange: () => { seen.push('first') },
     }
     const bound = bindLatestOptions(() => current)
 
     bound.onLocationChange?.(location)
-    current = { onLocationChange: () => seen.push('second') }
+    current = { onLocationChange: () => { seen.push('second') } }
     bound.onLocationChange?.(location)
 
     expect(seen).toEqual(['first', 'second'])
   })
 
   it('re-reads the clock, deadline, and fault hooks on every access', () => {
-    let current: FoliateReaderAdapterOptions = { openDeadlineMs: 1_000 }
+    let current: FoliateReaderAdapterOptions = { openDeadlineMs: 1_000, navigationDeadlineMs: 500 }
     const bound = bindLatestOptions(() => current)
 
     expect(bound.openDeadlineMs).toBe(1_000)
+    expect(bound.navigationDeadlineMs).toBe(500)
     expect(bound.faults).toBeUndefined()
 
     const faults = { beforeOpen: async () => undefined }
-    current = { openDeadlineMs: 2_000, faults }
+    current = { openDeadlineMs: 2_000, navigationDeadlineMs: 750, faults }
     expect(bound.openDeadlineMs).toBe(2_000)
+    expect(bound.navigationDeadlineMs).toBe(750)
     expect(bound.faults).toBe(faults)
   })
 

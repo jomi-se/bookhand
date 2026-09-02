@@ -6,6 +6,7 @@ import { DesignStateStore } from './design-state.ts'
 import { PresentationStore } from './presentation.ts'
 import { SurfaceStore } from './surface.ts'
 import { ReaderPortBridge } from './reader-bridge.ts'
+import { GuidanceController } from './guidance.ts'
 
 export { ReaderPortBridge } from './reader-bridge.ts'
 
@@ -19,11 +20,14 @@ export interface AppRuntime {
   readonly presentation: PresentationStore
   /** Which panel is open, written by UI and tools alike. */
   readonly surface: SurfaceStore
+  /** Runtime-only tutor navigation and persistence authority. */
+  readonly guidance: GuidanceController
 }
 
 export function createAppRuntime(client: StorageClient = new StorageClient()): AppRuntime {
   const preparedClient = prepareStorageClientForBrowser(client)
-  const reader = new ReaderPortBridge()
+  const guidance = new GuidanceController()
+  const reader = new ReaderPortBridge((target) => guidance.navigateOrdinary(target))
   const ports = prepareRuntimePortsForBrowser({
     persistence: { initialize: () => preparedClient.initialize() },
     library: { listBooks: () => preparedClient.listBooks() },
@@ -36,5 +40,6 @@ export function createAppRuntime(client: StorageClient = new StorageClient()): A
     designState: new DesignStateStore(),
     presentation: new PresentationStore(DEFAULT_READER_STYLE),
     surface: new SurfaceStore(),
+    guidance,
   }
 }
