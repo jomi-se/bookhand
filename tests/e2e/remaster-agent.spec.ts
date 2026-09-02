@@ -69,7 +69,8 @@ async function openChapter(page: Page) {
     .poll(() => renderedHtml(page).then((html) => html.includes('data-tex')), { timeout: 20_000 })
     .toBe(true)
   // Put the reader back the way a person reads, with the panel closed.
-  await page.getByRole('button', { name: 'Close contents' }).click()
+  const closeContents = page.getByRole('button', { name: 'Close contents' })
+  if (await closeContents.isVisible()) await closeContents.click()
   await expect(page.locator('#reader-contents-panel')).toBeHidden()
 }
 
@@ -251,4 +252,26 @@ test('the deterministic shortcut is one call the agent may choose', async ({ pag
   const undone = await agentCall(page, 'set_section_view', { view: 'undo' })
   expect(undone.isError).toBe(false)
   await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('data-tex')
+})
+
+test('the person keeps a usable reading surface and touch controls on a compact screen', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 412, height: 915 })
+  await openChapter(page)
+  const result = await agentCall(page, 'compile_section_math')
+  expect(result.isError).toBe(false)
+
+  const bar = page.locator('.remaster-bar')
+  const stage = page.locator('.reader-stage')
+  await expect(bar).toBeVisible()
+  const [barBox, stageBox] = await Promise.all([bar.boundingBox(), stage.boundingBox()])
+  expect(barBox).not.toBeNull()
+  expect(stageBox?.height).toBeGreaterThan(400)
+  expect((barBox?.x ?? 0) + (barBox?.width ?? 0)).toBeLessThanOrEqual(412)
+
+  for (const name of ['Original', 'Rewritten', 'Undo', 'Reset']) {
+    const box = await bar.getByRole('button', { name }).boundingBox()
+    expect(box?.height).toBeGreaterThanOrEqual(44)
+  }
 })

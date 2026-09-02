@@ -770,3 +770,22 @@
   margin: 0;
   color: var(--ink);
 }
+
+@media (max-width: 860px), (pointer: coarse) {
+  .remaster-bar {
+    gap: 0.35rem;
+  }
+
+  .remaster-bar-note,
+  .remaster-bar-tools {
+    flex: 1 0 100%;
+  }
+
+  .remaster-bar-tools {
+    justify-content: space-between;
+  }
+
+  .remaster-bar-tools > .button-text {
+    min-block-size: var(--tap);
+  }
+}
