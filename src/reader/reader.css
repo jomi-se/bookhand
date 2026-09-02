@@ -248,6 +248,13 @@
   min-inline-size: 0;
   min-block-size: 0;
   block-size: 100%;
+  /* Foliate destroys and rebuilds the section iframe at every chapter, so for
+     a frame or two there is nothing to paint. Painting the theme's own canvas
+     underneath makes that gap the colour of the page instead of a flash of
+     white. `contain` keeps the rebuild's own reflow from being attributed to
+     the rest of the app. */
+  background: var(--canvas);
+  contain: layout paint;
 }
 
 .reader-surface foliate-view {
@@ -335,9 +342,58 @@
   text-overflow: ellipsis;
 }
 
-@media (max-width: 860px) {
+/*
+ * Secondary chrome that has receded. It keeps its box so nothing below it
+ * moves — a toolbar that collapses would reflow the book and undo the reading
+ * position the recede was meant to protect — and it is taken out of the
+ * accessibility tree and the tab order along with the pointer, so it cannot be
+ * reached while invisible.
+ */
+.reader[data-chrome='hidden'] .reader-chrome,
+.reader[data-chrome='hidden'] .reader-footer {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--enter) ease,
+    visibility 0s linear var(--enter);
+}
+
+.reader-chrome,
+.reader-footer {
+  transition: opacity var(--enter) ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-chrome,
+  .reader-footer,
+  .reader[data-chrome='hidden'] .reader-chrome,
+  .reader[data-chrome='hidden'] .reader-footer {
+    transition: none;
+  }
+}
+
+/*
+ * The touch-first layout, which is not only about width. A phone in landscape
+ * is 915px across and needs tap zones and no side rails just as much as it did
+ * in portrait, so a coarse pointer qualifies on its own. Kept in step with
+ * `COMPACT_QUERY` in FoliateReaderAdapter.ts and useReaderChrome.ts.
+ */
+@media (max-width: 860px), (pointer: coarse) {
   .tool-label {
     display: none;
+  }
+
+  /*
+   * The side rails cost 88px of a 412px screen — 21% of the reading width —
+   * for something touch already does better. Tap zones replace them, and the
+   * book gets the whole width back. `VAL-MOBILE-CHROME`.
+   */
+  .page-step {
+    display: none;
+  }
+
+  .reader-book-area {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .reader-tools .button,
@@ -359,10 +415,41 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /*
+   * The book is put behind the panel rather than removed. `display: none`
+   * collapsed the Foliate container to 0x0, its ResizeObserver re-rendered,
+   * and re-rendered again on close — three relocations per panel toggle, which
+   * walked the reading position slowly backwards. `visibility: hidden` keeps
+   * the box, so the observer sees nothing change, and still takes the book out
+   * of the accessibility tree while a panel is showing.
+   */
+  .reader[data-panel='contents'] .reader-stage,
+  .reader[data-panel='text'] .reader-stage,
+  .reader[data-panel='study'] .reader-stage {
+    grid-template-areas: 'surface';
+  }
+
+  .reader[data-panel='contents'] .reader-panel,
+  .reader[data-panel='text'] .reader-panel,
+  .reader[data-panel='study'] .reader-panel,
   .reader[data-panel='contents'] .reader-book-area,
   .reader[data-panel='text'] .reader-book-area,
   .reader[data-panel='study'] .reader-book-area {
-    display: none;
+    grid-area: surface;
+  }
+
+  .reader[data-panel='contents'] .reader-book-area,
+  .reader[data-panel='text'] .reader-book-area,
+  .reader[data-panel='study'] .reader-book-area {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .reader[data-panel='contents'] .reader-panel,
+  .reader[data-panel='text'] .reader-panel,
+  .reader[data-panel='study'] .reader-panel {
+    z-index: 1;
+    background: var(--canvas);
   }
 
   .reader-panel {

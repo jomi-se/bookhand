@@ -279,3 +279,109 @@ node .playwright-mcp/mobile-review-2026-09-02/probe6.mjs   # Defect 2 attributio
 
 `probe.mjs` through `probe4.mjs` cover the layout, header, panel and overflow
 measurements quoted above.
+
+---
+
+## Outcome, 2026-09-02 (W3)
+
+Re-measured on the same Pixel 7 profile against a fresh production build.
+Evidence under `.playwright-mcp/mobile-review-2026-09-02/w3-*`; regression
+tests in `tests/e2e/reader-mobile.spec.ts`, which runs as its own Playwright
+project so the device profile is real rather than emulated over a desktop one.
+
+| defect | state |
+| --- | --- |
+| 1 — max-content reading surface | **closed** (before W3, at `9a3428c`) |
+| 2 — per-section iframe rebuild | **partly closed**, see below |
+| 3 — `<foliate-view>` unconfigured | **closed** |
+| 4 — side rails and dead centre tap | **closed** |
+| 5 — inert safe-area insets | **closed** |
+| 6 — text autosizing unpinned | **closed** in code, still unconfirmed on a real device |
+| 7 — panel toggle churns the reader | **closed** |
+| 8 — `npm run dev` broken | **closed**, plus a second dev-only fault it was hiding |
+
+### Measured
+
+| | as shipped | now |
+| --- | --- | --- |
+| distinct document widths over 40 turns | 12 (412–754) | **1** (412) |
+| book host as a share of the viewport at 412 | 79% | **100%** |
+| …at 320 | 79% | **100%** |
+| …in landscape (915×412) | 53% | **100%** |
+| horizontal app-shell overflow, all setups | present | **0** |
+| tap in the centre of the page | nothing | toggles chrome |
+| reading fraction after one panel open/close | drifts (0.10244 → 0.10217) | **identical** |
+
+Contrast against the shell background, all three themes: body ink 13.6–18.1,
+secondary text 5.7–8.4, tool buttons 13.6–18.1. All above WCAG AA.
+
+### What W3 changed, and why
+
+**Defect 4 was two bugs, not one.** Removing the rails and adding tap zones was
+the easy half. The hard half only appeared once taps worked: Foliate's own
+`touchend` handler calls `snap(0, 0)`, which resolves to the current page and
+then, *because that page is page 0 or the last page*, navigates to the adjacent
+section. So on a phone any tap taken while on a section's first page jumped
+backwards a whole section — a pre-existing fault, invisible only because
+tapping did nothing at all. Tap detection is therefore registered in capture
+phase on the section document, which is the one place that runs before
+Foliate's own listener, and a recognized tap stops propagation. Nothing else
+is stopped.
+
+**The tap zone cannot be measured inside the iframe.** Foliate lays each
+section out as a single very wide multi-column canvas and slides it, so
+`clientX` for a tap on the fourth page is several thousand pixels and
+`innerWidth` is the whole column set — measured at 4215 and 5365 on a 412px
+phone. The zone is computed by adding the frame's own position in the host
+document, which converts back to where the finger was on screen. The first
+version of this shipped in a build that looked right on the cover, where the
+section happens to be one page wide.
+
+**Handlers were being silently dropped.** `bindLatestOptions` listed the events
+it forwarded by hand, so `onTap` never reached the adapter — and neither had
+`onAnnotationActivate`, since it was introduced. The list is now checked at
+compile time. A forgotten handler is invisible: nothing fails, the feature
+simply never happens.
+
+**Themes were duplicated.** The book document carried its own copy of the three
+palettes, and they had already drifted — the shell's sepia was `#f4efe4`, the
+book's `#f5eddd`, a seam down the edge of every page. The book now reads the
+live `--canvas` and `--ink` from the shell, so they cannot disagree.
+
+**The mathematics disappeared in dark mode.** Every equation in this book is a
+black monochrome glyph image, so on a dark page it was not dim but invisible —
+the same failure as W1's stripped passages, in a different medium. `img[data-tex]`
+is inverted under the dark theme only; figures, which are photographs' shape
+rather than line art's, are left alone.
+
+**The breakpoint was width-only.** A phone in landscape is 915px across and was
+getting the desktop layout, rails and all. The touch-first layout now also
+triggers on a coarse pointer.
+
+**Defect 8 was hiding a second dev-only fault.** With the CSP relaxed for the
+dev server, the app booted — and then failed to load SQLite, because
+`locateFile` resolved the wasm relative to the worker's own URL. A built worker
+happens to sit beside the wasm in `assets/`, so this worked in production and
+silently fetched `index.html` in development.
+
+### Still open
+
+**Defect 2.** The 1px horizontal jump is gone — residual shifts now report
+`dx: 0, dy: 0`, so the incoming section lands where the outgoing one was. What
+remains is the rebuild itself: 8–9 shift events over 55 turns, one per section
+load, each a size change on a detached node. Cumulative score rose from 1.46 to
+2.9 because the reading surface is now the full width of the phone and CLS
+scales with the area affected, not because more is moving. The book host now
+paints the theme's own canvas underneath so the gap is the colour of the page
+rather than a flash of white, and is `contain: layout paint`. Genuinely fixing
+this means settling the incoming section before it is shown, which is a change
+inside Foliate's render path.
+
+**Defect 6** is fixed as written but was never reproducible in emulation. It
+needs a real Android device to confirm.
+
+**Not owned above Foliate.** `VAL-MOBILE-GESTURES` specifies drag-intent
+thresholds — lock after 12px at a 1.5:1 horizontal ratio, complete at 20% of
+viewport width or 0.5px/ms. Those live inside Foliate's paginator and are not
+configurable. Tap intent is ours and is tested to the stated boundaries;
+swipe behaviour is Foliate's, and this is recorded rather than claimed.

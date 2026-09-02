@@ -18,6 +18,13 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      // The mobile suite sets its own device profile, so it would otherwise
+      // run twice with the desktop one fighting it.
+      testIgnore: /reader-mobile\.spec\.ts/,
+    },
+    {
+      name: 'pixel-7',
+      testMatch: /reader-mobile\.spec\.ts/,
     },
   ],
 })

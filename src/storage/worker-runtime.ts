@@ -84,7 +84,13 @@ async function initializeOfficialSqlite(): Promise<Sqlite3Static> {
     locateFile(path: string): string
   }) => Promise<Sqlite3Static>
   return initialize({
-    locateFile: (path) => new URL(path, globalThis.location.href).href,
+    // Resolved from the site root rather than from the worker's own URL. A
+    // built worker happens to sit beside the wasm in `assets/`, so resolving
+    // relatively worked in production and silently fetched `index.html` in
+    // development, where the worker is served from `src/`. `BASE_URL` keeps a
+    // subpath deployment working.
+    locateFile: (path) =>
+      new URL(`${import.meta.env.BASE_URL}assets/${path}`, globalThis.location.origin).href,
   })
 }
 

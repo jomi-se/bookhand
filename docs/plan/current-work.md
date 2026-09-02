@@ -4,29 +4,32 @@ Last updated: 2026-09-02
 
 ## Next action
 
-W1 is implemented. All six contracts — `VAL-RANGE-OWNERSHIP`,
-`VAL-MATH-PASSAGE`, `VAL-STUDY-ID-OWNERSHIP`, `VAL-ACTION-PROVENANCE-UNDO`,
-`VAL-MUTATION-ERRORS`, and `VAL-DURABLE-STORAGE-REQUEST` — have implementation
-and evidence. Next is W2's style parity, then W3's theme/layout primitives, then
-W5.
+W1, W2, and W3 are implemented with evidence. Next is a review pass, then W5 —
+the generated study experience, which is what makes the submission worth
+judging.
+
+W2 gave the reading style and the study board one owner each
+(`src/app/presentation.ts`, `src/app/surface.ts`). Both are shared state the
+interface and the tools write through, so a tool change reaches the controls
+and storage, a control change cannot carry a stale snapshot back over an
+agent's, and the board's `focus` and `close` modes exist at all. Custom EPUB
+CSS now requires the current `get_design_context` version.
+
+W3 rebuilt the reader's mobile interaction. The outcome, the measurements, and
+what is still open are recorded at the end of
+`docs/reviews/2026-09-02-pixel-7-reader-diagnosis.md`. Seven of its eight
+defects are closed; Defect 2 (the per-section iframe rebuild) is improved but
+not gone, and Defect 6 needs a real Android device rather than emulation.
 
 W7 (`VAL-COMPOSITION-QUALITY`) was added on 2026-09-02 after the owner observed
 that nothing in this mission measures whether a frontier model given these
 affordances composes anything worth reading. It runs after W5.
 
 The wave order is being read as a dependency graph rather than a chain, because
-the deadline is 2026-09-03T20:00Z. W2 needs W1's error/provenance primitives,
-W3 needs W2's shared style/view state, and W5 needs W3's theme/layout
-primitives — each a narrow interface, not a whole wave. The intended path is
-W1, then those three interfaces, then W5, with W3's remaining mobile contracts
-and W4 taken after. W5 is what makes the submission worth judging: without it
-there is a well-behaved reader and nothing to demonstrate.
-
-Defect 1 of `docs/reviews/2026-09-02-pixel-7-reader-diagnosis.md` is fixed ahead
-of W3, because it made every mobile observation unreliable: `.reader` declared
-no grid column, so the reading surface was max-content sized and the whole app
-blew out horizontally. Defects 2 through 8 in that review are still open and
-belong to W3.
+the deadline is 2026-09-03T20:00Z. W5 is what makes the submission worth
+judging: without it there is a well-behaved reader and nothing to demonstrate.
+W4 (`VAL-INDEX-LIFECYCLE`, `VAL-SEARCH-BOOK`) depends only on W1 and can be
+taken at any point.
 
 ## Goal
 

@@ -22,6 +22,40 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
 ].join('; ')
 
+/**
+ * The development policy, and only the development policy.
+ *
+ * Vite's React Fast Refresh injects an inline preamble, which the production
+ * policy correctly refuses — so `npm run dev` did not boot at all, and the
+ * first command anyone runs after cloning failed. Relaxing it here keeps the
+ * shipped policy exactly as strict as it was: this never reaches a build, and
+ * the preview server, which is what the deployment contract is tested against,
+ * still serves the production string.
+ */
+function relaxForDevelopment(policy: string): string {
+  return policy
+    .replace("script-src 'self' 'wasm-unsafe-eval'", "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'")
+    .replace("connect-src 'self'", "connect-src 'self' ws: wss:")
+}
+
+const developmentContentSecurityPolicy = relaxForDevelopment(contentSecurityPolicy)
+
+/**
+ * The same relaxation for the meta tag, which the browser enforces alongside
+ * the header. The tag is relaxed by rewriting its two directives rather than
+ * by substituting the whole policy, because the tag deliberately omits
+ * `frame-ancestors` — a directive meta tags cannot express.
+ */
+function developmentCsp(): Plugin {
+  return {
+    name: 'bookhand-development-csp',
+    apply: 'serve',
+    transformIndexHtml(html) {
+      return relaxForDevelopment(html)
+    },
+  }
+}
+
 const testControlModuleId = 'virtual:bookhand-test-controls'
 const resolvedTestControlModuleId = `\0${testControlModuleId}`
 
@@ -52,6 +86,7 @@ export default defineConfig(({ mode }) => ({
   base: process.env.BOOKHAND_BASE ?? '/',
   plugins: [
     react(),
+    developmentCsp(),
     testControlBoundary(mode),
     designContextSource(),
     viteStaticCopy({
@@ -70,7 +105,7 @@ export default defineConfig(({ mode }) => ({
     }),
   ],
   server: {
-    headers: { 'Content-Security-Policy': contentSecurityPolicy },
+    headers: { 'Content-Security-Policy': developmentContentSecurityPolicy },
     allowedHosts: ['.ts.net'],
   },
   // The preview server is the honest one to test against: it serves the real

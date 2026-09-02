@@ -34,6 +34,7 @@ import type {
   FoliateView,
 } from './foliate-types.ts'
 import { boundCustomCss } from './custom-css.ts'
+import { isInteractiveTarget, tapZone, type TapZone } from './tap-intent.ts'
 import { localized, mapMetadata } from './metadata.ts'
 import {
   extractDocumentText,
@@ -48,6 +49,11 @@ export interface ReaderAdapterEvents {
   readonly onSectionError?: (error: ReaderSectionLoadError) => void
   /** A drawn highlight was activated in the book. */
   readonly onAnnotationActivate?: (annotationId: string) => void
+  /**
+   * A deliberate tap landed on the book. The host decides what each zone
+   * means, so the reading surface stays free of policy.
+   */
+  readonly onTap?: (zone: TapZone) => void
 }
 
 export interface ReaderFaultHooks {
@@ -244,7 +250,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
   applyStyle(style: ReaderStyle): void {
     this.#style = structuredClone(style)
-    this.#active?.view.renderer.setStyles?.(makeReaderCss(this.#style))
+    this.#active?.view.renderer.setStyles?.(makeReaderCss(this.#style, this.#shellPalette()))
   }
 
   getStyle(): ReaderStyle {
@@ -293,7 +299,11 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
     blockPackagedScripts(book)
     const view = document.createElement('foliate-view') as FoliateView
-    const cleanups = this.#listen(view)
+    // Foliate's defaults are desktop-shaped: 48px of margin top and bottom,
+    // and no page-turn animation at all. On a phone that spent 96px of a 839px
+    // screen on nothing, and made every turn snap without transition, which
+    // reads as unresponsive rather than fast.
+    const cleanups = [...this.#listen(view), configureForViewport(view)]
     this.#active = { book, view, cleanups }
     this.#host.replaceChildren(view)
     try {
@@ -301,7 +311,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       this.#assertCurrent(revision)
       this.#toc = mapToc(book.toc ?? [])
       this.#sections = mapSections(book.sections, this.#toc)
-      view.renderer.setStyles?.(makeReaderCss(this.#style))
+      view.renderer.setStyles?.(makeReaderCss(this.#style, this.#shellPalette()))
       await view.init({ showTextStart: true })
       this.#assertCurrent(revision)
       this.#captureRelocation(view.lastLocation)
@@ -330,6 +340,10 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       sectionCleanups.push(() =>
         detail.doc.removeEventListener('selectionchange', onSelectionChange),
       )
+      // Taps have to be caught inside the section document: Foliate binds its
+      // own touch handling there, and events in the book's iframe never reach
+      // the host element.
+      sectionCleanups.push(...this.#listenForTaps(detail.doc))
     }
     const onDrawAnnotation = (event: Event) => {
       const detail = (event as CustomEvent<FoliateDrawDetail>).detail
@@ -361,6 +375,106 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         while (sectionCleanups.length) sectionCleanups.pop()?.()
       },
     ]
+  }
+
+  /**
+   * Turn touch activity in one section document into tap intent.
+   *
+   * Taps have to be caught here, in capture phase, for two reasons. Events in
+   * the book's iframe never reach the host element, so this is the only place
+   * they exist. And Foliate's own `touchend` handler on this same document
+   * calls `snap(0, 0)`, which resolves to the current page and then — because
+   * that page is page 0 or the last page — navigates to the adjacent section.
+   * So on a phone, *any* tap taken while on a section's first page jumps
+   * backwards a whole section. Capture on the document runs before the target,
+   * and therefore before Foliate's own listener bubbles back, which is what
+   * lets a recognized tap stop it.
+   *
+   * Only a recognized tap is stopped. Everything else — swipes, presses,
+   * selection, a tap on a link — is left exactly as Foliate had it.
+   */
+  #listenForTaps(doc: Document): readonly (() => void)[] {
+    let start: { x: number; y: number; at: number; hadSelection: boolean } | undefined
+
+    const onStart = (event: TouchEvent) => {
+      const touch = event.changedTouches[0]
+      const selection = doc.getSelection()
+      start =
+        event.touches.length > 1 || !touch
+          ? undefined
+          : {
+              x: touch.clientX,
+              y: touch.clientY,
+              at: event.timeStamp,
+              hadSelection: Boolean(selection && !selection.isCollapsed),
+            }
+    }
+
+    const onEnd = (event: TouchEvent) => {
+      const began = start
+      start = undefined
+      const touch = event.changedTouches[0]
+      if (!began || !touch || isInteractiveTarget(event.target)) return
+      const zone = tapZone(began, {
+        x: touch.clientX,
+        y: touch.clientY,
+        at: event.timeStamp,
+        fraction: this.#hostFraction(doc, touch.clientX),
+      })
+      if (!zone) return
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      this.#options.onTap?.(zone)
+    }
+
+    const onCancel = () => {
+      start = undefined
+    }
+
+    doc.addEventListener('touchstart', onStart, { capture: true, passive: true })
+    doc.addEventListener('touchend', onEnd, { capture: true })
+    doc.addEventListener('touchcancel', onCancel, { capture: true, passive: true })
+    return [
+      () => doc.removeEventListener('touchstart', onStart, { capture: true }),
+      () => doc.removeEventListener('touchend', onEnd, { capture: true }),
+      () => doc.removeEventListener('touchcancel', onCancel, { capture: true }),
+    ]
+  }
+
+  /**
+   * Where a touch landed along the visible book, as a fraction of the host's
+   * width.
+   *
+   * The section document's own coordinates are useless for this: Foliate lays
+   * the whole section out as one very wide multi-column canvas and slides it,
+   * so a touch on the middle of the fourth page reports a `clientX` of several
+   * thousand. Adding the frame's position in this document converts back to
+   * where the finger actually was on screen.
+   */
+  /**
+   * The theme the shell is actually painted in, read from the stylesheet.
+   *
+   * The book had its own copy of the three palettes, and they had already
+   * drifted — the shell's sepia was `#f4efe4` and the book's `#f5eddd`, a seam
+   * visible down the edge of every page. Reading the live custom properties
+   * makes the stylesheet the single source, so the book and its surround can
+   * no longer disagree.
+   */
+  #shellPalette(): ThemePalette | undefined {
+    const styles = globalThis.getComputedStyle?.(this.#host)
+    if (!styles) return undefined
+    const background = styles.getPropertyValue('--canvas').trim()
+    const foreground = styles.getPropertyValue('--ink').trim()
+    if (!background || !foreground) return undefined
+    return { background, foreground }
+  }
+
+  #hostFraction(doc: Document, clientX: number): number {
+    const frame = doc.defaultView?.frameElement
+    const host = this.#host.getBoundingClientRect()
+    if (!frame || host.width <= 0) return Number.NaN
+    const onScreen = frame.getBoundingClientRect().left + clientX
+    return (onScreen - host.left) / host.width
   }
 
   #captureRelocation(detail?: FoliateRelocation): void {
@@ -551,21 +665,85 @@ function firstTocHref(items: readonly TocItem[]): string | undefined {
   return undefined
 }
 
-function makeReaderCss(style: ReaderStyle): string {
-  const themes = {
-    publisher: { background: 'transparent', foreground: 'inherit' },
-    light: { background: '#fafafa', foreground: '#0f1115' },
-    sepia: { background: '#f5eddd', foreground: '#342b20' },
-    dark: { background: '#171717', foreground: '#ece8e1' },
-  } as const
-  const theme = themes[style.theme]
+/** The touch-first condition the reader's own stylesheet uses. Keep in step. */
+const COMPACT_QUERY = '(max-width: 860px), (pointer: coarse)'
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
+
+/**
+ * Foliate's paginator is configured entirely through attributes, and Bookhand
+ * was setting none of them. These are the four that matter, kept in step with
+ * the viewport, since the same element outlives a rotation.
+ *
+ * `animated` is withheld under reduced motion: the page turn then completes
+ * instantly, which is the behaviour that setting asks for.
+ */
+function configureForViewport(view: FoliateView): () => void {
+  const compact = globalThis.matchMedia?.(COMPACT_QUERY)
+  const reduced = globalThis.matchMedia?.(REDUCED_MOTION_QUERY)
+
+  const apply = () => {
+    const isCompact = compact?.matches ?? false
+    const element = view as unknown as HTMLElement
+    element.setAttribute('margin', isCompact ? '20px' : '48px')
+    element.setAttribute('gap', isCompact ? '5%' : '7%')
+    element.setAttribute('max-column-count', isCompact ? '1' : '2')
+    if (reduced?.matches) element.removeAttribute('animated')
+    else element.setAttribute('animated', '')
+  }
+
+  apply()
+  compact?.addEventListener('change', apply)
+  reduced?.addEventListener('change', apply)
+  return () => {
+    compact?.removeEventListener('change', apply)
+    reduced?.removeEventListener('change', apply)
+  }
+}
+
+interface ThemePalette {
+  readonly background: string
+  readonly foreground: string
+}
+
+/** Used only when the shell's own tokens cannot be read, as in a unit test. */
+const FALLBACK_THEMES: Record<ReaderStyle['theme'], ThemePalette> = {
+  publisher: { background: 'transparent', foreground: 'inherit' },
+  light: { background: '#fafafa', foreground: '#0f1115' },
+  sepia: { background: '#f4efe4', foreground: '#29231b' },
+  dark: { background: '#171717', foreground: '#f4efe9' },
+}
+
+function makeReaderCss(style: ReaderStyle, shell?: ThemePalette): string {
+  // The publisher theme is the book's own design, so it is deliberately not
+  // painted over; every named theme takes the shell's live colours.
+  const theme =
+    style.theme === 'publisher'
+      ? FALLBACK_THEMES.publisher
+      : (shell ?? FALLBACK_THEMES[style.theme])
   const family = style.fontFamily ? JSON.stringify(style.fontFamily) : 'inherit'
   return `
     :root { color-scheme: ${style.theme === 'dark' ? 'dark' : 'light'}; background: ${theme.background}; color: ${theme.foreground}; }
+    body { background: ${theme.background}; color: ${theme.foreground}; }
     body { max-width: ${style.measureCh}ch; margin-inline: auto; font-family: ${family}; font-size: ${style.fontSizePercent}%; }
     p, li, blockquote, dd { line-height: ${style.lineHeight}; }
     p { margin-block: ${style.paragraphSpacingEm}em; }
     img, svg, video { max-inline-size: 100%; block-size: auto; }
+    ${
+      style.theme === 'dark'
+        ? // Inline mathematics in this book, and in anything else produced by
+          // the same TeX pipeline, is a monochrome black glyph image. On a dark
+          // page it is not dim, it is invisible — a book about dy/dx whose
+          // dy/dx cannot be seen. Inverting only these is deliberate: they are
+          // known to be black-on-transparent line art, which figures and
+          // photographs are not.
+          'img[data-tex] { filter: invert(1); }'
+        : ''
+    }
+    /* Chrome for Android inflates text inside an iframe that has no viewport
+       meta of its own, by a factor taken from the frame width. The paginator's
+       column arithmetic comes from the container, not from the inflated text,
+       so the two disagree and lines clip. Pinning it keeps them in step. */
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     ${style.customCss ? boundCustomCss(style.customCss).css : ''}
   `
 }

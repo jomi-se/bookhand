@@ -18,8 +18,18 @@ import { ContentsPanel } from './ContentsPanel.tsx'
 import { ReaderHost } from './ReaderHost.tsx'
 import { TextPanel } from './TextPanel.tsx'
 import { useReader } from './useReader.ts'
+import { useReaderChrome } from './useReaderChrome.ts'
 
 export type { ReaderPanel }
+
+/**
+ * The touch-first layout, where a panel replaces the book rather than sitting
+ * beside it — so navigating from a panel has to close it. Kept in step with
+ * the same condition in `reader.css`.
+ */
+function isCompactSurface(): boolean {
+  return window.matchMedia('(max-width: 860px), (pointer: coarse)').matches
+}
 
 export interface ReaderScreenProps {
   readonly entry: BookCatalogEntry
@@ -55,11 +65,13 @@ export function ReaderScreen({
   // Panel visibility is shared state, not local state: a tool can open, focus,
   // and close the study board, and the person can do the same, and neither may
   // act on a copy the other has already moved past. `VAL-BOARD-VIEW-PARITY`.
+  const bookHost = useRef<HTMLDivElement>(null)
   const [surfaceState, setSurfaceState] = useState(surface.state)
   useEffect(() => surface.subscribe(setSurfaceState), [surface])
   const panel = surfaceState.panel
   const setPanel = useCallback((next: ReaderPanel) => surface.setPanel(next), [surface])
   const panelInvoker = useRef<HTMLElement | null>(null)
+  const chrome = useReaderChrome({ panelOpen: panel !== null })
 
   useEffect(() => {
     onCommandsReady(study.commands)
@@ -79,16 +91,19 @@ export function ReaderScreen({
     return () => designState.clear()
   }, [designState, panel, study.board?.view])
 
-  // Stored highlights are drawn whenever the set changes or a section renders.
+  // Keyed on the section, not on the location. `renderAnnotations` deletes and
+  // re-adds every mark, so keying it on location tore down and redrew all
+  // stored highlights on every page turn and every panel toggle.
+  const sectionIndex = reader.location?.sectionIndex
   useEffect(() => {
     bridge.adapter?.renderAnnotations(study.marks)
-  }, [bridge, reader.location, study.marks])
+  }, [bridge, sectionIndex, study.marks])
 
   const goToSource = useCallback(
     (range: BookRange) => {
       if (!range.cfi) return
       void reader.navigate({ kind: 'cfi', cfi: range.cfi })
-      if (window.matchMedia('(max-width: 860px)').matches) setPanel(null)
+      if (isCompactSurface()) setPanel(null)
     },
     [reader],
   )
@@ -130,6 +145,26 @@ export function ReaderScreen({
     [reader.location, reader.selection, study],
   )
 
+  /**
+   * A tap in the book. The outer quarters turn a page; the middle half brings
+   * the chrome back or sends it away, which is the only way to reach the
+   * toolbar once it has receded.
+   */
+  const onBookTap = useCallback(
+    (zone: 'previous' | 'next' | 'center') => {
+      if (zone === 'center') {
+        chrome.toggle()
+        return
+      }
+      // Focus follows the turn to the book host, so a person navigating by
+      // keyboard is left where the reading is rather than on a hidden control.
+      bookHost.current?.focus({ preventScroll: true })
+      void reader.navigate({ kind: 'relative', direction: zone === 'next' ? 'next' : 'previous' })
+      chrome.notePageTurn()
+    },
+    [chrome, reader],
+  )
+
   const closePanel = useCallback(() => {
     surface.setPanel(null)
     const invoker = panelInvoker.current
@@ -165,6 +200,9 @@ export function ReaderScreen({
         )
           return
       }
+      // A panel has replaced the book on this surface. Arrow keys inside it
+      // must not page a book nobody can see.
+      if (panel) return
       if (event.key === 'ArrowRight') void reader.navigate({ kind: 'relative', direction: 'next' })
       if (event.key === 'ArrowLeft') void reader.navigate({ kind: 'relative', direction: 'previous' })
     }
@@ -181,6 +219,7 @@ export function ReaderScreen({
       data-panel={panel ?? 'none'}
       data-board={expanded ? 'expanded' : 'docked'}
       data-reader-theme={reader.style.theme === 'publisher' ? 'light' : reader.style.theme}
+      data-chrome={chrome.visible ? 'shown' : 'hidden'}
     >
       <header className="reader-chrome">
         <button type="button" className="button button-quiet button-back" onClick={onExit}>
@@ -243,7 +282,7 @@ export function ReaderScreen({
             currentSectionIndex={reader.location?.sectionIndex}
             onNavigate={(target) => {
               void reader.navigate(target)
-              if (window.matchMedia('(max-width: 860px)').matches) setPanel(null)
+              if (isCompactSurface()) setPanel(null)
             }}
             onClose={closePanel}
           />
@@ -348,18 +387,25 @@ export function ReaderScreen({
             type="button"
             className="page-step page-previous"
             aria-label="Previous page"
-            onClick={() => void reader.navigate({ kind: 'relative', direction: 'previous' })}
+            onClick={() => {
+              void reader.navigate({ kind: 'relative', direction: 'previous' })
+              // The person is using a control, so the chrome stays and the
+              // countdown restarts; focus is left on the button they pressed.
+              chrome.show()
+            }}
           >
             <ChevronLeft size={20} aria-hidden="true" />
           </button>
 
           <ReaderHost
+            hostRef={bookHost}
             className="reader-surface"
             onReady={reader.attach}
             options={{
               onLocationChange: reader.onLocationChange,
               onSelectionChange: reader.onSelectionChange,
               onSectionError: reader.onSectionError,
+              onTap: onBookTap,
             }}
           />
 
@@ -367,7 +413,10 @@ export function ReaderScreen({
             type="button"
             className="page-step page-next"
             aria-label="Next page"
-            onClick={() => void reader.navigate({ kind: 'relative', direction: 'next' })}
+            onClick={() => {
+              void reader.navigate({ kind: 'relative', direction: 'next' })
+              chrome.show()
+            }}
           >
             <ChevronRight size={20} aria-hidden="true" />
           </button>
