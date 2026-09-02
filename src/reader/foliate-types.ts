@@ -118,6 +118,7 @@ export interface FoliateView extends HTMLElement {
 export interface FoliateOverlayer {
   readonly highlight: FoliateDrawFunction
   readonly underline: FoliateDrawFunction
+  readonly outline: FoliateDrawFunction
 }
 
 export interface FoliateModule {

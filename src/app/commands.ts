@@ -16,6 +16,7 @@ import type {
   SourceExcerpt,
   SourceOwnership,
   TocItem,
+  TutorCue,
   SearchResult,
 } from '../domain/index.ts'
 import { createSourceExcerpt, SOURCE_EXTRACTION_VERSION } from '../domain/source.ts'
@@ -73,6 +74,7 @@ export interface FocusPassageInput {
   readonly textFingerprint: string
   readonly quote: string
   readonly indicatorMessage?: string
+  readonly cue?: TutorCue
 }
 
 export type FocusPassageCommandResult =
@@ -273,7 +275,7 @@ export class BookhandCommands {
     if (!request) return { outcome: 'unavailable', guidance: this.#context.guidance.view }
     try {
       const passage = await this.#verifyPassage(input.bookId, range, input.quote)
-      return this.#context.guidance.focus(passage, input.indicatorMessage, request)
+      return this.#context.guidance.focus(passage, input.indicatorMessage, request, input.cue)
     } catch (error) {
       this.#context.guidance.rejectFocusRequest(request)
       if (error instanceof SourceVerificationError) {

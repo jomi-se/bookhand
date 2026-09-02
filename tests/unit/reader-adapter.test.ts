@@ -10,6 +10,7 @@ import {
 } from '../../src/reader/index.ts'
 import type {
   FoliateBook,
+  FoliateDrawFunction,
   FoliateModule,
   FoliateRenderer,
   FoliateResolvedTarget,
@@ -588,9 +589,12 @@ describe('FoliateReaderAdapter', () => {
     await waitFor(() => expect(view.overlayAdd).toHaveBeenCalledWith(
       'bookhand-tutor-overlay',
       expect.any(Range),
-      drawTutor,
+      expect.any(Function),
       expect.any(Object),
     ))
+    const draw = view.overlayAdd.mock.calls.at(-1)?.[2] as FoliateDrawFunction
+    draw([], {})
+    expect(drawTutor).toHaveBeenCalled()
     view.overlayRemove.mockClear()
 
     adapter.renderAnnotations([{ id: 'durable', cfi: 'fixture:0:0:11', color: '#c24a2b' }])
@@ -599,6 +603,39 @@ describe('FoliateReaderAdapter', () => {
 
     adapter.setTutorTarget(null)
     expect(view.overlayRemove).toHaveBeenCalledWith('bookhand-tutor-overlay')
+  })
+
+  it('uses Foliate native painters for production tutor cues', async () => {
+    const host = document.createElement('div')
+    const highlight = vi.fn(() => document.createElementNS('http://www.w3.org/2000/svg', 'g'))
+    const underline = vi.fn(() => document.createElementNS('http://www.w3.org/2000/svg', 'g'))
+    const outline = vi.fn(() => document.createElementNS('http://www.w3.org/2000/svg', 'g'))
+    document.body.append(host)
+    const adapter = new FoliateReaderAdapter(host, {}, {
+      loadFoliate: async () => ({
+        makeBook: async () => makeBook(),
+        Overlayer: { highlight, underline, outline },
+      }),
+    })
+    await adapter.open(new Blob(['fixture']))
+    const view = host.querySelector('foliate-view') as unknown as FakeFoliateView
+    const target = await adapter.getPassageAtLocation!({
+      startCfi: 'fixture:0:0:0',
+      endCfi: 'fixture:0:11:11',
+      sectionIndex: 0,
+      textFingerprint: 'resolved-by-adapter',
+    })
+
+    adapter.setTutorTarget(target, { kind: 'outline' })
+    await waitFor(() => expect(view.overlayAdd).toHaveBeenCalled())
+    const call = view.overlayAdd.mock.calls.at(-1)
+    expect(call?.[0]).toBe('bookhand-tutor-overlay')
+    const draw = call?.[2] as ((rects: readonly DOMRect[], options?: Record<string, unknown>) => Element)
+    const element = draw([], call?.[3] as Record<string, unknown>)
+    expect(outline).toHaveBeenCalled()
+    expect(highlight).not.toHaveBeenCalled()
+    expect(underline).not.toHaveBeenCalled()
+    expect(element).toHaveAttribute('data-bookhand-tutor-cue', 'outline')
   })
 
   it('keeps one live viewer through the React StrictMode setup and cleanup cycle', async () => {

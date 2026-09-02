@@ -366,7 +366,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     {
       name: 'focus_passage',
       description:
-        'Temporarily guide the person to an exact passage returned by Bookhand. This verifies the source, moves the visible reader, and shows Back and Stop without creating a highlight, annotation, study block, or saved tutor state. Use this to point at the book; use navigate_book for ordinary navigation.',
+        'Temporarily guide the person to an exact passage returned by Bookhand. This verifies the source, moves the visible reader, points at the exact words with a transient highlight, underline, or outline, and shows Back and Stop without creating an annotation, study block, or saved tutor state. Use this to point at the book; use navigate_book for ordinary navigation.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -386,6 +386,15 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             maxLength: 1_000,
             description: 'A short plain-text explanation of why this passage is being shown.',
           },
+          cue: {
+            type: 'object',
+            description: 'How Bookhand should point at the verified passage. Defaults to highlight.',
+            properties: {
+              kind: { type: 'string', enum: ['highlight', 'underline', 'outline'] },
+            },
+            required: ['kind'],
+            additionalProperties: false,
+          },
         },
         required: [
           'bookId',
@@ -402,6 +411,13 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           const result = (value as ToolResult).structuredContent?.focus as { outcome?: string } | undefined
           return result?.outcome === 'applied' ? 'guided the reader to a passage' : 'could not guide the reader'
         }, async () => {
+          const cue = input.cue
+          if (
+            cue !== undefined &&
+            (!cue || typeof cue !== 'object' || Array.isArray(cue) ||
+              !['highlight', 'underline', 'outline'].includes(String((cue as { kind?: unknown }).kind)) ||
+              Object.keys(cue).some((key) => key !== 'kind'))
+          ) return errorResult('cue must contain exactly one kind: highlight, underline, or outline.')
           const result = await commands.focusPassage({
             bookId: String(input.bookId ?? ''),
             sectionIndex: Number(input.sectionIndex),
@@ -411,6 +427,9 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             quote: String(input.quote ?? ''),
             ...(typeof input.indicatorMessage === 'string'
               ? { indicatorMessage: input.indicatorMessage }
+              : {}),
+            ...(cue
+              ? { cue: { kind: (cue as { kind: 'highlight' | 'underline' | 'outline' }).kind } }
               : {}),
           })
           const copy =

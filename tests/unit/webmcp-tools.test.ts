@@ -195,10 +195,12 @@ describe('the WebMCP tool surface', () => {
       textFingerprint: range.textFingerprint,
       quote: 'The slope of a curve.',
       indicatorMessage: 'Notice how the two quantities change together.',
+      cue: { kind: 'underline' },
     })
     expect(commands.focusPassage).toHaveBeenCalledWith(expect.objectContaining({
       bookId: 'book-1',
       startCfi: range.startCfi,
+      cue: { kind: 'underline' },
     }))
     expect(result.structuredContent).toEqual({
       ok: true,
@@ -219,6 +221,23 @@ describe('the WebMCP tool surface', () => {
         guidance: { state: 'absent', canBack: false, revision: 5 },
       },
     })
+  })
+
+  it('rejects malformed tutor cues before they reach reader commands', async () => {
+    const { tool, commands } = setup()
+    const result = await tool('focus_passage').execute({
+      bookId: 'book-1',
+      sectionIndex: range.sectionIndex,
+      startCfi: range.startCfi,
+      endCfi: range.endCfi,
+      textFingerprint: range.textFingerprint,
+      quote: 'The slope of a curve.',
+      cue: { kind: 'sparkle' },
+    })
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0]?.text).toContain('highlight, underline, outline')
+    expect(commands.focusPassage).not.toHaveBeenCalled()
   })
 
   it('marks book text as untrusted data rather than instructions', async () => {

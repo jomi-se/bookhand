@@ -1,4 +1,10 @@
-import type { BookTarget, Passage, ReaderAdapter, ReaderLocation } from '../domain/reader.ts'
+import type {
+  BookTarget,
+  Passage,
+  ReaderAdapter,
+  ReaderLocation,
+  TutorCue,
+} from '../domain/reader.ts'
 import type { StudyBoardView } from '../domain/study.ts'
 
 export interface GuidanceView {
@@ -40,6 +46,7 @@ interface GuidanceSession {
   readonly origin: ReaderLocation
   readonly surface: GuidanceSurfaceSnapshot
   readonly target: Passage
+  readonly cue: TutorCue
   readonly message?: string
   readonly status: 'guiding' | 'yielded'
 }
@@ -251,6 +258,7 @@ export class GuidanceController {
     passage: Passage,
     message?: string,
     request = this.captureFocusRequest(this.#binding?.bookId ?? ''),
+    cue: TutorCue = { kind: 'highlight' },
   ): Promise<FocusPassageResult> {
     const binding = this.#binding
     if (!binding || !this.#ready) return { outcome: 'unavailable', guidance: this.view }
@@ -324,11 +332,12 @@ export class GuidanceController {
       origin: structuredClone(origin),
       surface,
       target: passage,
+      cue,
       ...(message ? { message } : {}),
       status: 'guiding',
     }
     binding.revealReadingSurface()
-    binding.adapter.setTutorTarget?.(passage)
+    binding.adapter.setTutorTarget?.(passage, cue)
     this.#emit()
     return { outcome: 'applied', guidance: this.view }
   }

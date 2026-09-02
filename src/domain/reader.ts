@@ -108,6 +108,13 @@ export interface ReaderAnnotationMark {
   readonly color: string
 }
 
+export type TutorCueKind = 'highlight' | 'underline' | 'outline'
+
+/** A runtime-only visual pointer. It is never stored as an annotation. */
+export interface TutorCue {
+  readonly kind: TutorCueKind
+}
+
 /**
  * What the reader needs to know about a book beyond its bytes.
  *
@@ -139,8 +146,8 @@ export interface ReaderAdapter {
   getStyle(): ReaderStyle
   resetStyle(): void
   renderAnnotations(marks: readonly ReaderAnnotationMark[]): void
-  /** Runtime-only verified tutor target; drawing is supplied only by a test harness until W9. */
-  setTutorTarget?(passage: Passage | null): void
+  /** Runtime-only verified tutor target, visually distinct from durable annotations. */
+  setTutorTarget?(passage: Passage | null, cue?: TutorCue): void
   /**
    * Reading and rewriting the book's own markup. Optional: a reader that
    * cannot remaster documents is still a reader.

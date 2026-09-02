@@ -11,6 +11,7 @@ import type {
   ReaderSelection,
   ReaderOpenOptions,
   ReaderStyle,
+  TutorCue,
   TocItem,
 } from '../domain/reader.ts'
 import {
@@ -98,7 +99,7 @@ export interface FoliateReaderAdapterOptions extends ReaderAdapterEvents {
   readonly openDeadlineMs?: number
   readonly navigationDeadlineMs?: number
   readonly faults?: ReaderFaultHooks
-  /** Supplied only by the browser test harness until W9 owns production cues. */
+  /** Optional test or embedding override; production uses Foliate's native painters. */
   readonly tutorOverlayRenderer?: FoliateDrawFunction
 }
 
@@ -141,6 +142,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   #overlayer: FoliateModule['Overlayer']
   #disposedViews = new WeakSet<FoliateView>()
   #tutorTarget: Passage | undefined
+  #tutorCue: TutorCue = { kind: 'highlight' }
   #tutorGeneration = 0
   #navigationQueue: Promise<void> = Promise.resolve()
   #activeNavigation: {
@@ -416,10 +418,11 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     }
   }
 
-  setTutorTarget(passage: Passage | null): void {
+  setTutorTarget(passage: Passage | null, cue: TutorCue = { kind: 'highlight' }): void {
     this.#tutorGeneration += 1
     this.#clearTutorOverlay()
     this.#tutorTarget = passage ? structuredClone(passage) : undefined
+    this.#tutorCue = cue
     if (passage) void this.#renderTutorOverlay(this.#tutorGeneration)
   }
 
@@ -723,10 +726,11 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   }
 
   async #renderTutorOverlay(generation: number): Promise<void> {
-    const renderer = this.#options.tutorOverlayRenderer
     const target = this.#tutorTarget
     const active = this.#active
-    if (!renderer || !target || !active || generation !== this.#tutorGeneration) return
+    const cueKind = this.#tutorCue.kind
+    const painter = this.#options.tutorOverlayRenderer ?? this.#overlayer?.[cueKind]
+    if (!painter || !target || !active || generation !== this.#tutorGeneration) return
     const content = active.view.renderer
       .getContents()
       .find((candidate) => candidate.index === target.range.sectionIndex)
@@ -748,8 +752,24 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         this.#active !== active ||
         normalizeBookText(resolved.text) !== normalizeBookText(target.text)
       ) return
+      const renderer: FoliateDrawFunction = (rects, options) => {
+        const element = painter(rects, options)
+        element.setAttribute('data-bookhand-tutor-cue', cueKind)
+        const reducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        if (!reducedMotion && 'animate' in element) {
+          element.animate(
+            [{ opacity: 0.15 }, { opacity: 1 }],
+            { duration: 520, easing: 'ease-out' },
+          )
+        }
+        return element
+      }
       content.overlayer.add('bookhand-tutor-overlay', range, renderer, {
-        color: 'currentColor',
+        color: '#c76532',
+        width: 2,
+        radius: 3,
+        writingMode: content.doc.documentElement.computedStyleMap?.().get('writing-mode')?.toString()
+          ?? 'horizontal-tb',
       })
     } catch {
       // A transient teaching cue must never make the book unreadable.

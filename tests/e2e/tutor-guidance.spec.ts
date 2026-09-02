@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
 test.use({ launchOptions: { args: ['--enable-features=WebMCPTesting'] } })
-const testHarness = process.env.BOOKHAND_TEST_HARNESS === '1'
 
 interface RegisteredTool { readonly name: string }
 interface RealModelContext {
@@ -73,6 +72,7 @@ test('genuine guidance points, yields, returns, stops, and keeps durable marks i
     textFingerprint: origin.visible.range.textFingerprint,
     quote: origin.visible.text,
     indicatorMessage: 'Notice how the argument turns from geometry into a limiting sum.',
+    cue: { kind: 'outline' },
   })
   expect(focused.isError).toBeFalsy()
   expect(focused.structuredContent).toMatchObject({
@@ -91,13 +91,11 @@ test('genuine guidance points, yields, returns, stops, and keeps durable marks i
       }
       const overlay = view?.renderer?.getContents?.()[0]?.overlayer?.element
       return {
-        tutor: overlay?.querySelectorAll('[data-bookhand-tutor-sentinel] rect').length ?? 0,
+        tutor: overlay?.querySelectorAll('[data-bookhand-tutor-cue="outline"]').length ?? 0,
         all: overlay?.querySelectorAll('rect').length ?? 0,
       }
     })
-    return testHarness
-      ? geometry.tutor > 0 && geometry.all > geometry.tutor
-      : geometry.tutor === 0 && geometry.all > 0
+    return geometry.tutor > 0 && geometry.all > 0
   }).toBe(true)
   const geometry = await page.evaluate(() => {
     const view = document.querySelector('foliate-view') as unknown as {
@@ -105,13 +103,12 @@ test('genuine guidance points, yields, returns, stops, and keeps durable marks i
     }
     const overlay = view?.renderer?.getContents?.()[0]?.overlayer?.element
     return {
-      tutor: overlay?.querySelectorAll('[data-bookhand-tutor-sentinel] rect').length ?? 0,
+      tutor: overlay?.querySelectorAll('[data-bookhand-tutor-cue="outline"]').length ?? 0,
       all: overlay?.querySelectorAll('rect').length ?? 0,
     }
   })
-  if (testHarness) expect(geometry.tutor).toBeGreaterThan(0)
-  else expect(geometry.tutor).toBe(0)
-  expect(geometry.all).toBeGreaterThan(geometry.tutor)
+  expect(geometry.tutor).toBeGreaterThan(0)
+  expect(geometry.all).toBeGreaterThan(0)
 
   // Panel replacement and receding chrome cannot take guidance controls away.
   await page.getByRole('button', { name: 'Search' }).click()
@@ -148,7 +145,7 @@ test('genuine guidance points, yields, returns, stops, and keeps durable marks i
     }
     const overlay = view?.renderer?.getContents?.()[0]?.overlayer?.element
     return {
-      tutor: overlay?.querySelectorAll('[data-bookhand-tutor-sentinel]').length ?? 0,
+      tutor: overlay?.querySelectorAll('[data-bookhand-tutor-cue]').length ?? 0,
       all: overlay?.querySelectorAll('rect').length ?? 0,
     }
   })
