@@ -88,6 +88,14 @@ Impeccable is available for deliberate design and UI review. Its automatic
 post-edit hooks are intentionally disabled: invoke the relevant skill when the
 work benefits from it instead of paying for a review on every edit.
 
+The shared Impeccable build default is code-first. This keeps routine reader
+and product work fast and avoids spending image-generation tokens on changes
+whose visual direction is already established. The default is not a ban on
+comps: override it for a specific task when a generated image will materially
+improve the reference, ambition, or alignment for a novel surface (for example,
+the hero interactive study experience). State the temporary override and its
+reason; do not change the shared default merely for one such task.
+
 `CLAUDE.md` imports this file. Keep durable cross-harness guidance here rather
 than maintaining two copies.
 
