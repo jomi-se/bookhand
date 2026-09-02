@@ -42,7 +42,7 @@ fixed before final visual polish can hold.
 | Design context says Undo is unavailable | Confirmed stale and actively misleading | Derive capability claims from runtime truth and test contradictions |
 | Study is still a flat feed | Confirmed | Make title, conceptual sequence, and shared source louder than storage types |
 | Equations still resemble raw TeX | Confirmed by the domain, `<pre>` renderer, and monospace styling | Add an explicit safe math format, accessible renderer, and visible fallback |
-| Old damaged/duplicate source content remains | Confirmed | Add a versioned canonical source excerpt, stale state, refresh path, and deduplication policy |
+| Old damaged/duplicate source content remains | Confirmed | Add a versioned canonical source excerpt, stale state, Retry/Relink path, and deduplication policy |
 | Expanded is materially different | Only spatially: it reuses the same feed; mobile collapses to effectively the same surface | Give docked and expanded modes different information architecture |
 | Tutor pointing exists through board `focus` | Only a seed: it focuses the board, not a source range or requested item | Add a transient tutor session, source focus, reveal, Back, Stop, and user-takeover lifecycle |
 | Tool schemas remain permissive/text-only | Confirmed | Tighten selectors and discriminated payloads; return structured fields plus concise human text |

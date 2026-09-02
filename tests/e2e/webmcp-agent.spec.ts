@@ -46,8 +46,16 @@ const agentCall = (page: Page, name: string, input?: unknown) =>
       const tool = (await context.getTools()).find((candidate) => candidate.name === toolName)
       if (!tool) throw new Error(`no tool ${toolName}`)
       const raw = await context.executeTool(tool, JSON.stringify(toolInput ?? {}))
-      const result = JSON.parse(raw) as { content: { text: string }[]; isError?: boolean }
-      return { text: result.content.map((part) => part.text).join('\n'), isError: !!result.isError }
+      const result = JSON.parse(raw) as {
+        content: { text: string }[]
+        structuredContent?: Record<string, unknown>
+        isError?: boolean
+      }
+      return {
+        text: result.content.map((part) => part.text).join('\n'),
+        structured: result.structuredContent ?? {},
+        isError: !!result.isError,
+      }
     },
     [name, input] as const,
   )
@@ -99,24 +107,28 @@ test('an agent reads the page, highlights it, and builds a source-linked lesson'
   expect(context.isError).toBe(false)
   expect(context.text).toContain('Calculus Made Easy')
   expect(context.text).toContain('untrusted book content')
+  expect(context.structured).toMatchObject({ ok: true })
 
-  const visibleRange = JSON.parse(
-    /Visible range: (\{.*\})/.exec(context.text)?.[1] ?? 'null',
-  ) as Record<string, unknown> | null
+  const readingContext = context.structured.readingContext as {
+    bookId?: string
+    visible?: { range?: Record<string, unknown>; text?: string }
+  }
+  const visibleRange = readingContext.visible?.range ?? null
   expect(visibleRange).not.toBeNull()
 
   // Grounding also tells it which book it is in, which every source-linked
   // mutation has to name.
-  const bookId = /Book id: (\S+)/.exec(context.text)?.[1]
+  const bookId = readingContext.bookId
   expect(bookId).toBeTruthy()
 
   // 2. Re-read that exact passage rather than trusting its own memory.
   const passage = await agentCall(page, 'get_passage', { range: visibleRange })
-  expect(passage.isError).toBe(false)
+  expect(passage.isError, passage.text).toBe(false)
   expect(passage.text).toContain('Passage')
+  expect(passage.structured).toMatchObject({ ok: true, passage: { range: visibleRange } })
 
   // The quote has to be the book's own words. An agent cannot invent one.
-  const quote = /<<<BOOK\n([\s\S]*?)\nBOOK/.exec(context.text)?.[1]
+  const quote = readingContext.visible?.text
   expect(quote).toBeTruthy()
 
   // 3. Highlight it in the person's book.
@@ -182,6 +194,16 @@ test('an agent reads the page, highlights it, and builds a source-linked lesson'
       }),
     )
     .toBeGreaterThan(0)
+
+  // Canonical source data is durable rather than a mounted-reader cache.
+  // Reopening the application restores both independently owned records and
+  // their source-linked presentation.
+  await reopenBook(page)
+  await page.getByRole('button', { name: 'Study' }).click()
+  await expect(page.locator('.study-item[data-kind="steps"]')).toBeVisible()
+  await expect(page.getByText('Divide the rise by the run')).toBeVisible()
+  await expect(page.getByText('Worth revisiting')).toBeVisible()
+  await expect(page.locator('.highlight')).toHaveCount(1)
 })
 
 test('an agent arriving at the library can see it and open a book itself', async ({ page }) => {
@@ -212,6 +234,34 @@ test('an agent arriving at the library can see it and open a book itself', async
       agentToolNames(page),
     )
     .toEqual(expect.arrayContaining(['list_books', 'get_reading_context', 'save_annotation']))
+})
+
+test('the genuine runtime preserves structured refusals while schemas remain advisory', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('.book-open', { hasText: 'Calculus Made Easy' })).toBeVisible({
+    timeout: 20_000,
+  })
+  const missingSelector = await agentCall(page, 'open_book', {})
+  expect(missingSelector.isError).toBe(true)
+  expect(missingSelector.structured).toMatchObject({ ok: false, error: { message: expect.any(String) } })
+
+  await agentCall(page, 'open_book', { title: 'calculus' })
+  await expect(page.locator('.reader')).toBeVisible()
+  await expect.poll(() => agentToolNames(page)).toContain('get_reading_context')
+
+  for (const [name, input] of [
+    ['get_reading_context', { unknown: true }],
+    ['navigate_book', { direction: 'next', sectionIndex: 1 }],
+    ['set_reading_style', {}],
+    ['set_reading_style', { undo: true, reset: true }],
+    ['set_reading_style', { fontSizePercent: 300, theme: 'bogus' }],
+    ['upsert_study_item', { kind: 'question' }],
+    ['set_study_board_view', {}],
+  ] as const) {
+    const result = await agentCall(page, name, input)
+    expect(result.isError, `${name}: ${result.text}`).toBe(true)
+    expect(result.structured).toMatchObject({ ok: false, message: expect.any(String) })
+  }
 })
 
 test('an agent cannot anchor to a range it invented', async ({ page }) => {

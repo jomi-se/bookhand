@@ -98,6 +98,11 @@ export type StorageWorkerRequest =
     }
   | {
       readonly requestId: string
+      readonly type: 'repair-annotation-source'
+      readonly annotation: Annotation
+    }
+  | {
+      readonly requestId: string
       readonly type: 'delete-annotation'
       readonly annotationId: string
     }
@@ -114,6 +119,11 @@ export type StorageWorkerRequest =
       readonly type: 'commit-study-item'
       readonly item: StudyItem
       readonly mutation: StudyMutation
+    }
+  | {
+      readonly requestId: string
+      readonly type: 'repair-study-item-source'
+      readonly item: StudyItem
     }
   | {
       readonly requestId: string
@@ -139,6 +149,7 @@ export type StorageWorkerResult =
   | { readonly type: 'annotations'; readonly annotations: readonly Annotation[] }
   | { readonly type: 'board'; readonly board: StudyBoard }
   | { readonly type: 'study-item-committed'; readonly commit: StudyItemCommit }
+  | { readonly type: 'study-item-repaired'; readonly item: StudyItem }
   | { readonly type: 'study-item-undone'; readonly item: StudyItem | null }
   | { readonly type: 'study-item-deleted'; readonly itemId: string }
   | { readonly type: 'study-items'; readonly items: readonly StudyItem[] }

@@ -13,6 +13,7 @@ import {
   errorResult,
   quoteBookContent,
   textResult,
+  withOutputSchema,
   type ToolDefinition,
   type ToolResult,
 } from './model-context.ts'
@@ -40,7 +41,7 @@ const BOOK_ID_SCHEMA = {
 const ACTION_GROUP_SCHEMA = {
   type: 'string',
   description:
-    'Group the writes of one intent under a shared id so the person can undo them together.',
+    'Correlate writes from one intent for provenance. Existing blocks are undone one item at a time.',
 } as const
 
 /** Every tool call is an agent acting; the interface is how a person acts. */
@@ -62,6 +63,7 @@ const RANGE_SCHEMA = {
     textFingerprint: { type: 'string' },
   },
   required: ['startCfi', 'endCfi', 'sectionIndex', 'textFingerprint'],
+  additionalProperties: false,
 } as const
 
 /**
@@ -171,7 +173,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
   ): Promise<ToolResult> => {
     try {
       const result = await body()
-      onCall({ name, summary: summary(result) })
+      onCall({ name, summary: summary(result), ...(result.isError ? { failed: true } : {}) })
       return result
     } catch (error) {
       // Every refusal this product raises already carries the wording meant for
@@ -185,7 +187,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     }
   }
 
-  return [
+  const tools: readonly Omit<ToolDefinition, 'outputSchema'>[] = [
     {
       name: 'get_reading_context',
       description:
@@ -217,7 +219,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               `Selected range: ${JSON.stringify(context.selection.range)}`,
             )
           }
-          return textResult(lines.join('\n'))
+          return textResult(lines.join('\n'), { readingContext: context })
         }),
     },
     {
@@ -236,9 +238,12 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               ),
             ])
           const toc = commands.getTableOfContents()
-          if (toc.length === 0) return textResult('This book has no table of contents.')
+          if (toc.length === 0) {
+            return textResult('This book has no table of contents.', { tableOfContents: toc })
+          }
           return textResult(
             quoteBookContent('Table of contents', flatten(toc as never).join('\n')),
+            { tableOfContents: toc },
           )
         }),
     },
@@ -262,6 +267,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               `Breadcrumb: ${passage.chapterBreadcrumb.join(' › ')}`,
               `Range: ${JSON.stringify(passage.range)}`,
             ].join('\n'),
+            { passage },
           )
         }),
     },
@@ -287,27 +293,36 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
       },
       execute: (input) =>
         run('navigate_book', () => 'moved the reader', async () => {
+          const selectors = ['cfi', 'href', 'sectionIndex', 'direction'].filter(
+            (field) => input[field] !== undefined,
+          )
+          if (selectors.length !== 1) {
+            return errorResult(
+              'Choose exactly one navigation target: cfi, href, sectionIndex, or direction.',
+            )
+          }
           const target =
-            typeof input.cfi === 'string'
+            typeof input.cfi === 'string' && input.cfi.trim().length > 0
               ? ({ kind: 'cfi', cfi: input.cfi } as const)
-              : typeof input.href === 'string'
+              : typeof input.href === 'string' && input.href.trim().length > 0
                 ? ({ kind: 'href', href: input.href } as const)
-                : Number.isInteger(input.sectionIndex)
+                : Number.isInteger(input.sectionIndex) && Number(input.sectionIndex) >= 0
                   ? ({ kind: 'section', sectionIndex: input.sectionIndex as number } as const)
-                  : ({
-                      kind: 'relative',
-                      direction: input.direction === 'previous' ? 'previous' : 'next',
-                    } as const)
+                  : input.direction === 'previous' || input.direction === 'next'
+                    ? ({ kind: 'relative', direction: input.direction } as const)
+                    : undefined
+          if (!target) return errorResult('That navigation target is invalid.')
           const context = await commands.navigateBook(target)
           return textResult(
             `Now at ${context.chapterLabel ?? `section ${context.sectionIndex}`} (${context.progressPercent}%).`,
+            { destination: context },
           )
         }),
     },
     {
       name: 'save_annotation',
       description:
-        'Highlight a passage in the book and optionally attach a note. The highlight appears in the book and in the study board, and belongs to the person.',
+        'Highlight a passage in the book and optionally attach a note. The highlight appears in the book and in the study board, is stored locally across reloads, belongs to the person, and remains removable by them.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -315,7 +330,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           range: RANGE_SCHEMA,
           quote: {
             type: 'string',
-            maxLength: 20_000,
+            maxLength: 32_000,
             description:
               'The exact text being highlighted, as returned by a Bookhand tool. It is compared against the text the range resolves to; only whitespace differences are forgiven.',
           },
@@ -337,7 +352,9 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               : {}),
             ...(typeof input.note === 'string' ? { note: input.note } : {}),
           })
-          return textResult(`Highlighted ${describeRange(range)} as ${saved.id}.`)
+          return textResult(`Highlighted ${describeRange(range)} as ${saved.id}.`, {
+            annotation: saved,
+          })
         }),
     },
     {
@@ -346,6 +363,49 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
         'Change how the book is presented: text size, line height, measure, paragraph spacing, theme, or custom book CSS. Send only the fields you mean to change — anything you restate would overwrite a change the person made a moment ago. Every change is reversible by the person with one action. Picking a shipped theme or adjusting size needs nothing else; custom CSS additionally requires designContextVersion from get_design_context, which explains the semantic roles, contrast floors, and what this CSS can and cannot reach.',
       inputSchema: {
         type: 'object',
+        oneOf: [
+          {
+            properties: { undo: { const: true } },
+            required: ['undo'],
+            not: {
+              anyOf: [
+                { required: ['reset'] },
+                { required: ['fontSizePercent'] },
+                { required: ['lineHeight'] },
+                { required: ['measureCh'] },
+                { required: ['paragraphSpacingEm'] },
+                { required: ['theme'] },
+                { required: ['customCss'] },
+              ],
+            },
+          },
+          {
+            properties: { reset: { const: true } },
+            required: ['reset'],
+            not: {
+              anyOf: [
+                { required: ['undo'] },
+                { required: ['fontSizePercent'] },
+                { required: ['lineHeight'] },
+                { required: ['measureCh'] },
+                { required: ['paragraphSpacingEm'] },
+                { required: ['theme'] },
+                { required: ['customCss'] },
+              ],
+            },
+          },
+          {
+            anyOf: [
+              { required: ['fontSizePercent'] },
+              { required: ['lineHeight'] },
+              { required: ['measureCh'] },
+              { required: ['paragraphSpacingEm'] },
+              { required: ['theme'] },
+              { required: ['customCss'] },
+            ],
+            not: { anyOf: [{ required: ['undo'] }, { required: ['reset'] }] },
+          },
+        ],
         properties: {
           fontSizePercent: { type: 'number', minimum: 70, maximum: 200 },
           lineHeight: { type: 'number', minimum: 1.1, maximum: 2.2 },
@@ -375,14 +435,35 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
       },
       execute: (input) =>
         run('set_reading_style', () => 'changed the presentation', async () => {
+          const patchFields = [
+            'fontSizePercent',
+            'lineHeight',
+            'measureCh',
+            'paragraphSpacingEm',
+            'theme',
+            'customCss',
+          ]
+          const hasPatch = patchFields.some((field) => input[field] !== undefined)
+          const operationCount = Number(input.undo === true) + Number(input.reset === true) + Number(hasPatch)
+          if (operationCount !== 1) {
+            return errorResult(
+              'Choose exactly one reading-style operation: undo, reset, or one or more presentation fields.',
+            )
+          }
           if (input.undo === true) {
             const undone = await commands.undoReadingStyle()
-            if (!undone) return textResult('There is no presentation change to undo.')
-            return textResult(describeStyleReceipt(undone, 'Put the presentation back'))
+            if (!undone) {
+              return textResult('There is no presentation change to undo.', { receipt: null })
+            }
+            return textResult(describeStyleReceipt(undone, 'Put the presentation back'), {
+              receipt: undone,
+            })
           }
           if (input.reset === true) {
             const receipt = await commands.resetReadingStyle(caller(input))
-            return textResult(describeStyleReceipt(receipt, 'Restored the default presentation'))
+            return textResult(describeStyleReceipt(receipt, 'Restored the default presentation'), {
+              receipt,
+            })
           }
           // Only what was named. Merging over a style read a moment ago would
           // carry that snapshot back over anything changed in between.
@@ -401,7 +482,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             ...(typeof input.customCss === 'string' ? { customCss: input.customCss } : {}),
           }
           if (Object.keys(patch).length === 0) {
-            return textResult('Nothing to change: name at least one presentation field.')
+            return errorResult('Nothing to change: name at least one presentation field.')
           }
           const receipt = await commands.setReadingStyle({
             patch,
@@ -410,13 +491,13 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               ? { designContextVersion: input.designContextVersion }
               : {}),
           })
-          return textResult(describeStyleReceipt(receipt, 'Updated the presentation'))
+          return textResult(describeStyleReceipt(receipt, 'Updated the presentation'), { receipt })
         }),
     },
     {
       name: 'upsert_study_item',
       description:
-        'Put a study block on this book’s board, or update one you created. Blocks are prose, quotation, equation, steps, or question. Attach the source range so the person can jump back to where it came from. One ordinary block needs nothing else; before composing several blocks into one piece of teaching, call get_design_context for the composition hierarchy this board expects.',
+        'Put a durable study block on this book’s board, or update one you created. Blocks are prose, quotation, equation, steps, or question. They are stored locally across reloads and each block remains individually reversible or removable by the person. Attach the source range so the person can jump back to where it came from. One ordinary block needs nothing else; before composing several blocks into one piece of teaching, call get_design_context for the composition hierarchy this board expects.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -437,33 +518,61 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           actionGroupId: {
             type: 'string',
             description:
-              'Group the blocks of one lesson under a shared id so the person can undo them together.',
+              'Correlate blocks from one intent for provenance. Each legacy block is undone separately.',
           },
           kind: { type: 'string', enum: [...STUDY_ITEM_KINDS] },
-          text: { type: 'string', maxLength: 20_000, description: 'Prose or quotation body.' },
+          text: { type: 'string', maxLength: 32_000, description: 'Prose or quotation body.' },
           attribution: { type: 'string', maxLength: 500 },
           expression: { type: 'string', maxLength: 5_000, description: 'Equation body.' },
           caption: { type: 'string', maxLength: 500 },
           title: { type: 'string', maxLength: 500, description: 'Title for a steps block.' },
-          steps: { type: 'array', maxItems: 100, items: { type: 'string', maxLength: 5_000 } },
+          steps: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 100,
+            items: { type: 'string', minLength: 1, maxLength: 5_000 },
+          },
           prompt: { type: 'string', maxLength: 20_000, description: 'Question body.' },
           answer: { type: 'string', maxLength: 20_000 },
           bookId: BOOK_ID_SCHEMA,
           sourceRange: RANGE_SCHEMA,
           sourceQuote: {
             type: 'string',
-            maxLength: 20_000,
+            maxLength: 32_000,
             description:
               'The exact text sourceRange covers. Required with sourceRange, and checked against the book, so a block can never cite words the book does not contain.',
           },
           sourceLabel: { type: 'string', maxLength: 500 },
         },
-        required: ['kind'],
-        dependentRequired: { sourceRange: ['bookId', 'sourceQuote'] },
+        oneOf: [
+          { properties: { kind: { const: 'prose' } }, required: ['kind', 'text'] },
+          { properties: { kind: { const: 'quotation' } }, required: ['kind', 'text'] },
+          { properties: { kind: { const: 'equation' } }, required: ['kind', 'expression'] },
+          { properties: { kind: { const: 'steps' } }, required: ['kind', 'steps'] },
+          { properties: { kind: { const: 'question' } }, required: ['kind', 'prompt'] },
+        ],
+        dependentRequired: {
+          id: ['updateToken'],
+          updateToken: ['id'],
+          sourceRange: ['bookId', 'sourceQuote'],
+          sourceQuote: ['bookId', 'sourceRange'],
+        },
         additionalProperties: false,
       },
       execute: (input) =>
         run('upsert_study_item', () => 'added to the study board', async () => {
+          const hasId = typeof input.id === 'string' && input.id.length > 0
+          const hasUpdateToken =
+            typeof input.updateToken === 'string' && input.updateToken.length > 0
+          if (hasId !== hasUpdateToken) {
+            return errorResult('id and updateToken must be supplied together when revising a block.')
+          }
+          const sourceFields = ['bookId', 'sourceRange', 'sourceQuote'].filter(
+            (field) => input[field] !== undefined,
+          )
+          if (sourceFields.length !== 0 && sourceFields.length !== 3) {
+            return errorResult('bookId, sourceRange, and sourceQuote must be supplied together.')
+          }
           const payload = toPayload(input)
           const receipt = await commands.upsertStudyItem({
             payload,
@@ -483,7 +592,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               : {}),
             ...(typeof input.sourceLabel === 'string' ? { sourceLabel: input.sourceLabel } : {}),
           })
-          return textResult(describeReceipt(receipt))
+          return textResult(describeReceipt(receipt), { receipt })
         }),
     },
     {
@@ -493,11 +602,12 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
       execute: () =>
         run('list_study_items', () => 'read the study board', async () => {
           const items = await commands.listStudyItems()
-          if (items.length === 0) return textResult('The study board is empty.')
+          if (items.length === 0) return textResult('The study board is empty.', { items })
           return textResult(
             items
               .map((item) => `${item.id} · ${item.payload.kind} · ${JSON.stringify(item.payload)}`)
               .join('\n'),
+            { items },
           )
         }),
     },
@@ -507,6 +617,14 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
         'Change what the study board is doing. "docked" and "expanded" are layout preferences the person keeps; "focus" brings the board forward and moves focus to it without changing their preference; "close" returns to the book without deleting anything. Prefer focus when you only want the person to look at what you added.',
       inputSchema: {
         type: 'object',
+        oneOf: [
+          { required: ['view'], not: { required: ['undo'] } },
+          {
+            properties: { undo: { const: true } },
+            required: ['undo'],
+            not: { required: ['view'] },
+          },
+        ],
         properties: {
           view: {
             type: 'string',
@@ -524,53 +642,105 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
       },
       execute: (input) =>
         run('set_study_board_view', () => 'changed the board layout', async () => {
+          const operationCount = Number(input.undo === true) + Number(input.view !== undefined)
+          if (operationCount !== 1) {
+            return errorResult('Choose exactly one board operation: undo or a view.')
+          }
           if (input.undo === true) {
             const undone = await commands.undoStudyBoardView()
-            if (!undone) return textResult('There is no board layout change to undo.')
-            return textResult(describeBoardReceipt(undone))
+            if (!undone) {
+              return textResult('There is no board layout change to undo.', { receipt: null })
+            }
+            return textResult(describeBoardReceipt(undone), { receipt: undone })
           }
           const view = input.view
           if (view !== 'docked' && view !== 'expanded' && view !== 'focus' && view !== 'close') {
-            return textResult('Choose one of: docked, expanded, focus, close.')
+            return errorResult('Choose one of: docked, expanded, focus, close.')
           }
           const receipt = await commands.setStudyBoardView(view, caller(input))
-          return textResult(describeBoardReceipt(receipt))
+          return textResult(describeBoardReceipt(receipt), { receipt })
         }),
     },
   ]
+  return tools.map((tool) =>
+    withOutputSchema(tool, (message) =>
+      onCall({ name: tool.name, summary: message, failed: true }),
+    ),
+  )
 }
 
 function toPayload(input: Record<string, unknown>): StudyItemPayload {
-  const text = typeof input.text === 'string' ? input.text : ''
+  const common = new Set([
+    'id',
+    'updateToken',
+    'actionToken',
+    'actionGroupId',
+    'kind',
+    'bookId',
+    'sourceRange',
+    'sourceQuote',
+    'sourceLabel',
+  ])
+  const kindFields: Record<string, readonly string[]> = {
+    prose: ['text'],
+    quotation: ['text', 'attribution'],
+    equation: ['expression', 'caption'],
+    steps: ['title', 'steps'],
+    question: ['prompt', 'answer'],
+  }
+  const allowed = kindFields[String(input.kind)]
+  if (allowed) {
+    const foreign = Object.keys(input).filter(
+      (field) => !common.has(field) && !allowed.includes(field),
+    )
+    if (foreign.length > 0) {
+      throw new Error(`${input.kind} does not accept: ${foreign.join(', ')}`)
+    }
+  }
+  const requiredText = (field: string, maximum: number): string => {
+    const value = input[field]
+    if (typeof value !== 'string' || value.trim().length === 0 || value.length > maximum) {
+      throw new Error(`${field} must be a non-empty string of at most ${maximum} characters`)
+    }
+    return value
+  }
   switch (input.kind) {
     case 'prose':
-      return { kind: 'prose', text }
+      return { kind: 'prose', text: requiredText('text', 32_000) }
     case 'quotation':
       return {
         kind: 'quotation',
-        text,
+        text: requiredText('text', 32_000),
         ...(typeof input.attribution === 'string' ? { attribution: input.attribution } : {}),
       }
     case 'equation':
       return {
         kind: 'equation',
-        expression: typeof input.expression === 'string' ? input.expression : text,
+        expression: requiredText('expression', 5_000),
         ...(typeof input.caption === 'string' ? { caption: input.caption } : {}),
       }
     case 'steps':
       return {
         kind: 'steps',
         ...(typeof input.title === 'string' ? { title: input.title } : {}),
-        steps: Array.isArray(input.steps)
-          ? input.steps.filter((step): step is string => typeof step === 'string')
-          : text
-            ? text.split('\n').filter(Boolean)
-            : [],
+        steps:
+          Array.isArray(input.steps) && input.steps.length > 0
+            ? input.steps.map((step) => {
+                if (typeof step !== 'string' || step.trim().length === 0 || step.length > 5_000) {
+                  throw new Error(
+                    'every step must be a non-empty string of at most 5000 characters',
+                  )
+                }
+                return step
+              })
+            : (() => {
+                throw new Error('steps must contain at least one step')
+              })(),
       }
     case 'question':
       return {
         kind: 'question',
-        prompt: typeof input.prompt === 'string' ? input.prompt : text,
+        prompt: requiredText('prompt', 20_000),
         ...(typeof input.answer === 'string' ? { answer: input.answer } : {}),
       }
     default:

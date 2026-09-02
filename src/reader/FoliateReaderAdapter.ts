@@ -156,13 +156,14 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     const content = view.renderer.getContents()[0]
     if (!content) throw new ReaderNotOpenError()
     const visibleRange = view.lastLocation?.range
-    if (visibleRange && normalizeBookText(visibleRange.toString())) {
-      return passageFromRange(
+    if (visibleRange) {
+      const visible = passageFromRange(
         visibleRange,
         content.index,
         this.#chapterBreadcrumb(content.index),
         (range) => view.getCFI(content.index, range),
       )
+      if (normalizeBookText(visible.text)) return visible
     }
     const snapshot = await this.getSectionSnapshot(content.index)
     return {
@@ -178,6 +179,16 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   }
 
   async getPassage(range: BookRange): Promise<Passage> {
+    const passage = await this.getPassageAtLocation(range)
+    if (passage.range.textFingerprint !== range.textFingerprint) {
+      throw new Error(
+        `Passage fingerprint mismatch: expected ${range.textFingerprint}, received ${passage.range.textFingerprint}`,
+      )
+    }
+    return passage
+  }
+
+  async getPassageAtLocation(range: BookRange): Promise<Passage> {
     const { book, view } = this.#requireActive()
     const document = await this.#createSectionDocument(range.sectionIndex)
     const start = this.#resolveCfi(book, range.startCfi, document, range.sectionIndex)
@@ -185,18 +196,12 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     const resolved = document.createRange()
     resolved.setStart(start.startContainer, start.startOffset)
     resolved.setEnd(end.endContainer, end.endOffset)
-    const passage = passageFromRange(
+    return passageFromRange(
       resolved,
       range.sectionIndex,
       this.#chapterBreadcrumb(range.sectionIndex),
       (value) => view.getCFI(range.sectionIndex, value),
     )
-    if (passage.range.textFingerprint !== range.textFingerprint) {
-      throw new Error(
-        `Passage fingerprint mismatch: expected ${range.textFingerprint}, received ${passage.range.textFingerprint}`,
-      )
-    }
-    return passage
   }
 
   listSections(): readonly BookSection[] {

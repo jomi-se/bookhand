@@ -31,7 +31,21 @@ function independentlyDigestDesignBlock(markdown: string): string {
   const end = markdown.indexOf('<!-- bookhand:agent-design-context:end -->')
   const firstContentByte = markdown.indexOf('\n', start) + 1
   const block = markdown.slice(firstContentByte, end)
-  return `sha256:${createHash('sha256').update(block, 'utf8').digest('hex')}`
+  const capabilities = JSON.parse(
+    readFileSync(resolve('src/webmcp/capabilities.json'), 'utf8'),
+  ) as unknown
+  const stable = (value: unknown): string => {
+    if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`
+    if (value !== null && typeof value === 'object') {
+      const record = value as Record<string, unknown>
+      return `{${Object.keys(record)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${stable(record[key])}`)
+        .join(',')}}`
+    }
+    return JSON.stringify(value)
+  }
+  return `sha256:${createHash('sha256').update(`${block}\n${stable(capabilities)}`, 'utf8').digest('hex')}`
 }
 
 const designMarkdown = readFileSync(resolve('DESIGN.md'), 'utf8')
@@ -73,6 +87,37 @@ describe('design context version', () => {
     )
     expect(edited).not.toBe(designMarkdown)
     expect(independentlyDigestDesignBlock(edited)).not.toBe(DESIGN_CONTEXT_VERSION)
+  })
+
+  it('changes when canonical capability truth changes', () => {
+    const capabilitiesPath = resolve('src/webmcp/capabilities.json')
+    const original = readFileSync(capabilitiesPath, 'utf8')
+    const capabilities = JSON.parse(original) as { scopes: { applicationWorlds: boolean } }
+    const edited = original.replace(
+      `"applicationWorlds": ${String(capabilities.scopes.applicationWorlds)}`,
+      `"applicationWorlds": ${String(!capabilities.scopes.applicationWorlds)}`,
+    )
+    const withCapabilities = designMarkdown.replace(
+      '<!-- bookhand:agent-design-context:end -->',
+      `<!-- bookhand:agent-design-context:end -->`,
+    )
+    const digest = (capabilityJson: string) => {
+      const start = withCapabilities.indexOf('<!-- bookhand:agent-design-context:start -->')
+      const end = withCapabilities.indexOf('<!-- bookhand:agent-design-context:end -->')
+      const block = withCapabilities.slice(withCapabilities.indexOf('\n', start) + 1, end)
+      const stable = (value: unknown): string => {
+        if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`
+        if (value !== null && typeof value === 'object') {
+          const record = value as Record<string, unknown>
+          return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stable(record[key])}`).join(',')}}`
+        }
+        return JSON.stringify(value)
+      }
+      return createHash('sha256')
+        .update(`${block}\n${stable(JSON.parse(capabilityJson))}`, 'utf8')
+        .digest('hex')
+    }
+    expect(digest(edited)).not.toBe(digest(original))
   })
 
   it('excludes the marker lines themselves', () => {
@@ -165,9 +210,10 @@ describe('composed response', () => {
 
   it('advertises only reversal actions that exist today', () => {
     const text = composeDesignContext('reader', READING_STATE)
-    expect(text).toContain('Reset (Text panel)')
-    expect(text).toContain('Return to source')
-    expect(text).toContain('Preview-before-apply and Undo are not implemented yet')
+    expect(text).toContain('preview, apply, cancel, undo, reset')
+    expect(text).toContain('return-to-source')
+    expect(text).toContain('one item at a time')
+    expect(text).toContain('raw tool history belongs in separate diagnostics')
   })
 
   it('never returns the person’s custom CSS, only that it is in force', () => {
@@ -208,13 +254,14 @@ describe('get_design_context tool', () => {
     expect(result.isError).toBeUndefined()
   })
 
-  it('ignores an unknown surface rather than failing the call', async () => {
+  it('rejects an unknown surface because the runtime does not enforce the schema', async () => {
     const { definition } = tool(LIBRARY_STATE)
     const result = await definition.execute({ surface: 'dashboard' })
-    expect(result.content[0]?.text).toContain('Requested surface: library')
+    expect(result.isError).toBe(true)
+    expect(result.content[0]?.text).toContain('surface must be one of')
   })
 
-  it('is visible in Agent Activity', async () => {
+  it('reports the read to diagnostics', async () => {
     const { definition, report } = tool(READING_STATE)
     await definition.execute({ surface: 'study' })
     expect(report).toHaveBeenCalledWith({

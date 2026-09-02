@@ -4,19 +4,13 @@ Last updated: 2026-09-02
 
 ## Next executable wave
 
-Implement **W4: runtime truth and canonical source lifecycle** from
-`docs/plan/polish-and-showcase-build-tasks.md`:
-
-1. replace stale hand-written capability prose in `get_design_context` with a
-   canonical capability manifest and version it with the design guidance;
-2. tighten the existing WebMCP schemas and preserve declared structured
-   results through the genuine runtime;
-3. close the remaining image-only, MathML, and CFI extraction cases;
-4. add versioned canonical source excerpts plus deterministic repair or visible
-   stale/relink behavior for old source-derived records.
-
-Do not start with card styling. Retrieval, lesson composition, and tutor focus
-all depend on trustworthy source meaning and truthful tool contracts.
+Implement **W5: local lexical retrieval** from
+`docs/plan/polish-and-showcase-build-tasks.md`: build its transactional index
+lifecycle, cancellation, resume, and failure truth from the frozen contracts,
+then expose bounded current-book `search_book` through genuine WebMCP and prove
+it against the two-book oracle. An interrupted concurrent W5 draft was audited
+against its transcript and removed rather than being mistaken for accepted
+groundwork.
 
 ## Active product direction
 
@@ -47,22 +41,27 @@ This direction is recorded in:
 - W0 through W3 are implemented: runtime design-context discovery, source and
   persistence trust, shared observable style/board state, and the mobile/desktop
   reader reset.
-- New passage extraction preserves inline math and semantic figure text. This
-  does not repair already stored damaged records or close every image-only and
-  CFI round-trip case.
+- W4 is implemented: runtime design guidance is derived from a canonical
+  capability manifest and versioned with it; WebMCP handlers defensively reject
+  invalid calls and preserve actionable structured success/failure results.
+- Passage extraction now covers image-only visibility, MathML `aria-label`,
+  figure-only semantic CFI round trips, and mixed math. A real bundled-book
+  Foliate regression proves Fig. 52 keeps its description, caption, typed
+  figure/math segments, `AB`, `x`, `P`, `Q`, `OM=x_1`, and `PM=y_1`.
+- Source-linked records use bounded typed canonical excerpts. Legacy derived
+  records and resolved excerpts from older extraction versions repair lazily
+  without a learner edit/revision; authored text remains unchanged; unresolved
+  records preserve their display and expose Retry and Relink. Source-bearing
+  migration and browser reload persistence are covered. ADR 0004 fixes and a
+  regression proves the non-destructive deduplication policy.
 - Source-linked mutations verify current book, range, fingerprint, and quote.
   Agent-created item updates use ownership tokens, retry idempotency, revisions,
   provenance, and per-item Undo.
 - `actionGroupId` is provenance only in the current product. It does not group
-  rendering or Undo despite stale tool copy that says otherwise.
+  rendering or Undo; tool and domain copy now state per-item Undo truthfully.
 - Study remains a flat record feed. Equations render as raw-looking `<pre>`
   content, raw Agent Activity occupies the Study viewport, initial Study load
   failure is not rendered, and removal is still permanent one-click behavior.
-- `get_design_context` incorrectly says Preview and Undo are unavailable even
-  though both exist. Its current version hashes only the marked `DESIGN.md`
-  block, so changing capability prose alone would not change the version.
-- Existing tool-contract gaps include ambiguous `open_book`, kind-insufficient
-  study payloads, empty reading-style operations, and text-only results.
 - There is no tutor session, exact transient passage cue, item reveal target,
   temporary explanation, Back stack, or Stop-guiding action yet.
 
@@ -102,6 +101,10 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
   `npm run dev` unsuitable.
 - Use `scripts/quiet-run.sh` for routine checks and preserve validation evidence
   under ignored `artifacts/validation/polish/<commit>/`.
+- W4 passed independent post-fix scrutiny for WebMCP boundaries, real-Foliate
+  math/figure meaning, canonical-source migration/repair, and genuine browser
+  persistence. The separate real-surface lane also passed design-context and
+  WebMCP runtime checks. W5 remains unimplemented and is the next clean wave.
 - The bundled *Calculus Made Easy* is judging content, not a permanent product
   dependency.
 - Keep embeddings optional and after lexical retrieval.

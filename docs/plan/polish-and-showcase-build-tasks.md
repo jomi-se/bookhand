@@ -129,7 +129,7 @@ Depends on: W2 shared style/view state.
 - Preserve the disciplined desktop docked/expanded workspace.
 - Add the mobile/desktop/zoom/safe-area browser evidence matrix.
 
-## W4: runtime truth and canonical source lifecycle
+## W4: runtime truth and canonical source lifecycle — implemented 2026-09-02
 
 Targets: `VAL-AGENT-DESIGN-CONTEXT`, `VAL-WEBMCP-TOOL-CONTRACTS`, amended
 `VAL-MATH-PASSAGE`, and `VAL-SOURCE-EXCERPT-LIFECYCLE`.
@@ -144,8 +144,25 @@ Depends on: W0 and W1.
 - Add versioned canonical source excerpts, source-derived quotation
   canonicalization, old-record refresh/stale state, and reindex semantics.
 
-This is the next executable wave. It prevents every later surface from
+This wave prevents every later surface from
 composing on contradictory capabilities or damaged source meaning.
+
+Implemented with a canonical runtime capability manifest included in the
+design-context digest; defensive handler validation because current Chromium
+does not enforce WebMCP input schemas; concise text plus actionable structured
+results; typed bounded source excerpts; additive schema-v3 migration and newer
+schema refusal; dedicated legacy repair that does not create a learner edit or
+revision; visible stale Retry/Relink; and one canonical source extraction
+version from which W5 must derive index invalidation. Figure-only semantic CFI envelopes, mixed math, image-only
+visible context, and MathML `aria-label` now have deterministic and real
+Foliate fixture coverage. Genuine Chromium WebMCP coverage proves structured
+success/refusal preservation. ADR 0004 records authored-text preservation and
+non-destructive annotation/quotation deduplication.
+
+Current Chromium strips the application’s non-standard `outputSchema` member
+from `getTools()`. W4 records that upstream limitation rather than claiming
+runtime discovery; application-side schema serialization and genuine
+`structuredContent` preservation are both tested.
 
 ## W5: local lexical retrieval
 

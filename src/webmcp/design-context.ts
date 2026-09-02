@@ -1,5 +1,9 @@
 import type { ReaderStyle, StudyBoardView } from '../domain/index.ts'
-import { CANONICAL_GUIDANCE, DESIGN_CONTEXT_VERSION } from 'virtual:bookhand-design-context'
+import {
+  CANONICAL_GUIDANCE,
+  CAPABILITY_MANIFEST,
+  DESIGN_CONTEXT_VERSION,
+} from 'virtual:bookhand-design-context'
 
 /**
  * What a browser agent is told about composing inside Bookhand.
@@ -62,13 +66,9 @@ export const SEMANTIC_ROLES = [
   'error',
 ] as const
 
-export const NATIVE_STUDY_PRIMITIVES = [
-  'prose',
-  'quotation',
-  'equation',
-  'steps',
-  'question',
-] as const
+export const NATIVE_STUDY_PRIMITIVES = CAPABILITY_MANIFEST.study.nativePrimitives
+
+export { CAPABILITY_MANIFEST }
 
 export interface GuidanceInvariant {
   readonly key: string
@@ -181,12 +181,10 @@ function reversalActions(state: DesignContextState): string {
   if (!state.presentation) {
     return 'Reversal actions: none apply yet. Opening a book makes Reset, Delete, and Return to source available.'
   }
-  return [
-    'Reversal actions available to the person right now: Reset (Text panel) restores every',
-    'presentation default; Delete removes one study block or highlight; Return to source moves the',
-    'book back to the passage a block came from. Preview-before-apply and Undo are not implemented',
-    'yet — do not tell the person a change can be previewed or undone.',
-  ].join(' ')
+  const style = CAPABILITY_MANIFEST.reversals.readingStyle.join(', ')
+  const study = CAPABILITY_MANIFEST.reversals.studyItem.join(', ')
+  const board = CAPABILITY_MANIFEST.reversals.boardView.join(', ')
+  return `User controls available now: reading presentation — ${style}; study items — ${study} (one item at a time); board layout — ${board}. Preview, Apply, and Cancel are person-facing Text-panel controls; agent style calls commit immediately and remain undoable/resettable.`
 }
 
 /**
@@ -211,17 +209,30 @@ export function composeDesignContext(
     '',
     `Semantic roles to define as one complete set: ${SEMANTIC_ROLES.join(', ')}.`,
     `Native study blocks: ${NATIVE_STUDY_PRIMITIVES.join(', ')}.`,
+    `Agent observability inside Study: ${
+      CAPABILITY_MANIFEST.study.agentObservabilityInStudy
+        ? 'available'
+        : 'unavailable — raw tool history belongs in separate diagnostics'
+    }.`,
     '',
     'What each change can reach:',
-    '- set_reading_style, including custom CSS, applies inside the EPUB document only. It cannot',
+    `- set_reading_style, including custom CSS, ${
+      CAPABILITY_MANIFEST.scopes.epubCss ? 'applies' : 'does not apply'
+    } inside the EPUB document only. It cannot`,
     '  style the library, reader chrome, panels, or Study. Send only the fields you mean to',
     '  change. Custom CSS also requires designContextVersion: pass the guidance version at the',
     '  top of this response, or the call is refused and nothing changes.',
-    '- upsert_study_item creates native study blocks that render through Bookhand’s own semantic',
+    `- upsert_study_item ${
+      CAPABILITY_MANIFEST.scopes.nativeStudyItems ? 'creates' : 'cannot create'
+    } native study blocks that render through Bookhand’s own semantic`,
     '  theme. Supply structure and content, not styling.',
     '- Whole-application custom worlds — theming the library, chrome, panels, and Study together —',
-    '  are NOT available yet. No tool accepts them, and raw CSS or JavaScript aimed at the',
-    '  application shell is refused rather than applied. Say so plainly if asked.',
+    ...(CAPABILITY_MANIFEST.scopes.applicationWorlds
+      ? ['  are available through the advertised semantic-world tool.']
+      : [
+          '  are NOT available yet. No tool accepts them, and raw CSS or JavaScript aimed at the',
+          '  application shell is refused rather than applied. Say so plainly if asked.',
+        ]),
     '',
     `Composition invariants for ${requested}:`,
   ]

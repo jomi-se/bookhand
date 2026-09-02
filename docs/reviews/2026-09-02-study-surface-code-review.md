@@ -213,7 +213,7 @@ Before calling this fixed, prove:
 2. the first mobile and desktop study viewport begins with learning content,
    while failures remain immediately discoverable;
 3. TeX renders accessibly and malformed/hostile input falls back safely;
-4. Chapter XIX Fig. 52 preserves `AB`, `x`, `P`, `Q`, `PM=x_1`, the figure
+4. Chapter XIX Fig. 52 preserves `AB`, `x`, `P`, `Q`, `OM=x_1`, `PM=y_1`, the figure
    description, and caption through selection, tool read, persistence, reload,
    and search;
 5. an exact `sourceQuote` plus an invented quotation payload is rejected or

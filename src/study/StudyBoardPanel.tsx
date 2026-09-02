@@ -20,6 +20,10 @@ export interface StudyBoardPanelProps {
   readonly onAddItem: (payload: StudyItemPayload, withSource: boolean) => void
   readonly onDeleteItem: (item: StudyItem) => void
   readonly onUndoItem: (item: StudyItem) => void
+  readonly onRetryItemSource: (item: StudyItem) => void
+  readonly onRelinkItemSource: (item: StudyItem) => void
+  readonly onRetryAnnotationSource: (annotation: Annotation) => void
+  readonly onRelinkAnnotationSource: (annotation: Annotation) => void
   readonly mutationError?: { readonly message: string; readonly retry: () => void }
   readonly onDismissMutationError?: () => void
   readonly onGoToSource: (range: BookRange) => void
@@ -215,6 +219,9 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
                 onGoToSource={(target) => target.sourceRange && props.onGoToSource(target.sourceRange)}
                 onDelete={props.onDeleteItem}
                 onUndo={props.onUndoItem}
+                onRetrySource={props.onRetryItemSource}
+                onRelinkSource={props.onRelinkItemSource}
+                canRelinkSource={Boolean(selectionQuote)}
               />
             ))}
           </ul>
@@ -226,6 +233,27 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
             <ul className="highlight-list">
               {annotations.map((annotation) => (
                 <li key={annotation.id} className="highlight" data-color={annotation.color}>
+                  {annotation.source?.status === 'stale' ? (
+                    <p className="control-note" role="status">
+                      Saved source is stale; the original highlight text is preserved.
+                      <button
+                        type="button"
+                        className="button button-text"
+                        onClick={() => props.onRetryAnnotationSource(annotation)}
+                      >
+                        Retry resolution
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-text"
+                        disabled={!selectionQuote}
+                        title={selectionQuote ? 'Use the current book selection as the new source.' : 'Select a replacement passage in the book first.'}
+                        onClick={() => props.onRelinkAnnotationSource(annotation)}
+                      >
+                        Relink
+                      </button>
+                    </p>
+                  ) : null}
                   <button
                     type="button"
                     className="highlight-quote"

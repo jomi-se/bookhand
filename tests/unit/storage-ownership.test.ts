@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { ImportBookInput, StudyItem, StudyMutation } from '../../src/domain/index.ts'
 import { OwnershipError } from '../../src/domain/provenance.ts'
+import { fingerprintText } from '../../src/reader/text.ts'
 import { LibraryRepository } from '../../src/storage/library-repository.ts'
-import { initializeSchema } from '../../src/storage/schema.ts'
+import { initializeSchema, STORAGE_SCHEMA_VERSION } from '../../src/storage/schema.ts'
 
 const NOW = '2026-09-02T12:00:00.000Z'
 
@@ -388,20 +389,58 @@ describe('opening a database written before provenance existed', () => {
         bind: [NOW, NOW],
       })
       db.exec({
-        sql: `INSERT INTO study_items VALUES ('old-item', 'board-1', NULL, 'prose', ?, 0, ?, ?)`,
-        bind: [JSON.stringify({ kind: 'prose', text: 'Written before provenance' }), NOW, NOW],
+        sql: `INSERT INTO study_items VALUES ('old-item', 'board-1', ?, 'quotation', ?, 0, ?, ?)`,
+        bind: [
+          JSON.stringify({
+            range: {
+              startCfi: 'start',
+              endCfi: 'end',
+              sectionIndex: 0,
+              textFingerprint: fingerprintText('Written before provenance'),
+            },
+            label: 'Chapter X',
+          }),
+          JSON.stringify({ kind: 'quotation', text: 'Written before provenance' }),
+          NOW,
+          NOW,
+        ],
+      })
+      db.exec({
+        sql: `INSERT INTO annotations VALUES ('old-mark', 'book-1', ?, ?, 'accent', NULL, ?, ?)`,
+        bind: [
+          JSON.stringify({
+            startCfi: 'start',
+            endCfi: 'end',
+            sectionIndex: 0,
+            textFingerprint: fingerprintText('Marked before provenance'),
+          }),
+          'Marked before provenance',
+          NOW,
+          NOW,
+        ],
       })
 
       initializeSchema(db)
 
-      expect(Number(db.selectValue('PRAGMA user_version'))).toBe(2)
+      expect(Number(db.selectValue('PRAGMA user_version'))).toBe(STORAGE_SCHEMA_VERSION)
       const migrated = new LibraryRepository(db).listStudyItems('board-1')
       expect(migrated).toHaveLength(1)
       // Truthful, not merely convenient: no agent path existed when this was
       // written, so the person is the only author it could have had.
       expect(migrated[0]?.origin).toBe('user')
       expect(migrated[0]?.revision).toBe(1)
-      expect(migrated[0]?.payload).toEqual({ kind: 'prose', text: 'Written before provenance' })
+      expect(migrated[0]?.payload).toEqual({
+        kind: 'quotation',
+        text: 'Written before provenance',
+      })
+      expect(migrated[0]?.source).toEqual({
+        status: 'pending-legacy',
+        ownership: 'derived',
+      })
+      expect(new LibraryRepository(db).listAnnotations('book-1')[0]?.source).toEqual({
+        status: 'pending-legacy',
+        ownership: 'derived',
+      })
     } finally {
       db.close()
     }

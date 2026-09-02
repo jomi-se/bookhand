@@ -40,7 +40,26 @@ export function digestCanonicalBlock(block) {
   return `sha256:${digest}`
 }
 
-export function readDesignContextSource(designMarkdownPath) {
+/** Stable JSON used in the public guidance-version preimage. */
+export function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+export function digestDesignContext(block, capabilities) {
+  const preimage = `${block}\n${canonicalJson(capabilities)}`
+  const digest = createHash('sha256').update(Buffer.from(preimage, 'utf8')).digest('hex')
+  return `sha256:${digest}`
+}
+
+export function readDesignContextSource(designMarkdownPath, capabilitiesPath) {
   const block = extractCanonicalBlock(readFileSync(designMarkdownPath, 'utf8'))
-  return { block, version: digestCanonicalBlock(block) }
+  const capabilities = JSON.parse(readFileSync(capabilitiesPath, 'utf8'))
+  return { block, capabilities, version: digestDesignContext(block, capabilities) }
 }

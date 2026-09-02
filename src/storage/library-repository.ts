@@ -15,8 +15,10 @@ import type {
   StudyItemCommit,
   StudyItemPayload,
   StudyMutation,
+  SourceLink,
 } from '../domain/index.ts'
 import { canonicalize, OwnershipError } from '../domain/provenance.ts'
+import { fingerprintText } from '../reader/text.ts'
 
 type Row = Record<string, SqlValue>
 
@@ -199,15 +201,16 @@ export class LibraryRepository {
     const statement = this.db.prepare(`
       INSERT INTO annotations (
         id, book_id, range_json, quote, color, note, created_at, updated_at,
-        origin, action_group_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        origin, action_group_id, source_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         range_json = excluded.range_json,
         quote = excluded.quote,
         color = excluded.color,
         note = excluded.note,
         updated_at = excluded.updated_at,
-        action_group_id = excluded.action_group_id
+        action_group_id = excluded.action_group_id,
+        source_json = excluded.source_json
     `)
     try {
       statement
@@ -222,11 +225,36 @@ export class LibraryRepository {
           annotation.updatedAt,
           annotation.origin,
           annotation.actionGroupId ?? null,
+          annotation.source ? JSON.stringify(annotation.source) : null,
         ])
         .step()
     } finally {
       finalize(statement)
     }
+    return annotation
+  }
+
+  /** Refresh canonical source data without pretending the person edited the annotation. */
+  repairAnnotationSource(annotation: Annotation): Annotation {
+    const existing = this.db.selectObject(
+      'SELECT book_id FROM annotations WHERE id = ?',
+      [annotation.id],
+    )
+    if (!existing || asString(existing.book_id, 'annotation book id') !== annotation.bookId) {
+      throw new Error('That annotation no longer exists in this book.')
+    }
+    this.db.exec({
+      sql: `UPDATE annotations
+            SET range_json = ?, quote = ?, source_json = ?
+            WHERE id = ? AND book_id = ?`,
+      bind: [
+        JSON.stringify(annotation.range),
+        annotation.quote,
+        annotation.source ? JSON.stringify(annotation.source) : null,
+        annotation.id,
+        annotation.bookId,
+      ],
+    })
     return annotation
   }
 
@@ -237,7 +265,7 @@ export class LibraryRepository {
   listAnnotations(bookId: string): readonly Annotation[] {
     const rows = this.db.selectObjects(
       `SELECT id, book_id, range_json, quote, color, note, created_at, updated_at,
-              origin, action_group_id
+              origin, action_group_id, source_json
        FROM annotations WHERE book_id = ? ORDER BY created_at ASC`,
       [bookId],
     )
@@ -246,6 +274,10 @@ export class LibraryRepository {
       bookId: asString(row.book_id, 'annotation book id'),
       range: parseJson<BookRange>(row.range_json, 'annotation range'),
       quote: asString(row.quote, 'annotation quote'),
+      source:
+        row.source_json === null
+          ? { status: 'pending-legacy', ownership: 'derived' }
+          : parseJson<SourceLink>(row.source_json, 'annotation source'),
       color: asString(row.color, 'annotation color') as Annotation['color'],
       ...(row.note === null ? {} : { note: asString(row.note, 'annotation note') }),
       createdAt: asString(row.created_at, 'annotation created time'),
@@ -319,6 +351,7 @@ export class LibraryRepository {
         payload: item.payload,
         sourceRange: item.sourceRange ?? null,
         sourceLabel: item.sourceLabel ?? null,
+        source: item.source ?? null,
       })
 
       const replay = this.#findReceipt(mutation)
@@ -364,9 +397,30 @@ export class LibraryRepository {
     )
   }
 
+  /** Repair source metadata without creating a revision or an action receipt. */
+  repairStudyItemSource(item: StudyItem): StudyItem {
+    const existing = this.#studyItemRow(item.id)
+    if (!existing || asString(existing.board_id, 'study item board id') !== item.boardId) {
+      throw new Error('That study block no longer exists on this board.')
+    }
+    this.db.exec({
+      sql: `UPDATE study_items
+            SET source_range_json = ?, source_json = ?, payload_json = ?
+            WHERE id = ? AND board_id = ?`,
+      bind: [
+        sourceJson(item),
+        item.source ? JSON.stringify(item.source) : null,
+        JSON.stringify(item.payload),
+        item.id,
+        item.boardId,
+      ],
+    })
+    return item
+  }
+
   #studyItemRow(itemId: string): Row | undefined {
     return this.db.selectObject(
-      `SELECT i.id, i.board_id, i.source_range_json, i.payload_json, i.sort_order,
+      `SELECT i.id, i.board_id, i.source_range_json, i.source_json, i.payload_json, i.sort_order,
               i.created_at, i.updated_at, i.origin, i.update_token, i.action_group_id, i.revision,
               b.book_id AS owning_book_id
        FROM study_items i JOIN boards b ON b.id = i.board_id
@@ -397,8 +451,8 @@ export class LibraryRepository {
     this.db.exec({
       sql: `INSERT INTO study_items (
               id, board_id, source_range_json, kind, payload_json, sort_order,
-              created_at, updated_at, origin, update_token, action_group_id, revision
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+              created_at, updated_at, origin, update_token, action_group_id, revision, source_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
       bind: [
         created.id,
         created.boardId,
@@ -411,6 +465,7 @@ export class LibraryRepository {
         created.origin,
         updateToken,
         mutation.actionGroupId,
+        created.source ? JSON.stringify(created.source) : null,
       ],
     })
     return { item: created, ...(updateToken ? { updateToken } : {}), replayed: false }
@@ -455,8 +510,8 @@ export class LibraryRepository {
     // rather than whatever the caller happens to remember.
     this.db.exec({
       sql: `INSERT OR REPLACE INTO study_item_versions
-            (item_id, revision, source_range_json, kind, payload_json, sort_order, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            (item_id, revision, source_range_json, kind, payload_json, sort_order, updated_at, source_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       bind: [
         prior.id,
         prior.revision,
@@ -465,6 +520,7 @@ export class LibraryRepository {
         JSON.stringify(prior.payload),
         prior.sortOrder,
         prior.updatedAt,
+        prior.source ? JSON.stringify(prior.source) : null,
       ],
     })
 
@@ -480,7 +536,7 @@ export class LibraryRepository {
     this.db.exec({
       sql: `UPDATE study_items SET
               source_range_json = ?, kind = ?, payload_json = ?, sort_order = ?,
-              updated_at = ?, action_group_id = ?, revision = ?
+              updated_at = ?, action_group_id = ?, revision = ?, source_json = ?
             WHERE id = ?`,
       bind: [
         sourceJson(updated),
@@ -490,6 +546,7 @@ export class LibraryRepository {
         updated.updatedAt,
         mutation.actionGroupId,
         updated.revision,
+        updated.source ? JSON.stringify(updated.source) : null,
         updated.id,
       ],
     })
@@ -528,7 +585,7 @@ export class LibraryRepository {
       }
       const previousRevision = current.revision - 1
       const version = this.db.selectObject(
-        `SELECT source_range_json, kind, payload_json, sort_order, updated_at
+        `SELECT source_range_json, kind, payload_json, sort_order, updated_at, source_json
          FROM study_item_versions WHERE item_id = ? AND revision = ?`,
         [itemId, previousRevision],
       )
@@ -541,7 +598,7 @@ export class LibraryRepository {
       this.db.exec({
         sql: `UPDATE study_items SET
                 source_range_json = ?, kind = ?, payload_json = ?, sort_order = ?,
-                updated_at = ?, revision = ?
+                updated_at = ?, revision = ?, source_json = ?
               WHERE id = ?`,
         bind: [
           version.source_range_json,
@@ -550,6 +607,7 @@ export class LibraryRepository {
           version.sort_order,
           now,
           previousRevision,
+          version.source_json,
           itemId,
         ],
       })
@@ -567,7 +625,7 @@ export class LibraryRepository {
 
   listStudyItems(boardId: string): readonly StudyItem[] {
     const rows = this.db.selectObjects(
-      `SELECT id, board_id, source_range_json, payload_json, sort_order, created_at, updated_at,
+      `SELECT id, board_id, source_range_json, source_json, payload_json, sort_order, created_at, updated_at,
               origin, action_group_id, revision
        FROM study_items WHERE board_id = ? ORDER BY sort_order ASC, created_at ASC`,
       [boardId],
@@ -584,6 +642,7 @@ export class LibraryRepository {
       ) + 1
     )
   }
+
 }
 
 function boardFromRow(row: Row): StudyBoard {
@@ -616,6 +675,19 @@ function studyItemFromRow(row: Row): StudyItem {
           row.source_range_json,
           'study item source',
         )
+  const payload = parseJson<StudyItemPayload>(row.payload_json, 'study item payload')
+  const sourceLink: SourceLink | undefined = source
+    ? row.source_json === null || row.source_json === undefined
+      ? {
+          status: 'pending-legacy',
+          ownership:
+            payload.kind === 'quotation' &&
+            fingerprintText(payload.text) === source.range.textFingerprint
+              ? 'derived'
+              : 'authored',
+        }
+      : parseJson<SourceLink>(row.source_json, 'study item canonical source')
+    : undefined
   return {
     id: asString(row.id, 'study item id'),
     boardId: asString(row.board_id, 'study item board id'),
@@ -624,9 +696,10 @@ function studyItemFromRow(row: Row): StudyItem {
       ? {}
       : { actionGroupId: asString(row.action_group_id, 'study item action group') }),
     revision: Number(row.revision ?? 1),
-    payload: parseJson<StudyItemPayload>(row.payload_json, 'study item payload'),
+    payload,
     ...(source ? { sourceRange: source.range } : {}),
     ...(source?.label ? { sourceLabel: source.label } : {}),
+    ...(sourceLink ? { source: sourceLink } : {}),
     sortOrder: Number(row.sort_order ?? 0),
     createdAt: asString(row.created_at, 'study item created time'),
     updatedAt: asString(row.updated_at, 'study item updated time'),

@@ -1,5 +1,6 @@
 import type { BookIdentifier, BookRange } from './reader.ts'
 import type { MutationOrigin } from './provenance.ts'
+import type { SourceLink } from './source.ts'
 
 export type AnnotationColor = 'accent' | 'amber' | 'sky' | 'moss'
 
@@ -12,6 +13,7 @@ export interface Annotation {
   readonly bookId: BookIdentifier
   readonly range: BookRange
   readonly quote: string
+  readonly source?: SourceLink
   readonly color: AnnotationColor
   readonly note?: string
   readonly createdAt: string
@@ -66,6 +68,7 @@ export interface StudyItem {
   /** Where in the book this came from, so the reader can always return to it. */
   readonly sourceRange?: BookRange
   readonly sourceLabel?: string
+  readonly source?: SourceLink
   readonly sortOrder: number
   readonly createdAt: string
   readonly updatedAt: string
@@ -91,7 +94,7 @@ export interface StudyMutation {
    * action wearing a used name.
    */
   readonly actionToken: string
-  /** Groups every write of one intent so they are taken back together. */
+  /** Correlates writes from one intent for provenance; legacy Undo is per item. */
   readonly actionGroupId: string
   /** An agent must present the token it was given when it created the item. */
   readonly updateToken?: string

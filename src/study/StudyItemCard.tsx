@@ -1,4 +1,4 @@
-import { CornerUpLeft, Sparkles, Trash2, Undo2 } from 'lucide-react'
+import { CornerUpLeft, Link, RefreshCw, Sparkles, Trash2, Undo2 } from 'lucide-react'
 import type { StudyItem } from '../domain/index.ts'
 
 export interface StudyItemCardProps {
@@ -6,6 +6,9 @@ export interface StudyItemCardProps {
   readonly onGoToSource: (item: StudyItem) => void
   readonly onDelete: (item: StudyItem) => void
   readonly onUndo: (item: StudyItem) => void
+  readonly onRetrySource: (item: StudyItem) => void
+  readonly onRelinkSource: (item: StudyItem) => void
+  readonly canRelinkSource: boolean
 }
 
 function Body({ item }: { readonly item: StudyItem }) {
@@ -53,7 +56,15 @@ function Body({ item }: { readonly item: StudyItem }) {
   }
 }
 
-export function StudyItemCard({ item, onGoToSource, onDelete, onUndo }: StudyItemCardProps) {
+export function StudyItemCard({
+  item,
+  onGoToSource,
+  onDelete,
+  onUndo,
+  onRetrySource,
+  onRelinkSource,
+  canRelinkSource,
+}: StudyItemCardProps) {
   const byAgent = item.origin === 'agent'
   return (
     <li className="study-item" data-kind={item.payload.kind} data-origin={item.origin}>
@@ -109,6 +120,23 @@ export function StudyItemCard({ item, onGoToSource, onDelete, onUndo }: StudyIte
           </button>
         </span>
       </div>
+      {item.source?.status === 'stale' ? (
+        <div className="control-note" role="status">
+          This source no longer resolves. The saved text has been kept.
+          <button type="button" className="button button-text" onClick={() => onRetrySource(item)}>
+            <RefreshCw size={14} aria-hidden="true" /> Retry
+          </button>
+          <button
+            type="button"
+            className="button button-text"
+            disabled={!canRelinkSource}
+            title={canRelinkSource ? 'Use the current book selection as the new source.' : 'Select a replacement passage in the book first.'}
+            onClick={() => onRelinkSource(item)}
+          >
+            <Link size={14} aria-hidden="true" /> Relink
+          </button>
+        </div>
+      ) : null}
       <Body item={item} />
     </li>
   )

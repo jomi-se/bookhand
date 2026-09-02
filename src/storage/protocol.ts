@@ -10,6 +10,11 @@ import type {
   StorageWorkerResponse,
   StoredBook,
 } from '../domain/index.ts'
+import {
+  SOURCE_EXCERPT_MAX_CHARACTERS,
+  SOURCE_SEGMENT_MAX_CHARACTERS,
+  SOURCE_SEGMENT_MAX_COUNT,
+} from '../domain/source.ts'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -92,6 +97,38 @@ function isBookRange(value: unknown): boolean {
   )
 }
 
+function isSourceLink(value: unknown): boolean {
+  if (!isRecord(value) || !['derived', 'authored'].includes(String(value.ownership))) {
+    return false
+  }
+  if (value.status === 'pending-legacy') return true
+  if (value.status === 'stale') {
+    return ['range-unresolved', 'book-unavailable'].includes(String(value.reason))
+  }
+  if (value.status !== 'resolved' || !isRecord(value.excerpt)) return false
+  const excerpt = value.excerpt
+  return (
+    excerpt.schemaVersion === 1 &&
+    isString(excerpt.bookId, 256) &&
+    isBookRange(excerpt.range) &&
+    Number.isInteger(excerpt.extractionVersion) &&
+    isString(excerpt.text, SOURCE_EXCERPT_MAX_CHARACTERS) &&
+    isRecord(excerpt.range) &&
+    excerpt.textFingerprint === excerpt.range.textFingerprint &&
+    Array.isArray(excerpt.segments) &&
+    excerpt.segments.length <= SOURCE_SEGMENT_MAX_COUNT &&
+    excerpt.segments.every(
+      (segment) =>
+        isRecord(segment) &&
+        ['text', 'math', 'figure'].includes(String(segment.kind)) &&
+        isString(segment.text, SOURCE_SEGMENT_MAX_CHARACTERS),
+    ) &&
+    Array.isArray(excerpt.chapterBreadcrumb) &&
+    excerpt.chapterBreadcrumb.length <= 100 &&
+    excerpt.chapterBreadcrumb.every((part) => isString(part, 500))
+  )
+}
+
 function isAnnotation(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -100,7 +137,8 @@ function isAnnotation(value: unknown): boolean {
     isString(value.id, 200) &&
     isString(value.bookId, 256) &&
     isBookRange(value.range) &&
-    isString(value.quote, 20_000) &&
+    isString(value.quote, 32_000) &&
+    (value.source === undefined || isSourceLink(value.source)) &&
     ['accent', 'amber', 'sky', 'moss'].includes(String(value.color)) &&
     (value.note === undefined || isString(value.note, 20_000)) &&
     isString(value.createdAt) &&
@@ -112,9 +150,9 @@ function isStudyPayload(value: unknown): boolean {
   if (!isRecord(value)) return false
   switch (value.kind) {
     case 'prose':
-      return isString(value.text, 20_000)
+      return isString(value.text, 32_000)
     case 'quotation':
-      return isString(value.text, 20_000) && isOptionalString(value.attribution)
+      return isString(value.text, 32_000) && isOptionalString(value.attribution)
     case 'equation':
       return isString(value.expression, 5_000) && isOptionalString(value.caption)
     case 'steps':
@@ -143,6 +181,7 @@ function isStudyItem(value: unknown): boolean {
     (value.actionGroupId === undefined || isString(value.actionGroupId, 200)) &&
     isStudyPayload(value.payload) &&
     (value.sourceRange === undefined || isBookRange(value.sourceRange)) &&
+    (value.source === undefined || isSourceLink(value.source)) &&
     isOptionalString(value.sourceLabel) &&
     Number.isInteger(value.sortOrder) &&
     isString(value.createdAt) &&
@@ -282,6 +321,7 @@ export function assertStorageWorkerRequest(value: unknown): asserts value is Sto
       if (isString(value.bookId, 256)) return
       break
     case 'save-annotation':
+    case 'repair-annotation-source':
       if (isAnnotation(value.annotation)) return
       break
     case 'delete-annotation':
@@ -294,6 +334,9 @@ export function assertStorageWorkerRequest(value: unknown): asserts value is Sto
       break
     case 'commit-study-item':
       if (isStudyItem(value.item) && isStudyMutation(value.mutation)) return
+      break
+    case 'repair-study-item-source':
+      if (isStudyItem(value.item)) return
       break
     case 'undo-study-item':
       if (isString(value.itemId, 200) && Number.isInteger(value.expectedRevision)) return
@@ -366,6 +409,9 @@ export function assertStorageWorkerResponse(
       break
     case 'study-item-committed':
       if (isStudyItemCommit(result.commit)) return
+      break
+    case 'study-item-repaired':
+      if (isStudyItem(result.item)) return
       break
     case 'study-item-undone':
       if (result.item === null || isStudyItem(result.item)) return

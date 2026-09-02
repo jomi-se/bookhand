@@ -101,7 +101,6 @@ export class StorageWorkerRuntime {
   private repository: LibraryRepository | undefined
   private pool: SAHPoolUtil | undefined
   private mode: StorageDiagnostics['mode'] | undefined
-
   constructor(initializeSqlite: SqliteInitializer = initializeOfficialSqlite) {
     this.initializeSqlite = initializeSqlite
   }
@@ -151,6 +150,11 @@ export class StorageWorkerRuntime {
           type: 'annotation-saved',
           annotation: this.requireRepository().saveAnnotation(request.annotation),
         }
+      case 'repair-annotation-source':
+        return {
+          type: 'annotation-saved',
+          annotation: this.requireRepository().repairAnnotationSource(request.annotation),
+        }
       case 'delete-annotation':
         this.requireRepository().deleteAnnotation(request.annotationId)
         return { type: 'annotation-deleted', annotationId: request.annotationId }
@@ -184,6 +188,11 @@ export class StorageWorkerRuntime {
             request.mutation,
             new Date().toISOString(),
           ),
+        }
+      case 'repair-study-item-source':
+        return {
+          type: 'study-item-repaired',
+          item: this.requireRepository().repairStudyItemSource(request.item),
         }
       case 'undo-study-item':
         return {

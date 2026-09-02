@@ -61,10 +61,16 @@ export interface ReaderSelection {
   readonly range: BookRange
 }
 
+export interface PassageSegment {
+  readonly kind: 'text' | 'math' | 'figure'
+  readonly text: string
+}
+
 export interface Passage {
   readonly text: string
   readonly range: BookRange
   readonly chapterBreadcrumb: readonly string[]
+  readonly segments?: readonly PassageSegment[]
 }
 
 export interface BookSection {
@@ -110,6 +116,8 @@ export interface ReaderAdapter {
   getSelection(): ReaderSelection | null
   getVisibleContext(): Promise<Passage>
   getPassage(range: BookRange): Promise<Passage>
+  /** Resolve the stored location without requiring its old fingerprint to match. */
+  getPassageAtLocation?(range: BookRange): Promise<Passage>
   listSections(): readonly BookSection[]
   getSectionSnapshot(sectionIndex: number): Promise<BookSectionSnapshot>
   navigate(target: BookTarget): Promise<void>
@@ -118,4 +126,3 @@ export interface ReaderAdapter {
   resetStyle(): void
   renderAnnotations(marks: readonly ReaderAnnotationMark[]): void
 }
-

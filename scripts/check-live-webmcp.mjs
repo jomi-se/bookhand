@@ -44,7 +44,11 @@ try {
       return document.modelContext.executeTool(tool, JSON.stringify(args ?? {}))
     }, [name, args])
     const result = JSON.parse(raw)
-    return { text: result.content.map((part) => part.text).join('\n'), isError: !!result.isError }
+    return {
+      text: result.content.map((part) => part.text).join('\n'),
+      structured: result.structuredContent ?? {},
+      isError: !!result.isError,
+    }
   }
 
   await page.waitForSelector('.book-open', { timeout: 30_000 })

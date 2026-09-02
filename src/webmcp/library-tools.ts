@@ -1,6 +1,12 @@
 import type { BookCatalogEntry, StorageDiagnostics } from '../domain/index.ts'
 import { authorLine, progressPercent, splitTitle } from '../library/progress.ts'
-import { textResult, type ToolDefinition, type ToolResult } from './model-context.ts'
+import {
+  errorResult,
+  textResult,
+  withOutputSchema,
+  type ToolDefinition,
+  type ToolResult,
+} from './model-context.ts'
 import type { ToolCallReporter } from './useWebMcpTools.ts'
 
 export interface LibraryToolOptions {
@@ -23,16 +29,16 @@ export function createLibraryTools(options: LibraryToolOptions): readonly ToolDe
   ): Promise<ToolResult> => {
     try {
       const result = await body()
-      options.report({ name, summary })
+      options.report({ name, summary, ...(result.isError ? { failed: true } : {}) })
       return result
     } catch (error) {
       const message = error instanceof Error ? error.message : 'That did not work'
       options.report({ name, summary: message, failed: true })
-      return { content: [{ type: 'text', text: message }], isError: true }
+      return errorResult(message)
     }
   }
 
-  return [
+  const tools: readonly Omit<ToolDefinition, 'outputSchema'>[] = [
     {
       name: 'list_books',
       description:
@@ -45,6 +51,7 @@ export function createLibraryTools(options: LibraryToolOptions): readonly ToolDe
           if (books.length === 0) {
             return textResult(
               'The library is empty. The person can add an EPUB with Open EPUB; books stay on their device.',
+              { books: [], storageMode: mode ?? null },
             )
           }
           const lines = books.map((entry) => {
@@ -55,15 +62,28 @@ export function createLibraryTools(options: LibraryToolOptions): readonly ToolDe
           })
           return textResult(
             [`Storage: ${mode ?? 'unknown'}`, `${books.length} book(s):`, ...lines].join('\n'),
+            {
+              storageMode: mode ?? null,
+              books: books.map((entry) => ({
+                bookId: entry.id,
+                title: splitTitle(entry.metadata).title,
+                author: authorLine(entry),
+                progressPercent: progressPercent(entry) ?? null,
+              })),
+            },
           )
         }),
     },
     {
       name: 'open_book',
       description:
-        'Open one of the books in the library so its reading tools become available. Identify it by the id from list_books, or by a distinctive part of its title.',
+        'Open one book so its reading tools become available. Send exactly one selector: the id from list_books, or a distinctive part of its title. An ambiguous title opens nothing and returns bounded candidates.',
       inputSchema: {
         type: 'object',
+        oneOf: [
+          { required: ['bookId'], not: { required: ['title'] } },
+          { required: ['title'], not: { required: ['bookId'] } },
+        ],
         properties: {
           bookId: { type: 'string', description: 'An id returned by list_books.' },
           title: { type: 'string', description: 'Part of the title, matched case-insensitively.' },
@@ -73,18 +93,45 @@ export function createLibraryTools(options: LibraryToolOptions): readonly ToolDe
       execute: (input) =>
         run('open_book', 'opened a book', async () => {
           const books = options.books()
-          const wanted = typeof input.title === 'string' ? input.title.toLowerCase() : undefined
-          const entry =
-            books.find((candidate) => candidate.id === input.bookId) ??
-            (wanted
-              ? books.find((candidate) => candidate.metadata.title.toLowerCase().includes(wanted))
-              : undefined)
+          const hasId = typeof input.bookId === 'string' && input.bookId.length > 0
+          const hasTitle = typeof input.title === 'string' && input.title.trim().length > 0
+          if (hasId === hasTitle) {
+            throw new Error('Choose exactly one book selector: bookId or title.')
+          }
+          const wanted = hasTitle ? String(input.title).trim().toLowerCase() : undefined
+          const matches = wanted
+            ? books.filter((candidate) => candidate.metadata.title.toLowerCase().includes(wanted))
+            : []
+          if (matches.length > 1) {
+            const candidates = matches
+              .slice(0, 10)
+              .map((candidate) => `${candidate.id} · ${splitTitle(candidate.metadata).title}`)
+            return errorResult(
+              `That title matches more than one book. Choose a bookId:\n${candidates.join('\n')}`,
+              {
+                code: 'ambiguous-title',
+                candidates: matches.slice(0, 10).map((candidate) => ({
+                  bookId: candidate.id,
+                  title: splitTitle(candidate.metadata).title,
+                })),
+              },
+            )
+          }
+          const entry = hasId
+            ? books.find((candidate) => candidate.id === input.bookId)
+            : matches[0]
           if (!entry) throw new Error('No book in the library matches that. Call list_books first.')
           options.openBook(entry)
           return textResult(
             `Opened ${splitTitle(entry.metadata).title}. The reading and study tools are now available.`,
+            { bookId: entry.id, title: splitTitle(entry.metadata).title },
           )
         }),
     },
   ]
+  return tools.map((tool) =>
+    withOutputSchema(tool, (message) =>
+      options.report({ name: tool.name, summary: message, failed: true }),
+    ),
+  )
 }

@@ -52,8 +52,16 @@ const agentCall = (page: Page, name: string, input?: unknown) =>
       const tool = (await context.getTools()).find((candidate) => candidate.name === toolName)
       if (!tool) throw new Error(`no tool ${toolName}`)
       const raw = await context.executeTool(tool, JSON.stringify(toolInput ?? {}))
-      const result = JSON.parse(raw) as { content: { text: string }[]; isError?: boolean }
-      return { text: result.content.map((part) => part.text).join('\n'), isError: !!result.isError }
+      const result = JSON.parse(raw) as {
+        content: { text: string }[]
+        structuredContent?: Record<string, unknown>
+        isError?: boolean
+      }
+      return {
+        text: result.content.map((part) => part.text).join('\n'),
+        structured: result.structuredContent ?? {},
+        isError: !!result.isError,
+      }
     },
     [name, input] as const,
   )
@@ -70,7 +78,20 @@ function expectedDesignContextVersion(): string {
   expect(start).toBeGreaterThan(-1)
   expect(end).toBeGreaterThan(start)
   const block = markdown.slice(markdown.indexOf('\n', start) + 1, end)
-  return `sha256:${createHash('sha256').update(block, 'utf8').digest('hex')}`
+  const capabilities = JSON.parse(
+    readFileSync(resolve('src/webmcp/capabilities.json'), 'utf8'),
+  ) as unknown
+  const canonical = (value: unknown): string => {
+    if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
+    if (value && typeof value === 'object') {
+      return `{${Object.keys(value as Record<string, unknown>)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`)
+        .join(',')}}`
+    }
+    return JSON.stringify(value)
+  }
+  return `sha256:${createHash('sha256').update(`${block}\n${canonical(capabilities)}`, 'utf8').digest('hex')}`
 }
 
 async function openLibrary(page: Page) {

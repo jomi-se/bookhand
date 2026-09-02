@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "scopes": {
+    "applicationWorlds": false,
+    "epubCss": true,
+    "nativeStudyItems": true
+  },
+  "reversals": {
+    "boardView": ["undo"],
+    "readingStyle": ["preview", "apply", "cancel", "undo", "reset"],
+    "studyItem": ["undo", "delete", "return-to-source"]
+  },
+  "study": {
+    "agentObservabilityInStudy": false,
+    "nativePrimitives": ["prose", "quotation", "equation", "steps", "question"]
+  }
+}

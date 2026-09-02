@@ -78,6 +78,11 @@ function setup(overrides: Partial<ReaderAdapter> = {}) {
       else annotations.push(annotation)
       return annotation
     }),
+    repairAnnotationSource: vi.fn(async (annotation: Annotation) => {
+      const index = annotations.findIndex((a) => a.id === annotation.id)
+      annotations[index] = annotation
+      return annotation
+    }),
     listAnnotations: vi.fn(async () => annotations),
     deleteAnnotation: vi.fn(async (id: string) => {
       annotations.splice(
@@ -90,6 +95,11 @@ function setup(overrides: Partial<ReaderAdapter> = {}) {
       if (index >= 0) items[index] = item
       else items.push(item)
       return { item, replayed: false }
+    }),
+    repairStudyItemSource: vi.fn(async (item: StudyItem) => {
+      const index = items.findIndex((candidate) => candidate.id === item.id)
+      items[index] = item
+      return item
     }),
     undoStudyItem: vi.fn(async (itemId: string) => {
       items.splice(
@@ -296,6 +306,185 @@ describe('source ownership at the mutation boundary', () => {
     const { commands, annotations } = setup()
     await commands.saveAnnotation({ bookId: 'book-1', range, quote: '  Alpha\n exact  ' })
     expect(annotations).toHaveLength(1)
+    expect(annotations[0]?.quote).toBe('Alpha exact')
+    expect(annotations[0]?.source).toMatchObject({
+      status: 'resolved',
+      ownership: 'derived',
+      excerpt: { text: 'Alpha exact', extractionVersion: 1 },
+    })
+  })
+
+  it('canonicalizes a source-derived quotation from the verified excerpt', async () => {
+    const { commands } = setup()
+    const receipt = await commands.upsertStudyItem({
+      payload: { kind: 'quotation', text: 'A caller-supplied paraphrase' },
+      bookId: 'book-1',
+      sourceRange: range,
+      sourceQuote: 'Alpha exact',
+    })
+    expect(receipt.applied.payload).toEqual({ kind: 'quotation', text: 'Alpha exact' })
+    expect(receipt.applied.source).toMatchObject({ status: 'resolved', ownership: 'derived' })
+  })
+
+  it('preserves an authored quotation while keeping its canonical source separately', async () => {
+    const { commands } = setup()
+    const receipt = await commands.upsertStudyItem({
+      payload: { kind: 'quotation', text: 'My interpretation' },
+      bookId: 'book-1',
+      sourceRange: range,
+      sourceQuote: 'Alpha exact',
+      sourceOwnership: 'authored',
+    })
+    expect(receipt.applied.payload).toEqual({ kind: 'quotation', text: 'My interpretation' })
+    expect(receipt.applied.source).toMatchObject({
+      status: 'resolved',
+      ownership: 'authored',
+      excerpt: { text: 'Alpha exact' },
+    })
+  })
+
+  it('keeps an annotation and quotation over the same source as separate user-owned records', async () => {
+    const { commands } = setup()
+    await commands.saveAnnotation({ bookId: 'book-1', range, quote: 'Alpha exact' })
+    await commands.upsertStudyItem({
+      payload: { kind: 'quotation', text: 'Alpha exact' },
+      bookId: 'book-1',
+      sourceRange: range,
+      sourceQuote: 'Alpha exact',
+    })
+
+    expect(await commands.listAnnotations()).toHaveLength(1)
+    expect(await commands.listStudyItems()).toHaveLength(1)
+  })
+
+  it('repairs a legacy derived quotation without creating a study revision', async () => {
+    const { commands, items, client } = setup()
+    items.push({
+      id: 'legacy',
+      boardId: board.id,
+      origin: 'user',
+      revision: 1,
+      payload: { kind: 'quotation', text: 'Damaged old extraction' },
+      sourceRange: range,
+      source: { status: 'pending-legacy', ownership: 'derived' },
+      sortOrder: 0,
+      createdAt: board.createdAt,
+      updatedAt: board.updatedAt,
+    })
+    const repaired = await commands.listStudyItems()
+    expect(repaired[0]).toMatchObject({
+      revision: 1,
+      payload: { kind: 'quotation', text: 'Alpha exact' },
+      source: { status: 'resolved' },
+    })
+    expect(client.commitStudyItem).not.toHaveBeenCalled()
+    expect(client.repairStudyItemSource).toHaveBeenCalledOnce()
+  })
+
+  it('refreshes a resolved excerpt when its extraction version is old', async () => {
+    const { commands, items, client } = setup()
+    items.push({
+      id: 'old-extraction',
+      boardId: board.id,
+      origin: 'user',
+      revision: 1,
+      payload: { kind: 'quotation', text: 'Old canonical text' },
+      sourceRange: range,
+      source: {
+        status: 'resolved',
+        ownership: 'derived',
+        excerpt: {
+          schemaVersion: 1,
+          bookId: 'book-1',
+          range,
+          extractionVersion: 0,
+          text: 'Old canonical text',
+          textFingerprint: range.textFingerprint,
+          segments: [{ kind: 'text', text: 'Old canonical text' }],
+          chapterBreadcrumb: ['Chapter X'],
+        },
+      },
+      sortOrder: 0,
+      createdAt: board.createdAt,
+      updatedAt: board.updatedAt,
+    })
+
+    const [repaired] = await commands.listStudyItems()
+    expect(repaired).toMatchObject({
+      revision: 1,
+      payload: { kind: 'quotation', text: 'Alpha exact' },
+      source: { status: 'resolved', excerpt: { extractionVersion: 1 } },
+    })
+    expect(client.commitStudyItem).not.toHaveBeenCalled()
+    expect(client.repairStudyItemSource).toHaveBeenCalledOnce()
+  })
+
+  it('automatically repairs a damaged Chapter XIX derived quotation', async () => {
+    const canonical =
+      'A curve from A to B with shaded area. Fig. 52. Let \\({A B}\\) be a curve. Then call \\({O M=x_{1}}\\) and the ordinate \\({P M=y_{1}}\\).'
+    const repairedRange = { ...range, textFingerprint: 'fnv1a-chapter-xix' }
+    const { commands, items } = setup({
+      getPassageAtLocation: vi.fn(async () => ({
+        text: canonical,
+        range: repairedRange,
+        chapterBreadcrumb: ['Chapter XIX'],
+        segments: [
+          { kind: 'figure' as const, text: 'A curve from A to B with shaded area. Fig. 52.' },
+          { kind: 'math' as const, text: '\\({A B}\\)' },
+          { kind: 'math' as const, text: '\\({O M=x_{1}}\\)' },
+          { kind: 'math' as const, text: '\\({P M=y_{1}}\\)' },
+        ],
+      })),
+    })
+    items.push({
+      id: 'chapter-xix-old',
+      boardId: board.id,
+      origin: 'user',
+      revision: 1,
+      payload: { kind: 'quotation', text: 'Let (Fig. 52) be a curve.' },
+      sourceRange: range,
+      source: { status: 'pending-legacy', ownership: 'derived' },
+      sortOrder: 0,
+      createdAt: board.createdAt,
+      updatedAt: board.updatedAt,
+    })
+
+    const [repaired] = await commands.listStudyItems()
+    expect(repaired?.payload).toEqual({ kind: 'quotation', text: canonical })
+    expect(repaired?.source).toMatchObject({
+      status: 'resolved',
+      excerpt: { chapterBreadcrumb: ['Chapter XIX'], segments: expect.any(Array) },
+    })
+  })
+
+  it('keeps legacy display text and records a stale source when resolution fails', async () => {
+    const { commands, items } = setup({
+      getPassageAtLocation: vi.fn(async () => {
+        throw new Error('gone')
+      }),
+    })
+    items.push({
+      id: 'legacy',
+      boardId: board.id,
+      origin: 'user',
+      revision: 1,
+      payload: { kind: 'quotation', text: 'Keep this original text' },
+      sourceRange: range,
+      source: { status: 'pending-legacy', ownership: 'derived' },
+      sortOrder: 0,
+      createdAt: board.createdAt,
+      updatedAt: board.updatedAt,
+    })
+    const repaired = await commands.listStudyItems()
+    expect(repaired[0]?.payload).toEqual({
+      kind: 'quotation',
+      text: 'Keep this original text',
+    })
+    expect(repaired[0]?.source).toEqual({
+      status: 'stale',
+      ownership: 'derived',
+      reason: 'range-unresolved',
+    })
   })
 
   it('will not let a study block cite a source it cannot prove', async () => {

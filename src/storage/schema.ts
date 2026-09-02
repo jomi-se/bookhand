@@ -1,6 +1,6 @@
 import type { Database } from '@sqlite.org/sqlite-wasm'
 
-export const STORAGE_SCHEMA_VERSION = 2
+export const STORAGE_SCHEMA_VERSION = 3
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS annotations (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   origin TEXT NOT NULL DEFAULT 'user' CHECK (origin IN ('user', 'agent')),
-  action_group_id TEXT
+  action_group_id TEXT,
+  source_json TEXT
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS boards (
@@ -61,7 +62,8 @@ CREATE TABLE IF NOT EXISTS study_items (
   -- presenting it; it is never listed back out.
   update_token TEXT,
   action_group_id TEXT,
-  revision INTEGER NOT NULL DEFAULT 1
+  revision INTEGER NOT NULL DEFAULT 1,
+  source_json TEXT
 ) STRICT;
 
 -- Every superseded version of an item, so Undo of an update can restore the
@@ -74,6 +76,7 @@ CREATE TABLE IF NOT EXISTS study_item_versions (
   payload_json TEXT NOT NULL,
   sort_order INTEGER NOT NULL,
   updated_at TEXT NOT NULL,
+  source_json TEXT,
   PRIMARY KEY (item_id, revision)
 ) STRICT;
 
@@ -153,6 +156,10 @@ CREATE TABLE IF NOT EXISTS vector_batches (
  * already there, because the same database may be opened by a build that has
  * already migrated it.
  */
+// Existing rows predate provenance. They were all written through the
+// interface by the person sitting there, so `'user'` is the truthful default
+// rather than a convenient one — no agent could have written them, because no
+// agent path existed.
 const VERSION_2_COLUMNS: readonly (readonly [string, string])[] = [
   ['annotations', "origin TEXT NOT NULL DEFAULT 'user'"],
   ['annotations', 'action_group_id TEXT'],
@@ -162,14 +169,19 @@ const VERSION_2_COLUMNS: readonly (readonly [string, string])[] = [
   ['study_items', 'revision INTEGER NOT NULL DEFAULT 1'],
 ]
 
-/**
- * Existing rows predate provenance. They were all written through the
- * interface by the person sitting there, so `'user'` is the truthful default
- * rather than a convenient one — no agent could have written them, because no
- * agent path existed.
- */
-function migrateToVersion2(db: Database): void {
-  for (const [table, definition] of VERSION_2_COLUMNS) {
+/** Canonical, versioned source excerpts. Null means a legacy record pending resolution. */
+const VERSION_3_COLUMNS: readonly (readonly [string, string])[] = [
+  ['annotations', 'source_json TEXT'],
+  ['study_items', 'source_json TEXT'],
+  ['study_item_versions', 'source_json TEXT'],
+]
+
+/** Safe to run against a database a newer build has already migrated. */
+function addMissingColumns(
+  db: Database,
+  columns: readonly (readonly [string, string])[],
+): void {
+  for (const [table, definition] of columns) {
     const column = definition.split(' ')[0]
     const present = db.selectValue(
       `SELECT count(*) FROM pragma_table_info(?) WHERE name = ?`,
@@ -184,8 +196,14 @@ export function initializeSchema(db: Database): void {
   db.exec('PRAGMA foreign_keys = ON; PRAGMA trusted_schema = OFF;')
   db.transaction('IMMEDIATE', () => {
     const from = Number(db.selectValue('PRAGMA user_version') ?? 0)
+    if (from > STORAGE_SCHEMA_VERSION) {
+      throw new Error(
+        `This library uses schema version ${from}, newer than this build supports (${STORAGE_SCHEMA_VERSION}). Update Bookhand before opening it.`,
+      )
+    }
     db.exec(SCHEMA_SQL)
-    if (from > 0 && from < 2) migrateToVersion2(db)
+    if (from > 0 && from < 2) addMissingColumns(db, VERSION_2_COLUMNS)
+    if (from > 0 && from < 3) addMissingColumns(db, VERSION_3_COLUMNS)
     db.exec(`PRAGMA user_version = ${STORAGE_SCHEMA_VERSION}`)
   })
 }

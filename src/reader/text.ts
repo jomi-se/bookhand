@@ -1,4 +1,4 @@
-import type { BookRange, Passage } from '../domain/reader.ts'
+import type { BookRange, Passage, PassageSegment } from '../domain/reader.ts'
 
 const SKIPPED_ELEMENTS =
   'script, style, noscript, template, [hidden], [inert], [aria-hidden="true"]'
@@ -38,20 +38,29 @@ export function fingerprintText(value: string): string {
  * Anything hidden from a reader is removed before any of this, because text a
  * person cannot see is not text the book is saying. `VAL-MATH-PASSAGE`.
  */
-function serializeContent(root: ParentNode): string {
+interface SerializedContent {
+  readonly text: string
+  readonly segments: readonly PassageSegment[]
+}
+
+function serializeContent(root: ParentNode): SerializedContent {
   for (const element of root.querySelectorAll(SKIPPED_ELEMENTS)) element.remove()
 
   // An explicit `data-tex` is the author stating the content outright. It wins
   // over every inferred alternative, on any element.
   for (const element of root.querySelectorAll('[data-tex]')) {
-    replaceWithText(element, element.getAttribute('data-tex'))
+    replaceWithSegment(element, 'math', element.getAttribute('data-tex'))
   }
 
   for (const math of root.querySelectorAll('math')) {
     const annotation = math.querySelector('annotation[encoding="application/x-tex"]')
-    replaceWithText(
+    replaceWithSegment(
       math,
-      math.getAttribute('alttext') ?? annotation?.textContent ?? math.textContent,
+      'math',
+      math.getAttribute('alttext') ??
+        annotation?.textContent ??
+        math.getAttribute('aria-label') ??
+        math.textContent,
     )
   }
 
@@ -63,14 +72,14 @@ function serializeContent(root: ParentNode): string {
     // style, used for chapter ornaments. The word itself says nothing about the
     // book, so passing it through would put a noise word into every passage
     // that happens to span an ornament.
-    replaceWithText(image, decorativeAlt(image.getAttribute('alt')))
+    replaceWithSegment(image, 'figure', decorativeAlt(image.getAttribute('alt')))
   }
 
   for (const svg of root.querySelectorAll('svg')) {
     const title = svg.querySelector('title')?.textContent
     const description = svg.querySelector('desc')?.textContent
     const labelled = [title, description].filter(Boolean).join('. ')
-    replaceWithText(svg, labelled || svg.getAttribute('aria-label'))
+    replaceWithSegment(svg, 'figure', labelled || svg.getAttribute('aria-label'))
   }
 
   // Block boundaries are word boundaries; without this a heading runs into the
@@ -80,7 +89,32 @@ function serializeContent(root: ParentNode): string {
     element.insertAdjacentText?.('afterend', ' ')
   }
 
-  return normalizeBookText(root.textContent ?? '')
+  const document_ = root.ownerDocument
+  if (!document_) return { text: '', segments: [] }
+  const walker = document_.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const segments: PassageSegment[] = []
+  let activeKind: PassageSegment['kind'] | undefined
+  let activeText = ''
+  const flush = () => {
+    const text = normalizeBookText(activeText)
+    if (text && activeKind) segments.push({ kind: activeKind, text })
+    activeText = ''
+  }
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const parent = (node as Text).parentElement
+    const marker = parent?.closest<HTMLElement>('[data-bookhand-passage-kind]')
+    const kind = (marker?.dataset.bookhandPassageKind ?? 'text') as PassageSegment['kind']
+    if (activeKind !== kind) {
+      flush()
+      activeKind = kind
+    }
+    activeText += node.nodeValue ?? ''
+  }
+  flush()
+  return {
+    text: normalizeBookText(segments.map((segment) => segment.text).join(' ')),
+    segments,
+  }
 }
 
 const DECORATIVE_ALT = new Set(['', 'decorative'])
@@ -97,20 +131,27 @@ function decorativeAlt(alt: string | null): string | null {
  * a replaced element sitting between two words, and deleting it outright would
  * weld them together — the decorative image would end up changing the prose.
  */
-function replaceWithText(element: Element, value: string | null | undefined): void {
+function replaceWithSegment(
+  element: Element,
+  kind: PassageSegment['kind'],
+  value: string | null | undefined,
+): void {
   const text = normalizeBookText(value ?? '')
   const document_ = element.ownerDocument
   if (!document_) {
     element.remove()
     return
   }
-  element.replaceWith(document_.createTextNode(` ${text} `))
+  const replacement = document_.createElement('span')
+  replacement.dataset.bookhandPassageKind = kind
+  replacement.textContent = ` ${text} `
+  element.replaceWith(replacement)
 }
 
 export function extractDocumentText(document: Document): string {
   const clone = document.body?.cloneNode(true) as HTMLElement | undefined
   if (!clone) return ''
-  return serializeContent(clone)
+  return serializeContent(clone).text
 }
 
 /**
@@ -146,13 +187,157 @@ export function toTextRange(range: Range): Range {
   return anchored
 }
 
+const SEMANTIC_ELEMENTS = '[data-tex], math, img, svg'
+const SEMANTIC_ENVELOPES = `figure, ${SEMANTIC_ELEMENTS}`
+
+/**
+ * Keep replaced semantic elements inside the CFI envelope.
+ *
+ * Foliate cannot round-trip a CFI whose endpoint is an element-container
+ * offset, while anchoring a figure or MathML selection to its descendant text
+ * loses the image alternative or aria label. A zero-character envelope from
+ * the preceding text end to the following text start gives Foliate stable text
+ * endpoints while retaining the semantic element between them.
+ */
+export function toSemanticTextRange(source: Range): Range {
+  const fragment = source.cloneContents()
+  if (!fragment.querySelector?.(SEMANTIC_ELEMENTS)) return toTextRange(source)
+  // A mixed prose range already has stable text endpoints, and those endpoints
+  // naturally keep every semantic element between them. Expanding it would
+  // turn a viewport-sized range into a section-sized one on some EPUB CFIs.
+  // The special envelope is only needed when the selected meaning is itself a
+  // figure/math object (a figure caption counts as part of that object).
+  const fragmentDocument = source.commonAncestorContainer.ownerDocument
+  if (fragmentDocument) {
+    const textWalker = fragmentDocument.createTreeWalker(fragment, NodeFilter.SHOW_TEXT)
+    for (let node = textWalker.nextNode(); node; node = textWalker.nextNode()) {
+      if (!(node.nodeValue ?? '').trim()) continue
+      const parent = (node as Text).parentElement
+      const semanticAncestor = parent?.closest(SEMANTIC_ELEMENTS)
+      const figure = parent ? closestElement(parent, 'figure') : undefined
+      if (!semanticAncestor && !figure?.querySelector(SEMANTIC_ELEMENTS)) {
+        return preserveSemanticEdges(source, toTextRange(source))
+      }
+    }
+  }
+
+  const document_ = source.commonAncestorContainer.ownerDocument
+  const root = document_?.body ?? document_?.documentElement
+  if (!document_ || !root) return toTextRange(source)
+
+  const walker = document_.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let previous: Text | undefined
+  let first: Text | undefined
+  let last: Text | undefined
+  let following: Text | undefined
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node as Text
+    if (!(text.nodeValue ?? '').trim()) continue
+    const length = text.nodeValue?.length ?? 0
+    // Zero-character envelope endpoints belong outside the semantic range.
+    // Treating them as intersecting would expand the envelope by one text node
+    // every time a stored CFI is resolved and serialized again.
+    if (source.startContainer === text && source.startOffset === length) {
+      previous = text
+      continue
+    }
+    if (source.endContainer === text && source.endOffset === 0) {
+      following = text
+      break
+    }
+    const startPosition = source.comparePoint(text, 0)
+    const endPosition = source.comparePoint(text, length)
+    if (endPosition < 0) {
+      previous = text
+    } else if (startPosition > 0) {
+      following = text
+      break
+    } else {
+      first ??= text
+      last = text
+    }
+  }
+  if ((!first || !last) && (!previous || !following)) return toTextRange(source)
+
+  const anchored = document_.createRange()
+  const start = previous ?? first!
+  const end = following ?? last!
+  anchored.setStart(start, previous ? (previous.nodeValue?.length ?? 0) : 0)
+  anchored.setEnd(end, following ? 0 : (end.nodeValue?.length ?? 0))
+  return preserveSemanticEdges(source, anchored)
+}
+
+/**
+ * A mixed selection usually has usable prose endpoints, but not when it starts
+ * with a figure followed by its caption (or ends with a replaced object after
+ * prose). `toTextRange` would anchor to the caption and silently put the image
+ * outside the persisted CFI. Expand only the affected edge to a zero-width
+ * text boundary outside the semantic object.
+ */
+function preserveSemanticEdges(source: Range, anchored: Range): Range {
+  const document_ = source.commonAncestorContainer.ownerDocument
+  const root = document_?.body ?? document_?.documentElement
+  if (!document_ || !root) return anchored
+  const semantics = [...root.querySelectorAll(SEMANTIC_ENVELOPES)]
+    .filter((element) => source.intersectsNode(element))
+    .map((element) => closestElement(element, 'figure') ?? element)
+  const first = semantics[0]
+  const last = semantics.at(-1)
+  if (!first || !last) return anchored
+
+  const needsStart =
+    first.contains(anchored.startContainer) ||
+    Boolean(
+      first.compareDocumentPosition(anchored.startContainer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+  const needsEnd =
+    last.contains(anchored.endContainer) ||
+    Boolean(
+      last.compareDocumentPosition(anchored.endContainer) & Node.DOCUMENT_POSITION_PRECEDING,
+    )
+  if (!needsStart && !needsEnd) return anchored
+
+  const walker = document_.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let previous: Text | undefined
+  let following: Text | undefined
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node as Text
+    if (!(text.nodeValue ?? '').trim()) continue
+    if (
+      !first.contains(text) &&
+      text.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING
+    ) {
+      previous = text
+    }
+    if (
+      !following &&
+      !last.contains(text) &&
+      last.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING
+    ) {
+      following = text
+    }
+  }
+
+  const result = anchored.cloneRange()
+  if (needsStart && previous) result.setStart(previous, previous.nodeValue?.length ?? 0)
+  if (needsEnd && following) result.setEnd(following, 0)
+  return result
+}
+
+function closestElement(element: Element, localName: string): Element | undefined {
+  for (let current: Element | null = element; current; current = current.parentElement) {
+    if (current.localName.toLowerCase() === localName) return current
+  }
+  return undefined
+}
+
 export function passageFromRange(
   source: Range,
   sectionIndex: number,
   chapterBreadcrumb: readonly string[],
   getCfi: (range: Range) => string,
 ): Passage {
-  const range = toTextRange(source)
+  const range = toSemanticTextRange(source)
   // Serialize the selection as the reader made it, not as it was re-anchored.
   //
   // `toTextRange` narrows the endpoints onto text nodes so the CFIs resolve to
@@ -165,7 +350,8 @@ export function passageFromRange(
   // `range.toString()` is not an option either: it concatenates raw text nodes,
   // losing image alts, `data-tex`, and MathML alternatives while including text
   // hidden from the reader.
-  const text = serializeContent(source.cloneContents())
+  const serialized = serializeContent(source.cloneContents())
+  const text = serialized.text
   const start = range.cloneRange()
   start.collapse(true)
   const end = range.cloneRange()
@@ -177,5 +363,5 @@ export function passageFromRange(
     sectionIndex,
     textFingerprint: fingerprintText(text),
   }
-  return { text, range: bookRange, chapterBreadcrumb }
+  return { text, range: bookRange, chapterBreadcrumb, segments: serialized.segments }
 }

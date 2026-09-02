@@ -4,7 +4,7 @@ import {
   fingerprintText,
   normalizeBookText,
 } from '../../src/reader/index.ts'
-import { passageFromRange, toTextRange } from '../../src/reader/text.ts'
+import { passageFromRange, toSemanticTextRange, toTextRange } from '../../src/reader/text.ts'
 
 describe('reader text snapshots', () => {
   it('normalizes visible content while excluding active and hidden content', () => {
@@ -102,6 +102,13 @@ describe('math-faithful passage serialization', () => {
     expect(wholeBody(doc)).toContain('\\frac{dy}{dx}')
   })
 
+  it('uses a MathML aria-label when no stronger mathematical alternative exists', () => {
+    const doc = fixture(
+      '<p>Let <math aria-label="m equals delta y over delta x"><mi>m</mi><mfrac><mi>y</mi><mi>x</mi></mfrac></math> be the slope.</p>',
+    )
+    expect(wholeBody(doc)).toContain('m equals delta y over delta x')
+  })
+
   it('keeps an equation image that would otherwise vanish entirely', () => {
     const doc = fixture('<p>so that <img alt="dy/dx = 2x"> holds.</p>')
     expect(wholeBody(doc)).toBe('so that dy/dx = 2x holds.')
@@ -114,6 +121,38 @@ describe('math-faithful passage serialization', () => {
     const text = wholeBody(doc)
     expect(text).toBe('A curve rising to the right Fig. 7')
     expect(text.match(/A curve rising/gu)).toHaveLength(1)
+  })
+
+  it('keeps semantic element kinds in their original order', () => {
+    const doc = fixture(
+      '<p>Before <math alttext="dy/dx"><mi>x</mi></math> beside <img alt="a tangent figure"> after.</p>',
+    )
+    const range = doc.createRange()
+    range.selectNodeContents(doc.body)
+    const passage = passageFromRange(range, 3, [], () => 'epubcfi(/6/4)')
+    expect(passage.segments).toEqual([
+      { kind: 'text', text: 'Before' },
+      { kind: 'math', text: 'dy/dx' },
+      { kind: 'text', text: 'beside' },
+      { kind: 'figure', text: 'a tangent figure' },
+      { kind: 'text', text: 'after.' },
+    ])
+  })
+
+  it('envelopes a figure-only range with stable text endpoints', () => {
+    const doc = fixture('<p>Before.</p><figure><img alt="A curve"><figcaption>Fig. 1</figcaption></figure><p>After.</p>')
+    const range = doc.createRange()
+    range.selectNode(doc.querySelector('img')!)
+    const anchored = toSemanticTextRange(range)
+    expect(anchored.startContainer.nodeType).toBe(Node.TEXT_NODE)
+    expect(anchored.endContainer.nodeType).toBe(Node.TEXT_NODE)
+    expect(anchored.startContainer.nodeValue).toContain('Before')
+    expect(anchored.endContainer.nodeValue).toContain('After.')
+    const repeated = toSemanticTextRange(anchored)
+    expect(repeated.startContainer).toBe(anchored.startContainer)
+    expect(repeated.startOffset).toBe(anchored.startOffset)
+    expect(repeated.endContainer).toBe(anchored.endContainer)
+    expect(repeated.endOffset).toBe(anchored.endOffset)
   })
 
   it('says nothing for a decorative image the author marked as empty', () => {

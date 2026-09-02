@@ -4,6 +4,7 @@ import sqlite3InitModule, { type Database } from '@sqlite.org/sqlite-wasm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type {
+  Annotation,
   ImportBookInput,
   ReadingState,
   StudyItem,
@@ -84,6 +85,18 @@ describe('official SQLite library repository', () => {
     )
   })
 
+  it('refuses a database written by a newer build instead of downgrading it', async () => {
+    const sqlite = await sqlite3InitModule()
+    const newer = new sqlite.oo1.DB(':memory:', 'c')
+    try {
+      newer.exec(`PRAGMA user_version = ${STORAGE_SCHEMA_VERSION + 1}`)
+      expect(() => initializeSchema(newer)).toThrow(/newer than this build supports/)
+      expect(newer.selectValue('PRAGMA user_version')).toBe(STORAGE_SCHEMA_VERSION + 1)
+    } finally {
+      newer.close()
+    }
+  })
+
   it('round-trips original bytes, flattened metadata, cover, and reading state', async () => {
     const bookId = await sha256BookId(book.epubBytes)
     repository.importBook(bookId, book)
@@ -100,6 +113,52 @@ describe('official SQLite library repository', () => {
         readingState: { ...readingState, bookId },
       },
     ])
+  })
+
+  it('persists canonical source excerpts without raw EPUB markup', async () => {
+    const bookId = await sha256BookId(book.epubBytes)
+    repository.importBook(bookId, book)
+    const range = {
+      startCfi: 'epubcfi(/6/2!/4/2:0)',
+      endCfi: 'epubcfi(/6/2!/4/2:11)',
+      sectionIndex: 0,
+      textFingerprint: 'fnv1a-canonical',
+    }
+    const annotation: Annotation = {
+      id: 'source-annotation',
+      origin: 'user',
+      bookId,
+      range,
+      quote: 'AB and dy/dx',
+      source: {
+        status: 'resolved',
+        ownership: 'derived',
+        excerpt: {
+          schemaVersion: 1,
+          bookId,
+          range,
+          extractionVersion: 1,
+          text: 'AB and dy/dx',
+          textFingerprint: range.textFingerprint,
+          segments: [
+            { kind: 'text', text: 'AB and' },
+            { kind: 'math', text: 'dy/dx' },
+          ],
+          chapterBreadcrumb: ['Chapter X'],
+        },
+      },
+      color: 'accent',
+      createdAt: readingState.updatedAt,
+      updatedAt: readingState.updatedAt,
+    }
+    repository.saveAnnotation(annotation)
+    expect(repository.listAnnotations(bookId)).toEqual([annotation])
+    const stored = String(
+      db.selectValue('SELECT source_json FROM annotations WHERE id = ?', [annotation.id]),
+    )
+    expect(stored).toContain('"extractionVersion":1')
+    expect(stored).not.toContain('<math')
+    expect(stored).not.toContain('<figure')
   })
 
   it('deduplicates identical bytes without replacing the original record', async () => {

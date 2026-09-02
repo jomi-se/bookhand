@@ -337,6 +337,49 @@ export function ReaderScreen({
                 study.commands!.undoStudyItem(item.id, item.revision),
               )
             }
+            onRetryItemSource={(item) =>
+              study.commands &&
+              study.run('retry that source', () =>
+                study.commands!.retryStudyItemSource(item.id),
+              )
+            }
+            onRelinkItemSource={(item) => {
+              const selection = reader.selection
+              if (!study.commands || !selection) return
+              study.run('relink that source', () =>
+                study.commands!.upsertStudyItem({
+                  id: item.id,
+                  payload: item.payload,
+                  bookId: study.commands!.bookId,
+                  sourceRange: selection.range,
+                  sourceQuote: selection.quote,
+                  sourceOwnership: item.source?.ownership ?? 'authored',
+                  ...(reader.location?.chapterLabel
+                    ? { sourceLabel: reader.location.chapterLabel }
+                    : {}),
+                }),
+              )
+            }}
+            onRetryAnnotationSource={(annotation) =>
+              study.commands &&
+              study.run('retry that highlight source', () =>
+                study.commands!.retryAnnotationSource(annotation.id),
+              )
+            }
+            onRelinkAnnotationSource={(annotation) => {
+              const selection = reader.selection
+              if (!study.commands || !selection) return
+              study.run('relink that highlight', () =>
+                study.commands!.saveAnnotation({
+                  id: annotation.id,
+                  bookId: study.commands!.bookId,
+                  range: selection.range,
+                  quote: selection.quote,
+                  color: annotation.color,
+                  ...(annotation.note ? { note: annotation.note } : {}),
+                }),
+              )
+            }}
             mutationError={study.mutationError}
             onDismissMutationError={study.dismissMutationError}
             onGoToSource={goToSource}

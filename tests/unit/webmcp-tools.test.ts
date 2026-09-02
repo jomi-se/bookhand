@@ -130,6 +130,10 @@ describe('the WebMCP tool surface', () => {
     for (const tool of tools) {
       expect(tool.description.length).toBeGreaterThan(20)
       expect(tool.inputSchema).toMatchObject({ type: 'object' })
+      expect(tool.outputSchema).toMatchObject({
+        type: 'object',
+        required: ['ok', 'message'],
+      })
     }
   })
 
@@ -148,6 +152,11 @@ describe('the WebMCP tool surface', () => {
     expect(text).toContain('Chapter X')
     expect(text).toContain('29%')
     expect(text).toContain('Selected passage')
+    const result = await tool('get_reading_context').execute({})
+    expect(result.structuredContent).toMatchObject({
+      ok: true,
+      readingContext: { bookId: 'book-1', visible: { range } },
+    })
   })
 
   it('records every call so the person can see what the agent did', async () => {
@@ -209,8 +218,53 @@ describe('the WebMCP tool surface', () => {
   it('refuses a call that names no presentation field', async () => {
     const { tool, commands } = setup()
     const result = await tool('set_reading_style').execute({})
-    expect(result.content[0].text).toContain('name at least one presentation field')
+    expect(result.content[0].text).toContain('exactly one allowed operation')
     expect(commands.setReadingStyle).not.toHaveBeenCalled()
+  })
+
+  it('rejects conflicting style operations instead of priority-resolving them', async () => {
+    const { tool, commands } = setup()
+    const result = await tool('set_reading_style').execute({ undo: true, reset: true })
+    expect(result.isError).toBe(true)
+    expect(result.structuredContent).toMatchObject({ ok: false })
+    expect(commands.undoReadingStyle).not.toHaveBeenCalled()
+    expect(commands.resetReadingStyle).not.toHaveBeenCalled()
+  })
+
+  it('enforces schema bounds and enums at the handler boundary', async () => {
+    const { tool, commands } = setup()
+    for (const input of [
+      { fontSizePercent: 300 },
+      { lineHeight: Number.NaN },
+      { measureCh: 12 },
+      { paragraphSpacingEm: -1 },
+      { theme: 'bogus' },
+      { customCss: 'x'.repeat(20_001), designContextVersion: 'sha256:test' },
+    ]) {
+      expect((await tool('set_reading_style').execute(input)).isError).toBe(true)
+    }
+    expect(commands.setReadingStyle).not.toHaveBeenCalled()
+  })
+
+  it('rejects unknown fields at the handler boundary and reports the refusal', async () => {
+    const { tool, calls } = setup()
+    const result = await tool('get_reading_context').execute({ surprise: true })
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toContain('Unknown input field')
+    expect(calls.at(-1)).toMatchObject({ name: 'get_reading_context', failed: true })
+  })
+
+  it('rejects missing, multiple, and invalid navigation selectors', async () => {
+    const { tool, commands } = setup()
+    for (const input of [
+      {},
+      { href: 'chapter.xhtml', direction: 'next' },
+      { direction: 'sideways' },
+      { sectionIndex: -1 },
+    ]) {
+      expect((await tool('navigate_book').execute(input)).isError).toBe(true)
+    }
+    expect(commands.navigateBook).not.toHaveBeenCalled()
   })
 
   it('restores every default when asked to reset', async () => {
@@ -249,7 +303,33 @@ describe('the WebMCP tool surface', () => {
     const { tool } = setup()
     const result = await tool('upsert_study_item').execute({ kind: 'hologram', text: 'x' })
     expect(result.isError).toBe(true)
-    expect(result.content[0].text).toContain('kind must be one of')
+    expect(result.content[0].text).toContain('exactly one allowed operation')
+  })
+
+  it('requires the content belonging to every study kind without defaults', async () => {
+    const { tool, commands } = setup()
+    for (const input of [
+      { kind: 'prose' },
+      { kind: 'quotation', text: '   ' },
+      { kind: 'equation' },
+      { kind: 'steps', steps: [] },
+      { kind: 'question' },
+    ]) {
+      expect((await tool('upsert_study_item').execute(input)).isError).toBe(true)
+    }
+    expect(commands.upsertStudyItem).not.toHaveBeenCalled()
+  })
+
+  it('rejects fields belonging to a different study discriminator', async () => {
+    const { tool, commands } = setup()
+    const result = await tool('upsert_study_item').execute({
+      kind: 'prose',
+      text: 'A note',
+      expression: 'x',
+    })
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toContain('does not accept')
+    expect(commands.upsertStudyItem).not.toHaveBeenCalled()
   })
 })
 

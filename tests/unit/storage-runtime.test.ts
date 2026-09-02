@@ -9,6 +9,7 @@ import {
   isLockError,
   StorageWorkerRuntime,
 } from '../../src/storage/worker-runtime.ts'
+import { STORAGE_SCHEMA_VERSION } from '../../src/storage/schema.ts'
 
 const input: ImportBookInput = {
   metadata: { title: 'Protocol book', authors: [{ name: 'Ada Reader' }] },
@@ -29,7 +30,7 @@ describe('storage worker runtime over the official SQLite artifact', () => {
         mode: 'session-only',
         vfsName: 'memory',
         sqliteVersion: '3.53.0',
-        schemaVersion: 2,
+        schemaVersion: STORAGE_SCHEMA_VERSION,
         connectionOwner: 'dedicated-worker',
         bookCount: 0,
       },

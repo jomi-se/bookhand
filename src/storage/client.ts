@@ -223,6 +223,13 @@ export class StorageClient {
     ).annotation
   }
 
+  async repairAnnotationSource(annotation: Annotation): Promise<Annotation> {
+    return expectResult(
+      await this.request({ type: 'repair-annotation-source', annotation }),
+      'annotation-saved',
+    ).annotation
+  }
+
   async deleteAnnotation(annotationId: string): Promise<void> {
     expectResult(
       await this.request({ type: 'delete-annotation', annotationId }),
@@ -251,6 +258,13 @@ export class StorageClient {
       await this.request({ type: 'commit-study-item', item, mutation }),
       'study-item-committed',
     ).commit
+  }
+
+  async repairStudyItemSource(item: StudyItem): Promise<StudyItem> {
+    return expectResult(
+      await this.request({ type: 'repair-study-item-source', item }),
+      'study-item-repaired',
+    ).item
   }
 
   async undoStudyItem(itemId: string, expectedRevision: number): Promise<StudyItem | null> {

@@ -12,6 +12,7 @@ const RESOLVED_ID = `\0${MODULE_ID}`
 
 export function designContextSource() {
   const designMarkdownPath = resolve('DESIGN.md')
+  const capabilitiesPath = resolve('src/webmcp/capabilities.json')
   return {
     name: 'bookhand-design-context',
     resolveId(id) {
@@ -20,9 +21,14 @@ export function designContextSource() {
     load(id) {
       if (id !== RESOLVED_ID) return
       this.addWatchFile(designMarkdownPath)
-      const { block, version } = readDesignContextSource(designMarkdownPath)
+      this.addWatchFile(capabilitiesPath)
+      const { block, capabilities, version } = readDesignContextSource(
+        designMarkdownPath,
+        capabilitiesPath,
+      )
       return [
         `export const CANONICAL_GUIDANCE = ${JSON.stringify(block)}`,
+        `export const CAPABILITY_MANIFEST = ${JSON.stringify(capabilities)}`,
         `export const DESIGN_CONTEXT_VERSION = ${JSON.stringify(version)}`,
         '',
       ].join('\n')

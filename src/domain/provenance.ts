@@ -32,7 +32,7 @@ export interface ReversalAction {
 export interface MutationReceipt<T> {
   readonly operation: 'create' | 'update'
   readonly origin: MutationOrigin
-  /** Groups the writes of one intent, so they are undone together. */
+  /** Correlates writes from one intent; each reversal states its own scope. */
   readonly actionGroupId: string
   /** What was there before. Absent on a create, because nothing was. */
   readonly prior?: T

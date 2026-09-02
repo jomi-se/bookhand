@@ -13,8 +13,11 @@ import type {
   StudyItem,
   StudyItemPayload,
   StudyMutation,
+  SourceExcerpt,
+  SourceOwnership,
   TocItem,
 } from '../domain/index.ts'
+import { createSourceExcerpt, SOURCE_EXTRACTION_VERSION } from '../domain/source.ts'
 import {
   DELETE_ACTION,
   HandshakeError,
@@ -86,6 +89,8 @@ export interface UpsertStudyItemInput extends CallerIdentity {
    */
   readonly sourceQuote?: string
   readonly sourceLabel?: string
+  /** Derived quotations track canonical book text; authored text never gets rewritten by repair. */
+  readonly sourceOwnership?: SourceOwnership
   readonly id?: string
   readonly sortOrder?: number
 }
@@ -298,20 +303,28 @@ export class BookhandCommands {
    * and the mounted interface untouched, which is why verification happens here
    * rather than inside the storage worker: nothing has been attempted yet.
    */
-  async #verifySource(bookId: string, range: BookRange, quote: string): Promise<void> {
+  async #verifySource(
+    bookId: string,
+    range: BookRange,
+    quote: string,
+  ): Promise<SourceExcerpt> {
     verifyBookOwnership(bookId, this.#context.bookId)
     let resolved
     try {
-      resolved = await this.#adapter().getPassage(range)
+      const adapter = this.#adapter()
+      resolved = adapter.getPassageAtLocation
+        ? await adapter.getPassageAtLocation(range)
+        : await adapter.getPassage(range)
     } catch (cause) {
       rejectSource('stale-range', `The range did not resolve: ${String(cause)}`)
     }
     verifyFingerprint(range.textFingerprint, resolved.range.textFingerprint)
     compareQuote(quote, resolved.text)
+    return createSourceExcerpt(this.#context.bookId, resolved)
   }
 
   async saveAnnotation(input: SaveAnnotationInput): Promise<Annotation> {
-    await this.#verifySource(input.bookId, input.range, input.quote)
+    const excerpt = await this.#verifySource(input.bookId, input.range, input.quote)
     const now = this.#timestamp()
     const existing = input.id
       ? (await this.listAnnotations()).find((item) => item.id === input.id)
@@ -321,8 +334,9 @@ export class BookhandCommands {
       origin: input.origin ?? 'user',
       ...(input.actionGroupId ? { actionGroupId: input.actionGroupId } : {}),
       bookId: this.#context.bookId,
-      range: input.range,
-      quote: input.quote,
+      range: excerpt.range,
+      quote: excerpt.text,
+      source: { status: 'resolved', ownership: 'derived', excerpt },
       color: input.color ?? existing?.color ?? 'accent',
       ...(input.note === undefined
         ? existing?.note === undefined
@@ -343,7 +357,47 @@ export class BookhandCommands {
   }
 
   async listAnnotations(): Promise<readonly Annotation[]> {
-    return this.#context.client.listAnnotations(this.#context.bookId)
+    const annotations = await this.#context.client.listAnnotations(this.#context.bookId)
+    return Promise.all(
+      annotations.map(async (annotation) => {
+        const needsRepair =
+          annotation.source?.status === 'pending-legacy' ||
+          (annotation.source?.status === 'resolved' &&
+            annotation.source.excerpt.extractionVersion !== SOURCE_EXTRACTION_VERSION)
+        if (!needsRepair || !annotation.source) return annotation
+        const repaired = await this.#repairSource(annotation.range, annotation.source.ownership)
+        const next: Annotation =
+          repaired.status === 'resolved'
+            ? {
+                ...annotation,
+                range: repaired.excerpt.range,
+                quote: repaired.excerpt.text,
+                source: repaired,
+              }
+            : { ...annotation, source: repaired }
+        return this.#context.client.repairAnnotationSource(next)
+      }),
+    )
+  }
+
+  async retryAnnotationSource(annotationId: string): Promise<Annotation> {
+    const annotation = (await this.#context.client.listAnnotations(this.#context.bookId)).find(
+      (candidate) => candidate.id === annotationId,
+    )
+    if (!annotation) throw new Error('That annotation no longer exists.')
+    const repaired = await this.#repairSource(annotation.range, 'derived')
+    const next: Annotation =
+      repaired.status === 'resolved'
+        ? {
+            ...annotation,
+            range: repaired.excerpt.range,
+            quote: repaired.excerpt.text,
+            source: repaired,
+          }
+        : { ...annotation, source: repaired }
+    const saved = await this.#context.client.repairAnnotationSource(next)
+    this.#changed()
+    return saved
   }
 
   /**
@@ -357,6 +411,7 @@ export class BookhandCommands {
    * `VAL-ACTION-PROVENANCE-UNDO`.
    */
   async upsertStudyItem(input: UpsertStudyItemInput): Promise<MutationReceipt<StudyItem>> {
+    let verifiedExcerpt: SourceExcerpt | undefined
     if (input.sourceRange) {
       if (input.bookId === undefined || input.sourceQuote === undefined) {
         rejectSource(
@@ -364,7 +419,11 @@ export class BookhandCommands {
           'A study item carrying a source range must also carry its bookId and the exact quote',
         )
       }
-      await this.#verifySource(input.bookId, input.sourceRange, input.sourceQuote)
+      verifiedExcerpt = await this.#verifySource(
+        input.bookId,
+        input.sourceRange,
+        input.sourceQuote,
+      )
     }
     const origin = input.origin ?? 'user'
     const now = this.#timestamp()
@@ -375,6 +434,17 @@ export class BookhandCommands {
     // naming nothing is a creation under a caller-chosen name. Both are honest
     // requests, and the repository decides whether this caller may make them.
     const operation = existing ? 'update' : 'create'
+    const sourceOwnership =
+      input.sourceOwnership ?? (input.payload.kind === 'quotation' ? 'derived' : 'authored')
+    const source = verifiedExcerpt
+      ? { status: 'resolved' as const, ownership: sourceOwnership, excerpt: verifiedExcerpt }
+      : existing?.source
+    const payload =
+      source?.status === 'resolved' &&
+      source.ownership === 'derived' &&
+      input.payload.kind === 'quotation'
+        ? { ...input.payload, text: source.excerpt.text }
+        : input.payload
 
     const item: StudyItem = {
       // A create with no id must land on the SAME id when it is retried,
@@ -386,12 +456,13 @@ export class BookhandCommands {
       origin: existing?.origin ?? origin,
       revision: existing?.revision ?? 1,
       ...(input.actionGroupId ? { actionGroupId: input.actionGroupId } : {}),
-      payload: input.payload,
-      ...(input.sourceRange
-        ? { sourceRange: input.sourceRange }
+      payload,
+      ...(verifiedExcerpt
+        ? { sourceRange: verifiedExcerpt.range }
         : existing?.sourceRange
           ? { sourceRange: existing.sourceRange }
           : {}),
+      ...(source ? { source } : {}),
       ...(input.sourceLabel
         ? { sourceLabel: input.sourceLabel }
         : existing?.sourceLabel
@@ -448,7 +519,74 @@ export class BookhandCommands {
   }
 
   async listStudyItems(): Promise<readonly StudyItem[]> {
-    return this.#context.client.listStudyItems(this.#context.board.id)
+    const items = await this.#context.client.listStudyItems(this.#context.board.id)
+    return Promise.all(
+      items.map(async (item) => {
+        const needsRepair =
+          item.source?.status === 'pending-legacy' ||
+          (item.source?.status === 'resolved' &&
+            item.source.excerpt.extractionVersion !== SOURCE_EXTRACTION_VERSION)
+        if (!item.sourceRange || !item.source || !needsRepair) return item
+        const repaired = await this.#repairSource(item.sourceRange, item.source.ownership)
+        const payload =
+          repaired.status === 'resolved' &&
+          repaired.ownership === 'derived' &&
+          item.payload.kind === 'quotation'
+            ? { ...item.payload, text: repaired.excerpt.text }
+            : item.payload
+        const next: StudyItem = {
+          ...item,
+          payload,
+          ...(repaired.status === 'resolved' ? { sourceRange: repaired.excerpt.range } : {}),
+          source: repaired,
+        }
+        return this.#context.client.repairStudyItemSource(next)
+      }),
+    )
+  }
+
+  async retryStudyItemSource(itemId: string): Promise<StudyItem> {
+    const item = (await this.#context.client.listStudyItems(this.#context.board.id)).find(
+      (candidate) => candidate.id === itemId,
+    )
+    if (!item?.sourceRange || !item.source) {
+      throw new Error('That study block has no source location to retry.')
+    }
+    const repaired = await this.#repairSource(item.sourceRange, item.source.ownership)
+    const next: StudyItem = {
+      ...item,
+      ...(repaired.status === 'resolved' ? { sourceRange: repaired.excerpt.range } : {}),
+      payload:
+        repaired.status === 'resolved' &&
+        repaired.ownership === 'derived' &&
+        item.payload.kind === 'quotation'
+          ? { ...item.payload, text: repaired.excerpt.text }
+          : item.payload,
+      source: repaired,
+    }
+    const saved = await this.#context.client.repairStudyItemSource(next)
+    this.#changed()
+    return saved
+  }
+
+  async #repairSource(range: BookRange, ownership: SourceOwnership) {
+    try {
+      const adapter = this.#adapter()
+      const passage = adapter.getPassageAtLocation
+        ? await adapter.getPassageAtLocation(range)
+        : await adapter.getPassage(range)
+      return {
+        status: 'resolved' as const,
+        ownership,
+        excerpt: createSourceExcerpt(this.#context.bookId, passage),
+      }
+    } catch {
+      return {
+        status: 'stale' as const,
+        ownership,
+        reason: 'range-unresolved' as const,
+      }
+    }
   }
 
   /**
