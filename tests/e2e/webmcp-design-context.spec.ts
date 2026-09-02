@@ -183,8 +183,14 @@ test('the design context returns no book text and no user-authored content', asy
   await openBook(page)
 
   const marker = 'ZZ-USER-AUTHORED-MARKER-ZZ'
+  // Custom CSS requires the current guidance version, so read it first — which
+  // is exactly the order the tool description asks for.
+  const handshake = await agentCall(page, 'get_design_context', { surface: 'reader' })
+  const version = /guidance version (sha256:[0-9a-f]{64})/.exec(handshake.text)?.[1]
+  expect(version).toBeTruthy()
   const styled = await agentCall(page, 'set_reading_style', {
     customCss: `body { color: rebeccapurple } /* ${marker} */`,
+    designContextVersion: version,
   })
   expect(styled.isError).toBe(false)
 

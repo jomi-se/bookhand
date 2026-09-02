@@ -77,6 +77,15 @@ async function openBook(page: Page) {
     .toBeGreaterThan(200)
 }
 
+/** Reading which book is open is not in the URL, so a reload lands on the library. */
+async function reopenBook(page: Page) {
+  await page.reload()
+  const row = page.locator('.book-open', { hasText: 'Calculus Made Easy' })
+  await expect(row).toBeVisible({ timeout: 20_000 })
+  await row.click()
+  await expect(page.locator('.reader')).toBeVisible()
+}
+
 test('an agent reads the page, highlights it, and builds a source-linked lesson', async ({ page }) => {
   await openBook(page)
 
@@ -219,4 +228,143 @@ test('an agent cannot anchor to a range it invented', async ({ page }) => {
   // and nothing is drawn.
   await page.getByRole('button', { name: 'Study' }).click()
   await expect(page.locator('.highlight')).toHaveCount(result.isError ? 0 : 1)
+})
+
+/**
+ * `VAL-STYLE-PARITY` and `VAL-BOARD-VIEW-PARITY`. Both contracts are about the
+ * same thing: a change made through a tool and a change made through the
+ * interface must be the same change. Before this, a tool wrote straight to the
+ * book while the controls kept their own copy, so an agent's change was
+ * invisible in the panel, unsaved, and undone by the next slider drag.
+ */
+test('a tool style change reaches the controls, the book, and storage', async ({ page }) => {
+  await openBook(page)
+  await expect.poll(() => agentToolNames(page)).toContain('set_reading_style')
+
+  const changed = await agentCall(page, 'set_reading_style', {
+    theme: 'dark',
+    fontSizePercent: 145,
+  })
+  expect(changed.isError).toBe(false)
+  expect(changed.text).toContain('Was: theme publisher')
+  expect(changed.text).toContain('Now: theme dark')
+  expect(changed.text).toContain('Saved, so it survives a reload.')
+  expect(changed.text).toContain('Undo')
+
+  // The shell follows immediately, without the panel having been opened.
+  await expect(page.locator('.reader')).toHaveAttribute('data-reader-theme', 'dark')
+
+  // So does the book document itself.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const view = document.querySelector('foliate-view') as unknown as {
+          renderer?: { getContents?: () => { doc: Document }[] }
+        }
+        const doc = view?.renderer?.getContents?.()[0]?.doc
+        return doc ? doc.defaultView?.getComputedStyle(doc.body).fontSize : undefined
+      }),
+    )
+    .not.toBe('16px')
+
+  // And so do the controls, which is the half that used to be missing.
+  await page.getByRole('button', { name: 'Text settings' }).click()
+  await expect(page.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('#reader-text-panel output').first()).toHaveText('145%')
+  await expect(page.getByText('An agent changed these settings.')).toBeVisible()
+
+  // A control the person moves must not carry a stale copy of the rest back
+  // over the agent's change.
+  const size = page.locator('#reader-text-panel input[type="range"]').first()
+  await size.fill('120')
+  await page.getByRole('button', { name: 'Apply' }).click()
+  await expect(page.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.reader')).toHaveAttribute('data-reader-theme', 'dark')
+
+  // Both survive a reload, which is the only proof that it was really stored.
+  await reopenBook(page)
+  await expect(page.locator('.reader')).toHaveAttribute('data-reader-theme', 'dark')
+  await page.getByRole('button', { name: 'Text settings' }).click()
+  await expect(page.locator('#reader-text-panel output').first()).toHaveText('120%')
+})
+
+test('a preview is temporary and Cancel puts the book back', async ({ page }) => {
+  await openBook(page)
+  await page.getByRole('button', { name: 'Text settings' }).click()
+
+  await page.getByRole('button', { name: 'Sepia' }).click()
+  await expect(page.locator('.reader')).toHaveAttribute('data-reader-theme', 'sepia')
+  await expect(page.getByText('Previewing.')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await expect(page.locator('.reader')).toHaveAttribute('data-reader-theme', 'light')
+
+  // Nothing temporary was stored.
+  await reopenBook(page)
+  await expect(page.locator('.reader')).toHaveAttribute('data-reader-theme', 'light')
+})
+
+test('custom book CSS needs the design guidance, and says how to get it', async ({ page }) => {
+  await openBook(page)
+  await expect.poll(() => agentToolNames(page)).toContain('set_reading_style')
+
+  const refused = await agentCall(page, 'set_reading_style', {
+    customCss: 'p { color: rebeccapurple }',
+    designContextVersion: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
+  })
+  expect(refused.isError).toBe(true)
+  expect(refused.text).toContain('get_design_context')
+  expect(refused.text).toContain('Nothing was changed.')
+
+  const context = await agentCall(page, 'get_design_context', { surface: 'reader' })
+  const version = /guidance version (sha256:[0-9a-f]{64})/.exec(context.text)?.[1]
+  expect(version).toBeTruthy()
+
+  const applied = await agentCall(page, 'set_reading_style', {
+    customCss: 'p { color: rebeccapurple }',
+    designContextVersion: version,
+  })
+  expect(applied.isError).toBe(false)
+  expect(applied.text).toContain('cannot reach the library')
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const view = document.querySelector('foliate-view') as unknown as {
+          renderer?: { getContents?: () => { doc: Document }[] }
+        }
+        const doc = view?.renderer?.getContents?.()[0]?.doc
+        const p = doc?.querySelector('p')
+        return p ? doc?.defaultView?.getComputedStyle(p).color : undefined
+      }),
+    )
+    .toBe('rgb(102, 51, 153)')
+})
+
+test('the study board can be focused and closed without changing the layout', async ({ page }) => {
+  await openBook(page)
+  await expect.poll(() => agentToolNames(page)).toContain('set_study_board_view')
+
+  const focused = await agentCall(page, 'set_study_board_view', { view: 'focus' })
+  expect(focused.isError).toBe(false)
+  expect(focused.text).toContain('The layout preference was not changed')
+
+  const board = page.locator('#reader-study-panel')
+  await expect(board).toBeVisible()
+  // Focus went to the board's own heading, so a person using the keyboard is
+  // where the agent said to look.
+  await expect(board.getByRole('heading', { level: 2 })).toBeFocused()
+
+  const closed = await agentCall(page, 'set_study_board_view', { view: 'close' })
+  expect(closed.isError).toBe(false)
+  await expect(board).toBeHidden()
+
+  // A persistent change is a different thing, and offers the person Undo.
+  const expanded = await agentCall(page, 'set_study_board_view', { view: 'expanded' })
+  expect(expanded.text).toContain('The layout preference was saved.')
+  await expect(page.locator('.reader')).toHaveAttribute('data-board', 'expanded')
+  await expect(page.getByText('An agent changed this board’s layout.')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Undo' }).first().click()
+  await expect(page.locator('.reader')).toHaveAttribute('data-board', 'docked')
 })

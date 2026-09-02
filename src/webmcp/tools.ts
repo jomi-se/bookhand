@@ -7,6 +7,8 @@ import type {
 } from '../domain/index.ts'
 import { ANNOTATION_COLORS, STUDY_ITEM_KINDS } from '../domain/study.ts'
 import type { BookhandCommands } from '../app/commands.ts'
+import type { StudyBoardSnapshot } from '../app/commands.ts'
+import type { StylePatch } from '../app/presentation.ts'
 import {
   errorResult,
   quoteBookContent,
@@ -34,6 +36,20 @@ const BOOK_ID_SCHEMA = {
   description:
     'The id of the book you are reading, from get_reading_context. Checked against the open book: a mutation naming a different book is rejected.',
 } as const
+
+const ACTION_GROUP_SCHEMA = {
+  type: 'string',
+  description:
+    'Group the writes of one intent under a shared id so the person can undo them together.',
+} as const
+
+/** Every tool call is an agent acting; the interface is how a person acts. */
+function caller(input: Record<string, unknown>) {
+  return {
+    origin: 'agent' as const,
+    ...(typeof input.actionGroupId === 'string' ? { actionGroupId: input.actionGroupId } : {}),
+  }
+}
 
 const RANGE_SCHEMA = {
   type: 'object',
@@ -72,6 +88,54 @@ function describeReceipt(receipt: MutationReceipt<StudyItem>): string {
     `The person can: ${receipt.actions.map((action) => `${action.label} (${action.description})`).join(' ')}`,
   )
   return lines.join('\n')
+}
+
+/**
+ * A style receipt in words. It states what it replaced, whether the change
+ * survives a reload, and the reversals the person can actually see — so an
+ * agent can describe what it did without guessing, and can put it back.
+ */
+function describeStyleReceipt(receipt: MutationReceipt<ReaderStyle>, verb: string): string {
+  const lines = [
+    `${verb}. Action group: ${receipt.actionGroupId}. Attributed to: ${receipt.origin}.`,
+    `Scope: ${receipt.scope}`,
+    `Was: ${summarizeStyle(receipt.prior)}`,
+    `Now: ${summarizeStyle(receipt.applied)}`,
+    receipt.persisted
+      ? 'Saved, so it survives a reload.'
+      : 'Showing now, but not saved — it will not survive a reload.',
+  ]
+  if (receipt.warnings.length > 0) lines.push(`Warnings: ${receipt.warnings.join(' ')}`)
+  lines.push(
+    `The person can: ${receipt.actions.map((action) => `${action.label} (${action.description})`).join(' ')}`,
+  )
+  return lines.join('\n')
+}
+
+function describeBoardReceipt(receipt: MutationReceipt<StudyBoardSnapshot>): string {
+  const lines = [
+    `The study board is ${receipt.applied.open ? 'on screen' : 'closed'}, laid out ${receipt.applied.view}.`,
+    `Was: ${receipt.prior?.open ? 'on screen' : 'closed'}, laid out ${receipt.prior?.view}.`,
+    `Scope: ${receipt.scope}`,
+    receipt.persisted
+      ? 'The layout preference was saved.'
+      : 'The layout preference was not changed, so nothing was saved.',
+    `Action group: ${receipt.actionGroupId}. Attributed to: ${receipt.origin}.`,
+    `The person can: ${receipt.actions.map((action) => `${action.label} (${action.description})`).join(' ')}`,
+  ]
+  return lines.join('\n')
+}
+
+function summarizeStyle(style: ReaderStyle | undefined): string {
+  if (!style) return 'unknown'
+  return [
+    `theme ${style.theme}`,
+    `size ${style.fontSizePercent}%`,
+    `line height ${style.lineHeight}`,
+    `measure ${style.measureCh}ch`,
+    `paragraph spacing ${style.paragraphSpacingEm}em`,
+    style.customCss ? `${style.customCss.length} characters of book CSS` : 'no book CSS',
+  ].join(', ')
 }
 
 function asRange(value: unknown): BookRange {
@@ -279,7 +343,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     {
       name: 'set_reading_style',
       description:
-        'Change how the book is presented: text size, line height, measure, paragraph spacing, theme, or custom book CSS. Every change is reversible by the person with one action. Picking a shipped theme or adjusting size needs nothing else; before writing custom CSS, call get_design_context for the semantic roles, contrast floors, and what this CSS can and cannot reach.',
+        'Change how the book is presented: text size, line height, measure, paragraph spacing, theme, or custom book CSS. Send only the fields you mean to change — anything you restate would overwrite a change the person made a moment ago. Every change is reversible by the person with one action. Picking a shipped theme or adjusting size needs nothing else; custom CSS additionally requires designContextVersion from get_design_context, which explains the semantic roles, contrast floors, and what this CSS can and cannot reach.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -292,21 +356,37 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             type: 'string',
             maxLength: 20_000,
             description:
-              'CSS applied inside the EPUB document only; it cannot style the library, reader chrome, panels, or Study. Call get_design_context first.',
+              'CSS applied inside the EPUB document only; it cannot style the library, reader chrome, panels, or Study. Requires designContextVersion.',
+          },
+          designContextVersion: {
+            type: 'string',
+            description:
+              'The guidance version get_design_context returned. Required with customCss, ignored otherwise.',
           },
           reset: { type: 'boolean', description: 'Restore every presentation default.' },
+          undo: {
+            type: 'boolean',
+            description: 'Put back the presentation as it was before the last change.',
+          },
+          actionGroupId: ACTION_GROUP_SCHEMA,
         },
         additionalProperties: false,
+        dependentRequired: { customCss: ['designContextVersion'] },
       },
       execute: (input) =>
         run('set_reading_style', () => 'changed the presentation', async () => {
-          if (input.reset === true) {
-            commands.resetReadingStyle()
-            return textResult('Restored the default presentation.')
+          if (input.undo === true) {
+            const undone = await commands.undoReadingStyle()
+            if (!undone) return textResult('There is no presentation change to undo.')
+            return textResult(describeStyleReceipt(undone, 'Put the presentation back'))
           }
-          const current = commands.getReadingStyle()
-          const next: ReaderStyle = {
-            ...current,
+          if (input.reset === true) {
+            const receipt = await commands.resetReadingStyle(caller(input))
+            return textResult(describeStyleReceipt(receipt, 'Restored the default presentation'))
+          }
+          // Only what was named. Merging over a style read a moment ago would
+          // carry that snapshot back over anything changed in between.
+          const patch: StylePatch = {
             ...(typeof input.fontSizePercent === 'number'
               ? { fontSizePercent: input.fontSizePercent }
               : {}),
@@ -320,8 +400,17 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               : {}),
             ...(typeof input.customCss === 'string' ? { customCss: input.customCss } : {}),
           }
-          commands.setReadingStyle(next)
-          return textResult('Updated the presentation. The person can reset it in Text.')
+          if (Object.keys(patch).length === 0) {
+            return textResult('Nothing to change: name at least one presentation field.')
+          }
+          const receipt = await commands.setReadingStyle({
+            patch,
+            ...caller(input),
+            ...(typeof input.designContextVersion === 'string'
+              ? { designContextVersion: input.designContextVersion }
+              : {}),
+          })
+          return textResult(describeStyleReceipt(receipt, 'Updated the presentation'))
         }),
     },
     {
@@ -414,19 +503,38 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     },
     {
       name: 'set_study_board_view',
-      description: 'Dock the study board beside the book, or expand it into the main workspace.',
+      description:
+        'Change what the study board is doing. "docked" and "expanded" are layout preferences the person keeps; "focus" brings the board forward and moves focus to it without changing their preference; "close" returns to the book without deleting anything. Prefer focus when you only want the person to look at what you added.',
       inputSchema: {
         type: 'object',
-        properties: { view: { type: 'string', enum: ['docked', 'expanded'] } },
-        required: ['view'],
+        properties: {
+          view: {
+            type: 'string',
+            enum: ['docked', 'expanded', 'focus', 'close'],
+            description:
+              'docked | expanded change the stored layout. focus | close change only what is on screen now.',
+          },
+          undo: {
+            type: 'boolean',
+            description: 'Put the layout back the way it was before your last change to it.',
+          },
+          actionGroupId: ACTION_GROUP_SCHEMA,
+        },
         additionalProperties: false,
       },
       execute: (input) =>
         run('set_study_board_view', () => 'changed the board layout', async () => {
-          const board = await commands.setStudyBoardView(
-            input.view === 'expanded' ? 'expanded' : 'docked',
-          )
-          return textResult(`The study board is now ${board.view}.`)
+          if (input.undo === true) {
+            const undone = await commands.undoStudyBoardView()
+            if (!undone) return textResult('There is no board layout change to undo.')
+            return textResult(describeBoardReceipt(undone))
+          }
+          const view = input.view
+          if (view !== 'docked' && view !== 'expanded' && view !== 'focus' && view !== 'close') {
+            return textResult('Choose one of: docked, expanded, focus, close.')
+          }
+          const receipt = await commands.setStudyBoardView(view, caller(input))
+          return textResult(describeBoardReceipt(receipt))
         }),
     },
   ]

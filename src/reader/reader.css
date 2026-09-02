@@ -387,6 +387,33 @@
   line-height: 1.45;
 }
 
+/*
+ * An agent changed something here. It reads as a notice rather than as an
+ * error, because nothing has gone wrong — the person simply needs to be able
+ * to tell that this was not them, and to put it back in one press.
+ */
+.control-agent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--accent-quiet);
+  color: var(--ink);
+}
+
+.control-actions[data-role='presentation-actions'] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+
 .study-preview {
   margin: 16px 0 0;
   padding-inline-start: 12px;

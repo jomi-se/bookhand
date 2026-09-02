@@ -9,7 +9,10 @@ import type {
 } from '../../src/domain/index.ts'
 import { BookhandCommands, ReaderUnavailableError } from '../../src/app/commands.ts'
 import { SourceVerificationError } from '../../src/domain/source-verification.ts'
+import { PresentationStore } from '../../src/app/presentation.ts'
 import { ReaderPortBridge } from '../../src/app/reader-bridge.ts'
+import { SurfaceStore } from '../../src/app/surface.ts'
+import { DEFAULT_READER_STYLE } from '../../src/reader/FoliateReaderAdapter.ts'
 import type { StorageClient } from '../../src/storage/client.ts'
 
 const range: BookRange = {
@@ -97,7 +100,7 @@ function setup(overrides: Partial<ReaderAdapter> = {}) {
     }),
     listStudyItems: vi.fn(async () => items),
     deleteStudyItem: vi.fn(async () => undefined),
-    setBoardView: vi.fn(async () => ({ ...board, view: 'expanded' as const })),
+    setBoardView: vi.fn(async (_id: string, view: StudyBoard['view']) => ({ ...board, view })),
   } as unknown as StorageClient
 
   const bridge = new ReaderPortBridge()
@@ -105,16 +108,21 @@ function setup(overrides: Partial<ReaderAdapter> = {}) {
   bridge.attach(adapter)
 
   let counter = 0
+  const presentation = new PresentationStore(DEFAULT_READER_STYLE)
+  const surface = new SurfaceStore()
   const commands = new BookhandCommands({
     client,
     bridge,
+    presentation,
+    surface,
+    designContextVersion: 'sha256:test',
     bookId: 'book-1',
     bookTitle: 'Calculus Made Easy',
     board,
     now: () => new Date('2026-09-01T12:00:00.000Z'),
     newId: () => `generated-${++counter}`,
   })
-  return { commands, client, bridge, adapter, annotations, items }
+  return { commands, client, bridge, adapter, annotations, items, presentation, surface }
 }
 
 describe('the shared command surface', () => {
@@ -319,5 +327,168 @@ describe('source ownership at the mutation boundary', () => {
     const { commands, items } = setup()
     await commands.upsertStudyItem({ payload: { kind: 'prose', text: 'A note of my own' } })
     expect(items).toHaveLength(1)
+  })
+})
+
+describe('the reading presentation', () => {
+  it('hands back what it replaced, what it applied, and how to take it back', async () => {
+    const { commands, presentation } = setup()
+    presentation.install({ apply: () => undefined, persist: async () => undefined })
+
+    const receipt = await commands.setReadingStyle({ patch: { theme: 'dark' }, origin: 'agent' })
+
+    expect(receipt.origin).toBe('agent')
+    expect(receipt.prior?.theme).toBe('publisher')
+    expect(receipt.applied.theme).toBe('dark')
+    expect(receipt.persisted).toBe(true)
+    expect(receipt.actions.map((action) => action.label)).toEqual([
+      'Undo',
+      'Reset all text settings',
+    ])
+    expect(receipt.actionGroupId).toBeTruthy()
+  })
+
+  it('says a change is not saved rather than claiming it is', async () => {
+    // No reader is mounted, so nothing installed a way to store it. Reporting
+    // this honestly is the whole point: the agent has just been told the
+    // change is on screen, and it is, and it will not come back.
+    const { commands } = setup()
+    const receipt = await commands.setReadingStyle({ patch: { theme: 'dark' } })
+    expect(receipt.persisted).toBe(false)
+  })
+
+  it('refuses custom book CSS from an agent that has not read the design guidance', async () => {
+    const { commands, presentation } = setup()
+    await expect(
+      commands.setReadingStyle({ patch: { customCss: 'p { color: red }' }, origin: 'agent' }),
+    ).rejects.toThrow(/get_design_context/)
+    expect(presentation.committed.customCss).toBeUndefined()
+  })
+
+  it('names the current guidance version when the one offered is stale', async () => {
+    const { commands, presentation } = setup()
+    await expect(
+      commands.setReadingStyle({
+        patch: { customCss: 'p { color: red }' },
+        origin: 'agent',
+        designContextVersion: 'sha256:something-older',
+      }),
+    ).rejects.toThrow(/sha256:test/)
+    expect(presentation.committed.customCss).toBeUndefined()
+  })
+
+  it('accepts custom book CSS once the current version is presented', async () => {
+    const { commands, presentation } = setup()
+    const receipt = await commands.setReadingStyle({
+      patch: { customCss: 'p { color: red }' },
+      origin: 'agent',
+      designContextVersion: 'sha256:test',
+    })
+    expect(presentation.committed.customCss).toContain('color: red')
+    expect(receipt.scope).toContain('cannot reach the library')
+  })
+
+  it('asks nothing of a person writing the same CSS through the panel', async () => {
+    const { commands, presentation } = setup()
+    await commands.setReadingStyle({ patch: { customCss: 'p { color: red }' } })
+    expect(presentation.committed.customCss).toContain('color: red')
+  })
+
+  it('lets a named theme through without any handshake', async () => {
+    const { commands, presentation } = setup()
+    await commands.setReadingStyle({ patch: { theme: 'sepia' }, origin: 'agent' })
+    expect(presentation.committed.theme).toBe('sepia')
+  })
+
+  it('undoes the last change whoever made it, and reports nothing to undo otherwise', async () => {
+    const { commands, presentation } = setup()
+    expect(await commands.undoReadingStyle()).toBeUndefined()
+
+    await commands.setReadingStyle({ patch: { fontSizePercent: 160 }, origin: 'agent' })
+    const undone = await commands.undoReadingStyle()
+
+    expect(undone?.applied.fontSizePercent).toBe(DEFAULT_READER_STYLE.fontSizePercent)
+    expect(presentation.committed).toEqual(DEFAULT_READER_STYLE)
+  })
+
+  it('reports the setting, not a half-finished preview', async () => {
+    const { commands, presentation } = setup()
+    presentation.preview({ fontSizePercent: 200 })
+
+    expect(commands.getReadingStyle().fontSizePercent).toBe(
+      DEFAULT_READER_STYLE.fontSizePercent,
+    )
+    expect(commands.getVisibleReadingStyle().fontSizePercent).toBe(200)
+  })
+})
+
+describe('the study board view', () => {
+  it('opens the board and stores the preference for docked and expanded', async () => {
+    const { commands, client, surface } = setup()
+    const receipt = await commands.setStudyBoardView('expanded', { origin: 'agent' })
+
+    expect(vi.mocked(client.setBoardView)).toHaveBeenCalledWith('board-1', 'expanded')
+    expect(surface.boardOpen).toBe(true)
+    expect(receipt.applied).toEqual({ view: 'expanded', open: true })
+    expect(receipt.prior).toEqual({ view: 'docked', open: false })
+    expect(receipt.persisted).toBe(true)
+  })
+
+  it('brings the board forward on focus without touching the preference', async () => {
+    const { commands, client, surface } = setup()
+    const before = surface.state.focusNonce
+    const receipt = await commands.setStudyBoardView('focus', { origin: 'agent' })
+
+    expect(vi.mocked(client.setBoardView)).not.toHaveBeenCalled()
+    expect(surface.boardOpen).toBe(true)
+    expect(surface.state.focusNonce).toBe(before + 1)
+    expect(receipt.applied.view).toBe('docked')
+    expect(receipt.persisted).toBe(false)
+  })
+
+  it('closes the board without changing the preference or the content', async () => {
+    const { commands, client, surface, items } = setup()
+    await commands.setStudyBoardView('expanded')
+    const storedBefore = vi.mocked(client.setBoardView).mock.calls.length
+
+    const receipt = await commands.setStudyBoardView('close', { origin: 'agent' })
+
+    expect(surface.boardOpen).toBe(false)
+    expect(vi.mocked(client.setBoardView).mock.calls).toHaveLength(storedBefore)
+    expect(vi.mocked(client.deleteStudyItem)).not.toHaveBeenCalled()
+    expect(await commands.listStudyItems()).toHaveLength(items.length)
+    expect(receipt.applied.view).toBe('expanded')
+    expect(receipt.persisted).toBe(false)
+  })
+
+  it('offers Undo only for a layout change an agent made', async () => {
+    const { commands, surface } = setup()
+    await commands.setStudyBoardView('expanded', { origin: 'user' })
+    expect(surface.state.boardReversal).toBeUndefined()
+
+    await commands.setStudyBoardView('docked', { origin: 'agent' })
+    expect(surface.state.boardReversal).toMatchObject({ origin: 'agent', priorView: 'expanded' })
+  })
+
+  it('undoes an agent layout change back to what was there', async () => {
+    const { commands, surface } = setup()
+    await commands.setStudyBoardView('expanded', { origin: 'agent' })
+    const undone = await commands.undoStudyBoardView()
+
+    expect(undone?.applied.view).toBe('docked')
+    // The board was closed before the agent opened it, so Undo closes it again.
+    expect(surface.boardOpen).toBe(false)
+    expect(surface.state.boardReversal).toBeUndefined()
+    expect(await commands.undoStudyBoardView()).toBeUndefined()
+  })
+
+  it('toggles from the layout in force, not from one read earlier', async () => {
+    // The interface used to compute the next view from its last render. A
+    // change made in between would be toggled away from the wrong starting
+    // point, so the person's click did the opposite of what they saw.
+    const { commands } = setup()
+    await commands.setStudyBoardView('expanded', { origin: 'agent' })
+    const receipt = await commands.toggleStudyBoardView()
+    expect(receipt.applied.view).toBe('docked')
   })
 })

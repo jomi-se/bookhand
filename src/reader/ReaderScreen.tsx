@@ -9,6 +9,8 @@ import type { useWebMcpTools } from '../webmcp/useWebMcpTools.ts'
 import type { BookhandCommands } from '../app/commands.ts'
 import { splitTitle } from '../library/progress.ts'
 import type { DesignStateStore } from '../app/design-state.ts'
+import type { PresentationStore } from '../app/presentation.ts'
+import type { ReaderPanel, SurfaceStore } from '../app/surface.ts'
 import type { ReaderPortBridge } from '../app/reader-bridge.ts'
 import type { RuntimePorts } from '../runtime/ports.ts'
 import type { StorageClient } from '../storage/client.ts'
@@ -17,7 +19,7 @@ import { ReaderHost } from './ReaderHost.tsx'
 import { TextPanel } from './TextPanel.tsx'
 import { useReader } from './useReader.ts'
 
-export type ReaderPanel = 'contents' | 'text' | 'study' | null
+export type { ReaderPanel }
 
 export interface ReaderScreenProps {
   readonly entry: BookCatalogEntry
@@ -29,6 +31,10 @@ export interface ReaderScreenProps {
   readonly onCommandsReady: (commands: BookhandCommands | undefined) => void
   /** Published for `get_design_context`; nothing renders from it. */
   readonly designState: DesignStateStore
+  /** The one owner of the reading presentation, shared with the tool layer. */
+  readonly presentation: PresentationStore
+  /** Which panel is open. Shared, so a tool can open, focus, and close it. */
+  readonly surface: SurfaceStore
   readonly agent: ReturnType<typeof useWebMcpTools>
 }
 
@@ -40,11 +46,19 @@ export function ReaderScreen({
   onExit,
   onCommandsReady,
   designState,
+  presentation,
+  surface,
   agent,
 }: ReaderScreenProps) {
-  const reader = useReader({ entry, client, ports, bridge })
-  const study = useStudy({ entry, client, bridge })
-  const [panel, setPanel] = useState<ReaderPanel>(null)
+  const reader = useReader({ entry, client, ports, bridge, presentation })
+  const study = useStudy({ entry, client, bridge, presentation, surface })
+  // Panel visibility is shared state, not local state: a tool can open, focus,
+  // and close the study board, and the person can do the same, and neither may
+  // act on a copy the other has already moved past. `VAL-BOARD-VIEW-PARITY`.
+  const [surfaceState, setSurfaceState] = useState(surface.state)
+  useEffect(() => surface.subscribe(setSurfaceState), [surface])
+  const panel = surfaceState.panel
+  const setPanel = useCallback((next: ReaderPanel) => surface.setPanel(next), [surface])
   const panelInvoker = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -117,25 +131,24 @@ export function ReaderScreen({
   )
 
   const closePanel = useCallback(() => {
-    setPanel(null)
+    surface.setPanel(null)
     const invoker = panelInvoker.current
     panelInvoker.current = null
     window.requestAnimationFrame(() => invoker?.focus())
-  }, [])
+  }, [surface])
 
-  const toggle = useCallback((next: Exclude<ReaderPanel, null>) => {
-    setPanel((current) => {
-      if (current === next) {
-        const invoker = panelInvoker.current
-        panelInvoker.current = null
-        window.requestAnimationFrame(() => invoker?.focus())
-        return null
+  const toggle = useCallback(
+    (next: Exclude<ReaderPanel, null>) => {
+      if (surface.state.panel === next) {
+        closePanel()
+        return
       }
       panelInvoker.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null
-      return next
-    })
-  }, [])
+      surface.setPanel(next)
+    },
+    [closePanel, surface],
+  )
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -238,9 +251,23 @@ export function ReaderScreen({
 
         {panel === 'text' ? (
           <TextPanel
-            style={reader.style}
-            onChange={reader.applyStyle}
-            onReset={reader.resetStyle}
+            presentation={reader.presentation}
+            onPreview={(patch) => presentation.preview(patch)}
+            onCancelPreview={() => presentation.cancelPreview()}
+            onApply={(patch) =>
+              study.commands &&
+              study.run('change the text settings', () =>
+                study.commands!.setReadingStyle({ patch }),
+              )
+            }
+            onReset={() =>
+              study.commands &&
+              study.run('reset the text settings', () => study.commands!.resetReadingStyle())
+            }
+            onUndo={() =>
+              study.commands &&
+              study.run('undo that text change', () => study.commands!.undoReadingStyle())
+            }
             onClose={closePanel}
           />
         ) : null}
@@ -278,10 +305,15 @@ export function ReaderScreen({
                 note,
               })
             }
+            focusNonce={surfaceState.focusNonce}
+            agentChangedView={surfaceState.boardReversal?.origin === 'agent'}
+            onUndoView={() =>
+              study.commands &&
+              study.run('undo that layout change', () => study.commands!.undoStudyBoardView())
+            }
             onToggleView={() =>
-              void study.commands
-                ?.setStudyBoardView(study.board?.view === 'expanded' ? 'docked' : 'expanded')
-                .then(study.setBoard)
+              study.commands &&
+              study.run('change the board layout', () => study.commands!.toggleStudyBoardView())
             }
             onClose={closePanel}
             agentActivity={

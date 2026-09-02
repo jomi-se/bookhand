@@ -17,8 +17,12 @@ import type {
 } from '../domain/index.ts'
 import {
   DELETE_ACTION,
+  HandshakeError,
+  RESET_PRESENTATION_ACTION,
   RETURN_TO_SOURCE_ACTION,
   UNDO_ACTION,
+  UNDO_BOARD_VIEW_ACTION,
+  UNDO_PRESENTATION_ACTION,
 } from '../domain/provenance.ts'
 import {
   compareQuote,
@@ -26,8 +30,11 @@ import {
   verifyBookOwnership,
   verifyFingerprint,
 } from '../domain/source-verification.ts'
+import type { PresentationStore, StyleCommit, StylePatch } from './presentation.ts'
+import type { BoardMode, SurfaceStore } from './surface.ts'
 import type { ReaderPortBridge } from './reader-bridge.ts'
 import type { StorageClient } from '../storage/client.ts'
+import { DEFAULT_READER_STYLE } from '../reader/FoliateReaderAdapter.ts'
 
 export interface ReadingContext {
   readonly bookId: string
@@ -83,9 +90,42 @@ export interface UpsertStudyItemInput extends CallerIdentity {
   readonly sortOrder?: number
 }
 
+/**
+ * A presentation change, from either caller.
+ *
+ * Only named fields are sent. A caller must not restate the fields it did not
+ * touch, because restating them means carrying a snapshot forward and writing
+ * it back over whatever changed in between — which is precisely how the Text
+ * panel used to erase an agent's theme when someone nudged the size slider.
+ */
+export interface SetReadingStyleInput extends CallerIdentity {
+  readonly patch: StylePatch
+  /**
+   * Required from an agent whenever `patch.customCss` is present: the version
+   * string `get_design_context` returned. Named themes and ordinary typography
+   * need no handshake, because they cannot express anything the design context
+   * would have warned about.
+   */
+  readonly designContextVersion?: string
+}
+
+/** What the board looked like, in the two terms that can differ. */
+export interface StudyBoardSnapshot {
+  /** The stored layout preference. */
+  readonly view: StudyBoardView
+  /** Whether the board is on screen right now. */
+  readonly open: boolean
+}
+
 export interface CommandContext {
   readonly client: StorageClient
   readonly bridge: ReaderPortBridge
+  /** The single owner of the reading presentation. */
+  readonly presentation: PresentationStore
+  /** Which panel is open, shared so a tool can open, focus, and close it. */
+  readonly surface: SurfaceStore
+  /** The guidance version an agent must echo before writing custom book CSS. */
+  readonly designContextVersion: string
   readonly bookId: string
   readonly bookTitle: string
   readonly board: StudyBoard
@@ -109,9 +149,14 @@ export class ReaderUnavailableError extends Error {
 export class BookhandCommands {
   readonly #context: CommandContext
   readonly #listeners = new Set<() => void>()
+  /** The live board, so a toggle never reads a preference from a stale render. */
+  #board: StudyBoard
+  #boardView: StudyBoardView
 
   constructor(context: CommandContext) {
     this.#context = context
+    this.#board = context.board
+    this.#boardView = context.board.view
   }
 
   get bookId(): string {
@@ -174,18 +219,75 @@ export class BookhandCommands {
     return this.getReadingContext()
   }
 
+  /**
+   * What is stored, not what the adapter happens to be showing. A preview is
+   * deliberately invisible here: a caller asking what the reading style is
+   * should be told the setting, not a half-finished experiment.
+   */
   getReadingStyle(): ReaderStyle {
-    return this.#adapter().getStyle()
+    return this.#context.presentation.committed
   }
 
-  setReadingStyle(style: ReaderStyle): void {
-    this.#adapter().applyStyle(style)
-    this.#changed()
+  /** What the book is showing right now, preview included. */
+  getVisibleReadingStyle(): ReaderStyle {
+    return this.#context.presentation.visible
   }
 
-  resetReadingStyle(): void {
-    this.#adapter().resetStyle()
+  async setReadingStyle(input: SetReadingStyleInput): Promise<MutationReceipt<ReaderStyle>> {
+    const origin = input.origin ?? 'user'
+    if (origin === 'agent' && input.patch.customCss !== undefined) {
+      this.#requireDesignContext(input.designContextVersion)
+    }
+    const commit = await this.#context.presentation.commit(
+      input.patch,
+      origin,
+      input.actionGroupId,
+    )
     this.#changed()
+    return styleReceipt(commit)
+  }
+
+  async resetReadingStyle(caller: CallerIdentity = {}): Promise<MutationReceipt<ReaderStyle>> {
+    const commit = await this.#context.presentation.restore(
+      DEFAULT_READER_STYLE,
+      caller.origin ?? 'user',
+      caller.actionGroupId,
+    )
+    this.#changed()
+    return styleReceipt(commit)
+  }
+
+  /**
+   * Take back the last committed presentation change, whoever made it.
+   *
+   * Deliberately not scoped to the caller: the point of Undo is that the person
+   * can reverse what an agent did, and an agent that has just been told what it
+   * replaced should be able to put it back.
+   */
+  async undoReadingStyle(): Promise<MutationReceipt<ReaderStyle> | undefined> {
+    const reversible = this.#context.presentation.view.reversible
+    if (!reversible) return undefined
+    const commit = await this.#context.presentation.restore(reversible.prior, 'user')
+    this.#changed()
+    return styleReceipt(commit)
+  }
+
+  /**
+   * Custom CSS is the one presentation change that can express something the
+   * design context exists to prevent — unreadable contrast, a hidden control,
+   * a layout that breaks at a phone width. An agent that has not read the
+   * current guidance is refused and told exactly how to become able to write
+   * it. Nothing changes in the meantime, so a stale call is a no-op the caller
+   * can recover from rather than a half-applied style.
+   */
+  #requireDesignContext(offered: string | undefined): void {
+    const current = this.#context.designContextVersion
+    if (offered === current) return
+    throw new HandshakeError(
+      offered === undefined
+        ? 'Custom book CSS needs the current design guidance. Call get_design_context, then send its version as designContextVersion. Nothing was changed.'
+        : `That design guidance version is out of date. Call get_design_context again for the current one (${current}) and send that. Nothing was changed.`,
+    )
   }
 
   /**
@@ -349,10 +451,79 @@ export class BookhandCommands {
     return this.#context.client.listStudyItems(this.#context.board.id)
   }
 
-  async setStudyBoardView(view: StudyBoardView): Promise<StudyBoard> {
-    const board = await this.#context.client.setBoardView(this.#context.board.id, view)
+  /**
+   * The four things a caller can ask of the study board.
+   *
+   * Only two of them are preferences. `focus` and `close` change what is on
+   * screen without touching what is stored, so an agent bringing the board
+   * forward to show its work does not also decide how the person's reader is
+   * laid out from then on.
+   */
+  async setStudyBoardView(
+    mode: BoardMode,
+    caller: CallerIdentity = {},
+  ): Promise<MutationReceipt<StudyBoardSnapshot>> {
+    const origin = caller.origin ?? 'user'
+    const actionGroupId = caller.actionGroupId ?? this.#id('view')
+    const prior: StudyBoardSnapshot = {
+      view: this.#boardView,
+      open: this.#context.surface.boardOpen,
+    }
+
+    let persisted = false
+    if (mode === 'docked' || mode === 'expanded') {
+      const board = await this.#context.client.setBoardView(this.#context.board.id, mode)
+      this.#boardView = board.view
+      this.#board = board
+      persisted = true
+      this.#context.surface.openBoard()
+      // Only a tool change needs taking back; the person just did this one.
+      this.#context.surface.recordBoardReversal(
+        origin === 'agent' ? { origin, actionGroupId, priorView: prior.view, priorOpen: prior.open } : undefined,
+      )
+    } else if (mode === 'focus') {
+      this.#context.surface.openBoard({ focus: true })
+    } else {
+      this.#context.surface.closeBoard()
+    }
+
     this.#changed()
-    return board
+    return {
+      operation: 'update',
+      origin,
+      actionGroupId,
+      prior,
+      applied: { view: this.#boardView, open: this.#context.surface.boardOpen },
+      scope:
+        mode === 'docked' || mode === 'expanded'
+          ? 'How the study board is laid out beside the book. The reading position does not change.'
+          : 'What is on screen right now. Nothing is stored, deleted, or reordered, and the reading position does not change.',
+      warnings: [],
+      persisted,
+      actions: [UNDO_BOARD_VIEW_ACTION],
+    }
+  }
+
+  /** The board as it stands, whoever changed it last. */
+  get studyBoard(): StudyBoard {
+    return this.#board
+  }
+
+  /** Flip the persistent layout, read from current state rather than a render. */
+  async toggleStudyBoardView(
+    caller: CallerIdentity = {},
+  ): Promise<MutationReceipt<StudyBoardSnapshot>> {
+    return this.setStudyBoardView(this.#boardView === 'expanded' ? 'docked' : 'expanded', caller)
+  }
+
+  /** Put back the layout an agent changed. */
+  async undoStudyBoardView(): Promise<MutationReceipt<StudyBoardSnapshot> | undefined> {
+    const reversal = this.#context.surface.state.boardReversal
+    if (!reversal) return undefined
+    const receipt = await this.setStudyBoardView(reversal.priorView, { origin: 'user' })
+    if (!reversal.priorOpen) this.#context.surface.closeBoard()
+    this.#context.surface.recordBoardReversal(undefined)
+    return receipt
   }
 
   async #nextOrder(): Promise<number> {
@@ -372,4 +543,24 @@ function reversalsFor(item: StudyItem): readonly ReversalAction[] {
     ...(item.sourceRange ? [RETURN_TO_SOURCE_ACTION] : []),
     DELETE_ACTION,
   ]
+}
+
+/**
+ * Everything a caller needs to describe the change and take it back, including
+ * the honest answer to whether it survives a reload.
+ */
+function styleReceipt(commit: StyleCommit): MutationReceipt<ReaderStyle> {
+  return {
+    operation: 'update',
+    origin: commit.origin,
+    actionGroupId: commit.actionGroupId,
+    prior: commit.prior,
+    applied: commit.applied,
+    scope: commit.applied.customCss
+      ? 'The open book’s own document. Custom CSS cannot reach the library, the reader chrome, the panels, or Study.'
+      : 'How the open book is presented. Nothing outside the book document changes.',
+    warnings: commit.warnings,
+    persisted: commit.persisted,
+    actions: [UNDO_PRESENTATION_ACTION, RESET_PRESENTATION_ACTION],
+  }
 }

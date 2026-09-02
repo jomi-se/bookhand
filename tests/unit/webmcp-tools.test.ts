@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { BookRange, ReaderStyle } from '../../src/domain/index.ts'
+import type { BookRange, MutationReceipt, ReaderStyle } from '../../src/domain/index.ts'
+import {
+  RESET_PRESENTATION_ACTION,
+  UNDO_BOARD_VIEW_ACTION,
+  UNDO_PRESENTATION_ACTION,
+} from '../../src/domain/provenance.ts'
 import type { BookhandCommands } from '../../src/app/commands.ts'
 import { createBookhandTools, type ToolCallRecord } from '../../src/webmcp/tools.ts'
 import type { ToolDefinition } from '../../src/webmcp/model-context.ts'
@@ -19,6 +24,18 @@ const style: ReaderStyle = {
   measureCh: 68,
   paragraphSpacingEm: 0.75,
   theme: 'publisher',
+}
+
+const styleReceipt: MutationReceipt<ReaderStyle> = {
+  operation: 'update',
+  origin: 'agent',
+  actionGroupId: 'style-1',
+  prior: style,
+  applied: { ...style, theme: 'sepia' },
+  scope: 'How the open book is presented.',
+  warnings: [],
+  persisted: true,
+  actions: [UNDO_PRESENTATION_ACTION, RESET_PRESENTATION_ACTION],
 }
 
 function setup(overrides: Partial<BookhandCommands> = {}) {
@@ -51,8 +68,9 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
     })),
     saveAnnotation: vi.fn(async () => ({ id: 'annotation-1' })),
     getReadingStyle: vi.fn(() => style),
-    setReadingStyle: vi.fn(),
-    resetReadingStyle: vi.fn(),
+    setReadingStyle: vi.fn(async () => styleReceipt),
+    resetReadingStyle: vi.fn(async () => styleReceipt),
+    undoReadingStyle: vi.fn(async () => styleReceipt),
     upsertStudyItem: vi.fn(async () => ({
       operation: 'create' as const,
       origin: 'agent' as const,
@@ -65,7 +83,21 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
       actions: [{ kind: 'undo' as const, label: 'Undo', description: 'Put it back.' }],
     })),
     listStudyItems: vi.fn(async () => []),
-    setStudyBoardView: vi.fn(async () => ({ view: 'expanded' })),
+    setStudyBoardView: vi.fn(async (mode: string) => ({
+      operation: 'update' as const,
+      origin: 'agent' as const,
+      actionGroupId: 'view-1',
+      prior: { view: 'docked' as const, open: false },
+      applied: {
+        view: mode === 'expanded' ? ('expanded' as const) : ('docked' as const),
+        open: mode !== 'close',
+      },
+      scope: 'How the study board is laid out beside the book.',
+      warnings: [],
+      persisted: mode === 'docked' || mode === 'expanded',
+      actions: [UNDO_BOARD_VIEW_ACTION],
+    })),
+    undoStudyBoardView: vi.fn(async () => undefined),
     ...overrides,
   } as unknown as BookhandCommands
 
@@ -162,10 +194,23 @@ describe('the WebMCP tool surface', () => {
     )
   })
 
-  it('changes only the presentation fields it was given', async () => {
+  it('sends only the presentation fields it was given, not a whole style', async () => {
+    // The tool must not read the current style and send it back with one field
+    // changed: that snapshot would overwrite anything the person adjusted in
+    // between. `VAL-STYLE-PARITY`.
     const { tool, commands } = setup()
     await tool('set_reading_style').execute({ theme: 'sepia' })
-    expect(commands.setReadingStyle).toHaveBeenCalledWith({ ...style, theme: 'sepia' })
+    expect(commands.setReadingStyle).toHaveBeenCalledWith({
+      patch: { theme: 'sepia' },
+      origin: 'agent',
+    })
+  })
+
+  it('refuses a call that names no presentation field', async () => {
+    const { tool, commands } = setup()
+    const result = await tool('set_reading_style').execute({})
+    expect(result.content[0].text).toContain('name at least one presentation field')
+    expect(commands.setReadingStyle).not.toHaveBeenCalled()
   })
 
   it('restores every default when asked to reset', async () => {
@@ -205,5 +250,57 @@ describe('the WebMCP tool surface', () => {
     const result = await tool('upsert_study_item').execute({ kind: 'hologram', text: 'x' })
     expect(result.isError).toBe(true)
     expect(result.content[0].text).toContain('kind must be one of')
+  })
+})
+
+describe('the study board view tool', () => {
+  it('offers all four modes the architecture promised', () => {
+    const { tool } = setup()
+    const schema = tool('set_study_board_view').inputSchema as {
+      properties: { view: { enum: string[] } }
+    }
+    expect(schema.properties.view.enum).toEqual(['docked', 'expanded', 'focus', 'close'])
+  })
+
+  it('says plainly that focus and close store nothing', async () => {
+    const { tool } = setup()
+    const result = await tool('set_study_board_view').execute({ view: 'focus' })
+    expect(result.content[0].text).toContain('The layout preference was not changed')
+  })
+
+  it('refuses a mode it does not have', async () => {
+    const { tool, commands } = setup()
+    const result = await tool('set_study_board_view').execute({ view: 'fullscreen' })
+    expect(result.content[0].text).toContain('docked, expanded, focus, close')
+    expect(commands.setStudyBoardView).not.toHaveBeenCalled()
+  })
+
+  it('says so when there is no layout change to undo', async () => {
+    const { tool } = setup()
+    const result = await tool('set_study_board_view').execute({ undo: true })
+    expect(result.content[0].text).toContain('no board layout change to undo')
+  })
+})
+
+describe('the custom CSS handshake', () => {
+  it('makes the design context version required alongside custom CSS', () => {
+    const { tool } = setup()
+    const schema = tool('set_reading_style').inputSchema as {
+      dependentRequired?: Record<string, string[]>
+    }
+    expect(schema.dependentRequired?.customCss).toEqual(['designContextVersion'])
+  })
+
+  it('passes the version through so the refusal can be decided in one place', async () => {
+    const { tool, commands } = setup()
+    await tool('set_reading_style').execute({
+      customCss: 'p { color: red }',
+      designContextVersion: 'sha256:abc',
+    })
+    expect(commands.setReadingStyle).toHaveBeenCalledWith({
+      patch: { customCss: 'p { color: red }' },
+      origin: 'agent',
+      designContextVersion: 'sha256:abc',
+    })
   })
 })

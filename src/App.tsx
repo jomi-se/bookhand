@@ -30,15 +30,6 @@ const DESIGN_BEARING_TOOLS = new Set([
   'set_study_board_view',
 ])
 
-/** The style is unavailable rather than invented while a book is still opening. */
-function safeReadingStyle(commands: BookhandCommands) {
-  try {
-    return commands.getReadingStyle()
-  } catch {
-    return undefined
-  }
-}
-
 function App() {
   const runtime = useMemo(() => createAppRuntime(), [])
   const library = useLibrary({ client: runtime.client, ports: runtime.ports })
@@ -68,10 +59,11 @@ function App() {
           report,
           state: () => {
             const reader = designState.current
-            // Read from the adapter, not from React: a tool call changes the
-            // style without passing through React state, so React's copy can
-            // be stale until W2 routes both paths through one command.
-            const style = readerCommands ? safeReadingStyle(readerCommands) : undefined
+            // One store, so this is what the book is showing whoever changed
+            // it last. Reported only while a book is open; before that there
+            // is no presentation to describe, and inventing one would be worse
+            // than saying so.
+            const style = readerCommands ? runtime.presentation.visible : undefined
             return {
               activeSurface: reader?.surface ?? 'library',
               viewport: readViewportClass(),
@@ -91,7 +83,7 @@ function App() {
         ...bookTools,
       ]
     },
-    [books, designState, diagnostics, readerCommands],
+    [books, designState, diagnostics, readerCommands, runtime.presentation],
   )
 
   const agent = useWebMcpTools({ createTools })
@@ -112,6 +104,8 @@ function App() {
         onExit={exitReader}
         onCommandsReady={setReaderCommands}
         designState={designState}
+        presentation={runtime.presentation}
+        surface={runtime.surface}
         agent={agent}
       />
     )

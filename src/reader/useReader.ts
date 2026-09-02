@@ -20,6 +20,7 @@ import {
   type RuntimeClock,
 } from '../runtime/deadlines.ts'
 import type { RuntimePorts } from '../runtime/ports.ts'
+import type { PresentationStore, PresentationView } from '../app/presentation.ts'
 import type { ReaderPortBridge } from '../app/reader-bridge.ts'
 import type { StorageClient } from '../storage/client.ts'
 import { DEFAULT_READER_STYLE } from './FoliateReaderAdapter.ts'
@@ -32,6 +33,7 @@ export interface ReaderState {
   readonly toc: readonly TocItem[]
   readonly location?: ReaderLocation
   readonly selection: ReaderSelection | null
+  /** What the book is showing, which during a preview is not what is stored. */
   readonly style: ReaderStyle
   readonly error?: string
   readonly sectionError?: string
@@ -42,6 +44,8 @@ export interface UseReaderOptions {
   readonly client: StorageClient
   readonly ports: RuntimePorts
   readonly bridge: ReaderPortBridge
+  /** The one owner of the reading presentation; the UI and tools both write it. */
+  readonly presentation: PresentationStore
   readonly clock?: RuntimeClock
   readonly persistDelayMs?: number
 }
@@ -56,6 +60,7 @@ export function useReader({
   client,
   ports,
   bridge,
+  presentation,
   clock = systemClock,
   persistDelayMs = 900,
 }: UseReaderOptions) {
@@ -63,30 +68,36 @@ export function useReader({
     phase: 'loading',
     toc: [],
     selection: null,
-    style: entry.readingState?.style ?? DEFAULT_READER_STYLE,
+    style: presentation.visible,
   })
+  const [presentationView, setPresentationView] = useState<PresentationView>(presentation.view)
   const adapterRef = useRef<ReaderAdapter>(null)
   const alive = useRef(true)
   const pendingSave = useRef<ReturnType<typeof setTimeout>>(null)
   const latest = useRef<{ location?: ReaderLocation; style: ReaderStyle }>({
-    style: entry.readingState?.style ?? DEFAULT_READER_STYLE,
+    style: presentation.committed,
   })
 
-  const persistNow = useCallback(() => {
+  /**
+   * Resolves only when the write actually lands. A style receipt states
+   * whether the change survives a reload, so it cannot be built on a promise
+   * that was never waited for.
+   */
+  const persistNow = useCallback(async (): Promise<void> => {
     const location = latest.current.location
-    if (!location) return
+    if (!location) throw new Error('There is no reading position to save yet.')
     const record: ReadingState = {
       bookId: entry.id,
       location,
       style: latest.current.style,
       updatedAt: new Date().toISOString(),
     }
-    void client.putReadingState(record).catch(() => undefined)
+    await client.putReadingState(record)
   }, [client, entry.id])
 
   const schedulePersist = useCallback(() => {
     if (pendingSave.current) clearTimeout(pendingSave.current)
-    pendingSave.current = setTimeout(persistNow, persistDelayMs)
+    pendingSave.current = setTimeout(() => void persistNow().catch(() => undefined), persistDelayMs)
   }, [persistDelayMs, persistNow])
 
   useEffect(() => {
@@ -94,9 +105,33 @@ export function useReader({
     return () => {
       alive.current = false
       if (pendingSave.current) clearTimeout(pendingSave.current)
-      persistNow()
+      void persistNow().catch(() => undefined)
     }
   }, [persistNow])
+
+  /**
+   * Mirror the store into React, and give it the two things only a mounted
+   * reader can do: push a style into the open book, and save it.
+   */
+  useEffect(() => {
+    const stop = presentation.subscribe((view) => {
+      setPresentationView(view)
+      latest.current.style = view.committed
+      setState((p) => (p.style === view.visible ? p : { ...p, style: view.visible }))
+    })
+    const uninstall = presentation.install({
+      apply: (style) => adapterRef.current?.applyStyle(style),
+      persist: async (style) => {
+        latest.current.style = style
+        if (pendingSave.current) clearTimeout(pendingSave.current)
+        await persistNow()
+      },
+    })
+    return () => {
+      stop()
+      uninstall()
+    }
+  }, [persistNow, presentation])
 
   /** Called by the host once its adapter exists; opens and restores the book. */
   const attach = useCallback(
@@ -119,10 +154,14 @@ export function useReader({
           if (!alive.current) return
 
           // Style precedes location so pagination settles before we restore.
+          // `hydrate` yields to anything already committed: the tools are live
+          // while a book opens, so a change made in that window must not be
+          // erased by a restore that finishes after it.
           const restored = await client.getReadingState(entry.id)
-          const style = restored?.style ?? DEFAULT_READER_STYLE
+          presentation.hydrate(restored?.style ?? DEFAULT_READER_STYLE)
+          const style = presentation.visible
           adapter.applyStyle(style)
-          latest.current.style = style
+          latest.current.style = presentation.committed
           if (restored?.location.cfi) {
             try {
               await adapter.navigate({ kind: 'cfi', cfi: restored.location.cfi })
@@ -139,12 +178,13 @@ export function useReader({
             toc: adapter.getToc(),
             location: safeLocation(adapter),
           }))
+          latest.current.location = safeLocation(adapter)
         } catch (error) {
           if (alive.current) setState((p) => ({ ...p, phase: 'error', error: describe(error) }))
         }
       })()
     },
-    [bridge, clock, client, entry.id, ports],
+    [bridge, clock, client, entry.id, ports, presentation],
   )
 
   const detach = useCallback(
@@ -183,25 +223,12 @@ export function useReader({
     }
   }, [])
 
-  const applyStyle = useCallback(
-    (style: ReaderStyle) => {
-      adapterRef.current?.applyStyle(style)
-      latest.current.style = style
-      setState((p) => ({ ...p, style }))
-      schedulePersist()
-    },
-    [schedulePersist],
-  )
-
-  const resetStyle = useCallback(() => applyStyle(DEFAULT_READER_STYLE), [applyStyle])
-
   return {
     ...state,
+    presentation: presentationView,
     attach,
     detach,
     navigate,
-    applyStyle,
-    resetStyle,
     onLocationChange,
     onSelectionChange,
     onSectionError,

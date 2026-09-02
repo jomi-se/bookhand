@@ -26,6 +26,10 @@ export interface StudyBoardPanelProps {
   readonly onDeleteAnnotation: (annotation: Annotation) => void
   readonly onEditNote: (annotation: Annotation, note: string) => void
   readonly onToggleView: () => void
+  /** Raised when something asks the board to take focus; see `SurfaceStore`. */
+  readonly focusNonce?: number
+  readonly agentChangedView?: boolean
+  readonly onUndoView?: () => void
   readonly onClose: () => void
   readonly agentActivity?: ReactNode
 }
@@ -63,7 +67,9 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
   const [draft, setDraft] = useState('')
   const expanded = board?.view === 'expanded'
   const heading = useRef<HTMLHeadingElement>(null)
-  useEffect(() => heading.current?.focus(), [])
+  // Focus lands on the heading when the board opens, and again whenever
+  // something asks for it — an agent using `focus` to say "look at this".
+  useEffect(() => heading.current?.focus(), [props.focusNonce])
 
   return (
     <aside id="reader-study-panel" className="reader-panel study-panel" aria-label="Study">
@@ -86,6 +92,14 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
       </header>
 
       <div className="panel-body">
+        {props.agentChangedView && props.onUndoView ? (
+          <p className="control-note control-agent" role="status">
+            An agent changed this board’s layout.
+            <button type="button" className="button button-text" onClick={props.onUndoView}>
+              Undo
+            </button>
+          </p>
+        ) : null}
         {props.agentActivity}
 
         <div className="add-row">

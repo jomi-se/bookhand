@@ -13,7 +13,7 @@
 
 export type MutationOrigin = 'user' | 'agent'
 
-export type ReversalKind = 'undo' | 'return-to-source' | 'delete'
+export type ReversalKind = 'undo' | 'return-to-source' | 'delete' | 'reset'
 
 /**
  * A reversal the interface actually offers, named exactly as it appears.
@@ -55,6 +55,28 @@ export const UNDO_ACTION: ReversalAction = {
   kind: 'undo',
   label: 'Undo',
   description: 'Put the board back the way it was before this change.',
+}
+
+/**
+ * Presentation gets its own pair, worded for what they actually do. Reusing
+ * the board's Undo here would have promised to restore a board.
+ */
+export const UNDO_PRESENTATION_ACTION: ReversalAction = {
+  kind: 'undo',
+  label: 'Undo',
+  description: 'Put the text settings back the way they were before this change.',
+}
+
+export const RESET_PRESENTATION_ACTION: ReversalAction = {
+  kind: 'reset',
+  label: 'Reset all text settings',
+  description: 'Return to the presentation the publisher intended.',
+}
+
+export const UNDO_BOARD_VIEW_ACTION: ReversalAction = {
+  kind: 'undo',
+  label: 'Undo',
+  description: 'Put the study board back the way it was laid out before this change.',
 }
 
 export const RETURN_TO_SOURCE_ACTION: ReversalAction = {
@@ -112,5 +134,21 @@ export class OwnershipError extends Error {
   /** Kept for call sites that want to be explicit about which text they mean. */
   get userMessage(): string {
     return this.message
+  }
+}
+
+/**
+ * A refusal that tells the caller how to become able to do the thing.
+ *
+ * Like `OwnershipError`, the person-facing wording is the Error's own message,
+ * because that is the only field that survives the worker boundary.
+ */
+export class HandshakeError extends Error {
+  readonly code = 'handshake'
+  readonly retryable = true
+
+  constructor(message: string) {
+    super(message)
+    this.name = 'HandshakeError'
   }
 }

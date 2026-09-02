@@ -9,7 +9,10 @@ import type {
   StudyItem,
 } from '../domain/index.ts'
 import { BookhandCommands } from '../app/commands.ts'
+import type { PresentationStore } from '../app/presentation.ts'
 import type { ReaderPortBridge } from '../app/reader-bridge.ts'
+import type { SurfaceStore } from '../app/surface.ts'
+import { DESIGN_CONTEXT_VERSION } from '../webmcp/design-context.ts'
 import { splitTitle } from '../library/progress.ts'
 import type { StorageClient } from '../storage/client.ts'
 
@@ -43,9 +46,11 @@ export interface UseStudyOptions {
   readonly entry: BookCatalogEntry
   readonly client: StorageClient
   readonly bridge: ReaderPortBridge
+  readonly presentation: PresentationStore
+  readonly surface: SurfaceStore
 }
 
-export function useStudy({ entry, client, bridge }: UseStudyOptions) {
+export function useStudy({ entry, client, bridge, presentation, surface }: UseStudyOptions) {
   const [board, setBoard] = useState<StudyBoard>()
   const [commands, setCommands] = useState<BookhandCommands>()
   const [annotations, setAnnotations] = useState<readonly Annotation[]>([])
@@ -64,6 +69,9 @@ export function useStudy({ entry, client, bridge }: UseStudyOptions) {
           new BookhandCommands({
             client,
             bridge,
+            presentation,
+            surface,
+            designContextVersion: DESIGN_CONTEXT_VERSION,
             bookId: entry.id,
             bookTitle: splitTitle(entry.metadata).title,
             board: loaded,
@@ -76,7 +84,7 @@ export function useStudy({ entry, client, bridge }: UseStudyOptions) {
     return () => {
       alive = false
     }
-  }, [bridge, client, entry.id, entry.metadata])
+  }, [bridge, client, entry.id, entry.metadata, presentation, surface])
 
   const reload = useCallback(async () => {
     if (!commands) return
@@ -86,6 +94,9 @@ export function useStudy({ entry, client, bridge }: UseStudyOptions) {
     ])
     setAnnotations(nextAnnotations)
     setItems(nextItems)
+    // The board is refreshed here too, so a layout change made through a tool
+    // shows without the interface having to be told about it separately.
+    setBoard(commands.studyBoard)
   }, [commands])
 
   useEffect(() => {
