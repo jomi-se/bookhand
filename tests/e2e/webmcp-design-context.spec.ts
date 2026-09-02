@@ -242,16 +242,17 @@ test('the design context returns no book text and no user-authored content', asy
   expect(after.text).toBe(before.text)
 })
 
-test('the design-context read is visible to the person in Agent Activity', async ({ page }) => {
+test('design-context diagnostics never displace learning content in Study', async ({ page }) => {
   await openLibrary(page)
   await openBook(page)
-  await agentCall(page, 'get_design_context', { surface: 'study' })
+  const result = await agentCall(page, 'get_design_context', { surface: 'study' })
+  expect(result.isError).toBe(false)
 
   await page.getByRole('button', { name: 'Study' }).click()
-  await expect(page.locator('.agent-calls code', { hasText: 'get_design_context' }).first())
-    .toBeVisible()
-  await expect(page.locator('.agent-calls li', { hasText: 'get_design_context' }).first())
-    .toContainText('read design context for study')
+  const study = page.getByRole('complementary', { name: 'Study' })
+  await expect(study).toBeVisible()
+  await expect(study).not.toContainText('get_design_context')
+  await expect(study.locator('.agent-activity, .agent-calls')).toHaveCount(0)
 })
 
 test.describe('runtime requirements', () => {
