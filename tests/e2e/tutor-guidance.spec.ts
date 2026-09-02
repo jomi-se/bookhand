@@ -110,6 +110,29 @@ test('genuine guidance points, yields, returns, stops, and keeps durable marks i
   expect(geometry.tutor).toBeGreaterThan(0)
   expect(geometry.all).toBeGreaterThan(0)
 
+  // All three public cue styles use the same verified target and replace only
+  // the transient tutor layer. This is a genuine WebMCP call, not a harness
+  // shortcut into Foliate.
+  for (const kind of ['highlight', 'underline'] as const) {
+    const changedCue = await call(page, 'focus_passage', {
+      bookId: origin.bookId,
+      sectionIndex: origin.visible.range.sectionIndex,
+      startCfi: origin.visible.range.startCfi,
+      endCfi: origin.visible.range.endCfi,
+      textFingerprint: origin.visible.range.textFingerprint,
+      quote: origin.visible.text,
+      cue: { kind },
+    })
+    expect(changedCue.structuredContent).toMatchObject({ focus: { outcome: 'applied' } })
+    await expect.poll(() => page.evaluate((cueKind) => {
+      const view = document.querySelector('foliate-view') as unknown as {
+        renderer?: { getContents?: () => { overlayer?: { element?: Element } }[] }
+      }
+      const overlay = view?.renderer?.getContents?.()[0]?.overlayer?.element
+      return overlay?.querySelectorAll(`[data-bookhand-tutor-cue="${cueKind}"]`).length ?? 0
+    }, kind)).toBeGreaterThan(0)
+  }
+
   // Panel replacement and receding chrome cannot take guidance controls away.
   await page.getByRole('button', { name: 'Search' }).click()
   await page.waitForTimeout(5_200)
