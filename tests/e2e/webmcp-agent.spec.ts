@@ -155,6 +155,8 @@ test('an agent reads the page, highlights it, and builds a source-linked lesson'
     kind: 'steps',
     title: 'Reading a slope',
     steps: ['Take two points on the curve', 'Divide the rise by the run'],
+    actionToken: 'slope-steps',
+    actionGroupId: 'slope-lesson',
     bookId,
     sourceRange: visibleRange,
     sourceQuote: quote,
@@ -166,22 +168,33 @@ test('an agent reads the page, highlights it, and builds a source-linked lesson'
   expect(lesson.text).toContain('updateToken:')
   expect(lesson.text).toContain('Undo')
 
+  const equation = await agentCall(page, 'upsert_study_item', {
+    kind: 'equation',
+    expression: '\\dfrac{dy}{dx}',
+    caption: 'The differential coefficient',
+    actionToken: 'slope-equation',
+    actionGroupId: 'slope-lesson',
+    bookId,
+    sourceRange: visibleRange,
+    sourceQuote: quote,
+    sourceLabel: 'Chapter X',
+  })
+  expect(equation.isError).toBe(false)
+
   // The person sees all of it in the ordinary interface.
   await page.getByRole('button', { name: 'Study' }).click()
   await expect(page.locator('.study-item[data-kind="steps"]')).toBeVisible()
   await expect(page.getByText('Divide the rise by the run')).toBeVisible()
+  await expect(page.locator('.study-item-group[data-composed="true"]')).toHaveCount(1)
+  await expect(page.locator('.block-equation-rendered math')).toBeVisible()
+  await expect(page.locator('.block-equation pre')).toHaveCount(0)
   await expect(page.locator('.highlight')).toHaveCount(1)
   await expect(page.getByText('Worth revisiting')).toBeVisible()
 
-  // And can see exactly what the agent did — including what it was refused.
-  const activity = page.locator('.agent-calls li')
-  await expect(activity.filter({ hasText: 'save_annotation' })).toHaveCount(2)
-  await expect(activity.filter({ hasText: 'upsert_study_item' })).toHaveCount(1)
-  const refused = activity.filter({ hasText: 'save_annotation' }).and(
-    page.locator('[data-failed="true"]'),
-  )
-  await expect(refused).toHaveCount(1)
-  await expect(refused).toContainText('does not match the text at that location')
+  // Tool logs are observability, not learning content. Study contains the
+  // result and its authorship, never raw handler names or call history.
+  await expect(page.locator('.agent-activity')).toHaveCount(0)
+  await expect(page.getByText('upsert_study_item')).toHaveCount(0)
 
   // The highlight is drawn over the book itself, not merely stored.
   await expect
@@ -202,6 +215,8 @@ test('an agent reads the page, highlights it, and builds a source-linked lesson'
   await page.getByRole('button', { name: 'Study' }).click()
   await expect(page.locator('.study-item[data-kind="steps"]')).toBeVisible()
   await expect(page.getByText('Divide the rise by the run')).toBeVisible()
+  await expect(page.locator('.study-item-group[data-composed="true"]')).toHaveCount(1)
+  await expect(page.locator('.block-equation-rendered math')).toBeVisible()
   await expect(page.getByText('Worth revisiting')).toBeVisible()
   await expect(page.locator('.highlight')).toHaveCount(1)
 })

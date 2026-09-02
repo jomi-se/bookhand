@@ -72,6 +72,19 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
   const [draft, setDraft] = useState('')
   const expanded = board?.view === 'expanded'
   const heading = useRef<HTMLHeadingElement>(null)
+  const groupedItems = items.reduce<Array<{ key: string; items: StudyItem[] }>>((groups, item) => {
+    const actionKey = item.actionGroupId ? `action:${item.actionGroupId}` : `item:${item.id}`
+    const previous = groups.at(-1)
+    if (item.actionGroupId && previous?.key === actionKey) previous.items.push(item)
+    else groups.push({ key: actionKey, items: [item] })
+    return groups
+  }, [])
+
+  const sharedContextKey = (item: StudyItem) => JSON.stringify({
+    origin: item.origin,
+    sourceLabel: item.sourceLabel,
+    sourceRange: item.sourceRange,
+  })
   // Focus lands on the heading when the board opens, and again whenever
   // something asks for it — an agent using `focus` to say "look at this".
   useEffect(() => heading.current?.focus(), [props.focusNonce])
@@ -224,17 +237,31 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
           </p>
         ) : (
           <ul className="study-items">
-            {items.map((item) => (
-              <StudyItemCard
-                key={item.id}
-                item={item}
-                onGoToSource={(target) => target.sourceRange && props.onGoToSource(target.sourceRange)}
-                onDelete={props.onDeleteItem}
-                onUndo={props.onUndoItem}
-                onRetrySource={props.onRetryItemSource}
-                onRelinkSource={props.onRelinkItemSource}
-                canRelinkSource={Boolean(selectionQuote)}
-              />
+            {groupedItems.map((group) => (
+              <li
+                key={group.key}
+                className="study-item-group"
+                data-composed={group.items.length > 1 ? 'true' : undefined}
+              >
+                <ul aria-label={group.items.length > 1 ? 'Blocks added together' : undefined}>
+                  {group.items.map((item, index) => (
+                    <StudyItemCard
+                      key={item.id}
+                      item={item}
+                      showSharedContext={
+                        index === 0 ||
+                        sharedContextKey(item) !== sharedContextKey(group.items[index - 1]!)
+                      }
+                      onGoToSource={(target) => target.sourceRange && props.onGoToSource(target.sourceRange)}
+                      onDelete={props.onDeleteItem}
+                      onUndo={props.onUndoItem}
+                      onRetrySource={props.onRetryItemSource}
+                      onRelinkSource={props.onRelinkItemSource}
+                      canRelinkSource={Boolean(selectionQuote)}
+                    />
+                  ))}
+                </ul>
+              </li>
             ))}
           </ul>
         )}

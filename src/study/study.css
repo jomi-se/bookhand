@@ -62,10 +62,23 @@
 }
 
 .study-items,
-.highlight-list {
+.highlight-list,
+.study-item-group > ul {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.study-item-group[data-composed='true'] {
+  margin-block: 14px;
+  padding: 4px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--raised) 72%, var(--canvas));
+}
+
+.study-item-group[data-composed='true'] .study-item:first-child {
+  border-block-start: 0;
 }
 
 .study-item {
@@ -79,13 +92,6 @@
   justify-content: space-between;
   gap: 10px;
   margin-block-end: 8px;
-}
-
-.study-item-kind {
-  color: var(--muted);
-  font-size: var(--step--2);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 /*
@@ -178,13 +184,27 @@
   margin: 0;
 }
 
-.block-equation pre {
+.block-equation-rendered {
+  display: grid;
+  place-items: center;
   margin: 0;
-  padding: 12px;
+  min-block-size: 72px;
+  padding: 18px 12px;
   overflow-x: auto;
   border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--raised);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--raised) 78%, var(--canvas));
+  font-family: var(--serif);
+  font-size: var(--step-1);
+}
+
+.block-equation-rendered math {
+  max-inline-size: 100%;
+}
+
+.block-equation-rendered[data-fallback='true'] {
+  display: block;
+  min-block-size: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--step--1);
 }

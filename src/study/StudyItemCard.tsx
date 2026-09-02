@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react'
 import { CornerUpLeft, Link, RefreshCw, Sparkles, Trash2, Undo2 } from 'lucide-react'
 import type { StudyItem } from '../domain/index.ts'
+import { compileTex } from '../remaster/tex.ts'
 
 export interface StudyItemCardProps {
   readonly item: StudyItem
@@ -9,6 +11,30 @@ export interface StudyItemCardProps {
   readonly onRetrySource: (item: StudyItem) => void
   readonly onRelinkSource: (item: StudyItem) => void
   readonly canRelinkSource: boolean
+  /** A multi-block action shows its shared provenance once, on the first block. */
+  readonly showSharedContext?: boolean
+}
+
+function RenderedEquation({ expression }: { readonly expression: string }) {
+  const host = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const element = host.current
+    if (!element) return
+    element.replaceChildren()
+    try {
+      const compiled = compileTex(expression, { document: element.ownerDocument, display: true })
+      element.appendChild(compiled.element)
+      element.setAttribute('aria-label', compiled.text)
+      element.dataset.fallback = 'false'
+    } catch {
+      const fallback = element.ownerDocument.createElement('code')
+      fallback.textContent = expression
+      element.appendChild(fallback)
+      element.setAttribute('aria-label', `Equation: ${expression}`)
+      element.dataset.fallback = 'true'
+    }
+  }, [expression])
+  return <div ref={host} className="block-equation-rendered" />
 }
 
 function Body({ item }: { readonly item: StudyItem }) {
@@ -26,7 +52,7 @@ function Body({ item }: { readonly item: StudyItem }) {
     case 'equation':
       return (
         <figure className="block-equation">
-          <pre>{payload.expression}</pre>
+          <RenderedEquation expression={payload.expression} />
           {payload.caption ? <figcaption>{payload.caption}</figcaption> : null}
         </figure>
       )
@@ -64,13 +90,13 @@ export function StudyItemCard({
   onRetrySource,
   onRelinkSource,
   canRelinkSource,
+  showSharedContext = true,
 }: StudyItemCardProps) {
   const byAgent = item.origin === 'agent'
   return (
     <li className="study-item" data-kind={item.payload.kind} data-origin={item.origin}>
       <div className="study-item-head">
-        <span className="study-item-kind">{item.payload.kind}</span>
-        {byAgent ? (
+        {byAgent && showSharedContext ? (
           // Agent work is marked, always. A block a person did not write should
           // never be able to pass for one they did.
           <span className="study-item-origin">
@@ -97,7 +123,7 @@ export function StudyItemCard({
           >
             <Undo2 size={14} aria-hidden="true" />
           </button>
-          {item.sourceRange ? (
+          {item.sourceRange && showSharedContext ? (
             <button
               type="button"
               className="button button-text"
