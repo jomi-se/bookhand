@@ -65,6 +65,10 @@ artifacts that remain visibly attached to their sources and under user control.
   environment, not silent rewrites of the book or application. Persistent
   changes remain identifiable, removable, resettable, or undoable as
   appropriate.
+- Bookhand is intentionally hackable. People may customize typography, themes,
+  book CSS, and study presentation directly or through an agent. The shipped
+  visual system is a strong default and a source of composition guidance, not a
+  restriction on the worlds a user may create.
 - Generated work stays bounded to its study surface and never silently changes
   publisher content.
 - Whole-book lexical retrieval, the cohesive interactive study experience, and
@@ -109,6 +113,9 @@ artifacts that remain visibly attached to their sources and under user control.
    append conversational prose.
 5. **Local-first is product behavior.** Core reading and study remain useful
    without an account, hosted model backend, or book-content upload.
+6. **Guidance enables freedom.** Customization surfaces give people and agents
+   enough semantic design context to create coherent alternatives while
+   preserving accessibility, reversibility, and the book's source integrity.
 
 ## Accessibility & Inclusion
 

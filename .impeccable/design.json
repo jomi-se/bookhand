@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-02T05:51:55Z",
+  "title": "Design System: Bookhand",
+  "extensions": {
+    "colorMeta": {
+      "clear-canvas": {
+        "role": "canvas",
+        "displayName": "Clear Canvas",
+        "canonical": "oklch(98.51% 0 89.88)",
+        "tonalRamp": ["oklch(15% 0 89.88)", "oklch(25% 0 89.88)", "oklch(38% 0 89.88)", "oklch(52% 0 89.88)", "oklch(65% 0 89.88)", "oklch(77% 0 89.88)", "oklch(87% 0 89.88)", "oklch(95% 0 89.88)"]
+      },
+      "library-ink": {
+        "role": "ink",
+        "displayName": "Library Ink",
+        "canonical": "oklch(17.73% 0.0089 264.32)",
+        "tonalRamp": ["oklch(15% 0.0089 264.32)", "oklch(25% 0.0089 264.32)", "oklch(38% 0.0089 264.32)", "oklch(52% 0.0089 264.32)", "oklch(65% 0.0089 264.32)", "oklch(77% 0.0089 264.32)", "oklch(87% 0.0089 264.32)", "oklch(95% 0.0089 264.32)"]
+      },
+      "quiet-graphite": {
+        "role": "muted-ink",
+        "displayName": "Quiet Graphite",
+        "canonical": "oklch(50.23% 0.0205 264.37)",
+        "tonalRamp": ["oklch(15% 0.0205 264.37)", "oklch(25% 0.0205 264.37)", "oklch(38% 0.0205 264.37)", "oklch(52% 0.0205 264.37)", "oklch(65% 0.0205 264.37)", "oklch(77% 0.0205 264.37)", "oklch(87% 0.0205 264.37)", "oklch(95% 0.0205 264.37)"]
+      },
+      "fine-rule": {
+        "role": "rule",
+        "displayName": "Fine Rule",
+        "canonical": "oklch(92.76% 0.0058 264.53)",
+        "tonalRamp": ["oklch(15% 0.0058 264.53)", "oklch(25% 0.0058 264.53)", "oklch(38% 0.0058 264.53)", "oklch(52% 0.0058 264.53)", "oklch(65% 0.0058 264.53)", "oklch(77% 0.0058 264.53)", "oklch(87% 0.0058 264.53)", "oklch(95% 0.0058 264.53)"]
+      },
+      "terracotta-spine": {
+        "role": "accent",
+        "displayName": "Terracotta Spine",
+        "canonical": "oklch(56.66% 0.1606 35.42)",
+        "tonalRamp": ["oklch(15% 0.1606 35.42)", "oklch(25% 0.1606 35.42)", "oklch(38% 0.1606 35.42)", "oklch(52% 0.1606 35.42)", "oklch(65% 0.1606 35.42)", "oklch(77% 0.1606 35.42)", "oklch(87% 0.1606 35.42)", "oklch(95% 0.1606 35.42)"]
+      },
+      "raised-leaf": {
+        "role": "raised-surface",
+        "displayName": "Raised Leaf",
+        "canonical": "oklch(100% 0 0)",
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(25% 0 0)", "oklch(38% 0 0)", "oklch(52% 0 0)", "oklch(65% 0 0)", "oklch(77% 0 0)", "oklch(87% 0 0)", "oklch(95% 0 0)"]
+      },
+      "sepia-canvas": {
+        "role": "canvas",
+        "displayName": "Reading Sepia Canvas",
+        "canonical": "#f4efe4",
+        "tonalRamp": ["oklch(15% 0.025 75)", "oklch(25% 0.025 75)", "oklch(38% 0.025 75)", "oklch(52% 0.025 75)", "oklch(65% 0.025 75)", "oklch(77% 0.025 75)", "oklch(87% 0.025 75)", "oklch(95% 0.025 75)"]
+      },
+      "sepia-ink": {
+        "role": "ink",
+        "displayName": "Reading Sepia Ink",
+        "canonical": "#29231b",
+        "tonalRamp": ["oklch(15% 0.025 75)", "oklch(25% 0.025 75)", "oklch(38% 0.025 75)", "oklch(52% 0.025 75)", "oklch(65% 0.025 75)", "oklch(77% 0.025 75)", "oklch(87% 0.025 75)", "oklch(95% 0.025 75)"]
+      },
+      "sepia-muted": {
+        "role": "muted-ink",
+        "displayName": "Reading Sepia Muted",
+        "canonical": "#655c50",
+        "tonalRamp": ["oklch(15% 0.025 75)", "oklch(25% 0.025 75)", "oklch(38% 0.025 75)", "oklch(52% 0.025 75)", "oklch(65% 0.025 75)", "oklch(77% 0.025 75)", "oklch(87% 0.025 75)", "oklch(95% 0.025 75)"]
+      },
+      "sepia-rule": {
+        "role": "rule",
+        "displayName": "Reading Sepia Rule",
+        "canonical": "#d8cdbb",
+        "tonalRamp": ["oklch(15% 0.025 75)", "oklch(25% 0.025 75)", "oklch(38% 0.025 75)", "oklch(52% 0.025 75)", "oklch(65% 0.025 75)", "oklch(77% 0.025 75)", "oklch(87% 0.025 75)", "oklch(95% 0.025 75)"]
+      },
+      "sepia-accent": {
+        "role": "accent",
+        "displayName": "Reading Sepia Accent",
+        "canonical": "#9b3b21",
+        "tonalRamp": ["oklch(15% 0.14 35)", "oklch(25% 0.14 35)", "oklch(38% 0.14 35)", "oklch(52% 0.14 35)", "oklch(65% 0.14 35)", "oklch(77% 0.14 35)", "oklch(87% 0.14 35)", "oklch(95% 0.14 35)"]
+      },
+      "sepia-raised": {
+        "role": "raised-surface",
+        "displayName": "Reading Sepia Raised",
+        "canonical": "#fffaf0",
+        "tonalRamp": ["oklch(15% 0.025 75)", "oklch(25% 0.025 75)", "oklch(38% 0.025 75)", "oklch(52% 0.025 75)", "oklch(65% 0.025 75)", "oklch(77% 0.025 75)", "oklch(87% 0.025 75)", "oklch(95% 0.025 75)"]
+      },
+      "night-canvas": {
+        "role": "canvas",
+        "displayName": "Night Reading Canvas",
+        "canonical": "#171717",
+        "tonalRamp": ["oklch(15% 0.008 60)", "oklch(25% 0.008 60)", "oklch(38% 0.008 60)", "oklch(52% 0.008 60)", "oklch(65% 0.008 60)", "oklch(77% 0.008 60)", "oklch(87% 0.008 60)", "oklch(95% 0.008 60)"]
+      },
+      "night-ink": {
+        "role": "ink",
+        "displayName": "Night Reading Ink",
+        "canonical": "#f4efe9",
+        "tonalRamp": ["oklch(15% 0.008 60)", "oklch(25% 0.008 60)", "oklch(38% 0.008 60)", "oklch(52% 0.008 60)", "oklch(65% 0.008 60)", "oklch(77% 0.008 60)", "oklch(87% 0.008 60)", "oklch(95% 0.008 60)"]
+      },
+      "night-muted": {
+        "role": "muted-ink",
+        "displayName": "Night Reading Muted",
+        "canonical": "#b8b0a7",
+        "tonalRamp": ["oklch(15% 0.008 60)", "oklch(25% 0.008 60)", "oklch(38% 0.008 60)", "oklch(52% 0.008 60)", "oklch(65% 0.008 60)", "oklch(77% 0.008 60)", "oklch(87% 0.008 60)", "oklch(95% 0.008 60)"]
+      },
+      "night-rule": {
+        "role": "rule",
+        "displayName": "Night Reading Rule",
+        "canonical": "#3b3733",
+        "tonalRamp": ["oklch(15% 0.008 60)", "oklch(25% 0.008 60)", "oklch(38% 0.008 60)", "oklch(52% 0.008 60)", "oklch(65% 0.008 60)", "oklch(77% 0.008 60)", "oklch(87% 0.008 60)", "oklch(95% 0.008 60)"]
+      },
+      "night-accent": {
+        "role": "accent",
+        "displayName": "Night Reading Accent",
+        "canonical": "#ff9a76",
+        "tonalRamp": ["oklch(15% 0.12 35)", "oklch(25% 0.12 35)", "oklch(38% 0.12 35)", "oklch(52% 0.12 35)", "oklch(65% 0.12 35)", "oklch(77% 0.12 35)", "oklch(87% 0.12 35)", "oklch(95% 0.12 35)"]
+      },
+      "night-raised": {
+        "role": "raised-surface",
+        "displayName": "Night Reading Raised",
+        "canonical": "#232220",
+        "tonalRamp": ["oklch(15% 0.008 60)", "oklch(25% 0.008 60)", "oklch(38% 0.008 60)", "oklch(52% 0.008 60)", "oklch(65% 0.008 60)", "oklch(77% 0.008 60)", "oklch(87% 0.008 60)", "oklch(95% 0.008 60)"]
+      },
+      "highlight-amber": {
+        "role": "user-highlight",
+        "displayName": "Highlight Amber",
+        "canonical": "#d69e2e",
+        "tonalRamp": ["oklch(15% 0.12 80)", "oklch(25% 0.12 80)", "oklch(38% 0.12 80)", "oklch(52% 0.12 80)", "oklch(65% 0.12 80)", "oklch(77% 0.12 80)", "oklch(87% 0.12 80)", "oklch(95% 0.12 80)"]
+      },
+      "highlight-sky": {
+        "role": "user-highlight",
+        "displayName": "Highlight Sky",
+        "canonical": "#3b82f6",
+        "tonalRamp": ["oklch(15% 0.15 250)", "oklch(25% 0.15 250)", "oklch(38% 0.15 250)", "oklch(52% 0.15 250)", "oklch(65% 0.15 250)", "oklch(77% 0.15 250)", "oklch(87% 0.15 250)", "oklch(95% 0.15 250)"]
+      },
+      "highlight-moss": {
+        "role": "user-highlight",
+        "displayName": "Highlight Moss",
+        "canonical": "#48946a",
+        "tonalRamp": ["oklch(15% 0.1 155)", "oklch(25% 0.1 155)", "oklch(38% 0.1 155)", "oklch(52% 0.1 155)", "oklch(65% 0.1 155)", "oklch(77% 0.1 155)", "oklch(87% 0.1 155)", "oklch(95% 0.1 155)"]
+      }
+    },
+    "typographyMeta": {
+      "literary-display": { "displayName": "Literary Display", "purpose": "Library title and rare high-level literary moments." },
+      "literary-title": { "displayName": "Literary Title", "purpose": "Wordmark, book identity, and compact bookish moments." },
+      "body": { "displayName": "Product Body", "purpose": "Ordinary product text and authored study prose." },
+      "label": { "displayName": "Product Label", "purpose": "Controls, metadata, status, panel headings, and values." },
+      "micro-label": { "displayName": "Micro Label", "purpose": "Format tags, study kinds, and dense tool history." },
+      "code": { "displayName": "Code", "purpose": "Custom CSS, equations before typesetting, tool names, and diagnostics." }
+    },
+    "shadows": [
+      { "name": "selection-action", "value": "0 2px 8px rgb(15 17 21 / 0.14)", "purpose": "Only for a temporary selection action floating above book content." }
+    ],
+    "motion": [
+      { "name": "duration-standard", "value": "180ms", "purpose": "Panel, paging, focus, and persistence state transitions." },
+      { "name": "ease-standard", "value": "ease", "purpose": "Direct, quiet state changes without decorative travel." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "720px" },
+      { "name": "library-max", "value": "900px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single action that advances the current task.",
+      "html": "<button class=\"ds-btn-primary\">Add to Study</button>",
+      "css": ".ds-btn-primary { min-height: 44px; padding: 0 16px; border: 1px solid var(--accent, #c24a2b); border-radius: 6px; background: var(--accent, #c24a2b); color: var(--canvas, #fafafa); font: 500 0.8125rem/1.4 'Inter Variable', system-ui, sans-serif; transition: background 180ms ease, border-color 180ms ease; } .ds-btn-primary:hover { background: color-mix(in oklch, var(--accent, #c24a2b) 88%, black); } .ds-btn-primary:active { background: color-mix(in oklch, var(--accent, #c24a2b) 80%, black); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #c24a2b); outline-offset: 3px; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "A reversible tool, toggle, or secondary action.",
+      "html": "<button class=\"ds-btn-quiet\">Reset theme</button>",
+      "css": ".ds-btn-quiet { min-height: 44px; padding: 0 16px; border: 1px solid var(--rule, #e5e7eb); border-radius: 6px; background: var(--raised, #fff); color: var(--ink, #0f1115); font: 500 0.8125rem/1.4 'Inter Variable', system-ui, sans-serif; transition: background 180ms ease, border-color 180ms ease; } .ds-btn-quiet:hover { border-color: var(--muted, #5e6470); background: color-mix(in oklch, var(--rule, #e5e7eb) 38%, var(--canvas, #fafafa)); } .ds-btn-quiet:active { background: var(--accent-quiet, #f8e9e4); } .ds-btn-quiet:focus-visible { outline: 2px solid var(--accent, #c24a2b); outline-offset: 3px; }"
+    },
+    {
+      "name": "Text Action",
+      "kind": "button",
+      "description": "A low-emphasis local action inside an adequately sized hit region.",
+      "html": "<button class=\"ds-text-action\">Return to source</button>",
+      "css": ".ds-text-action { min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--muted, #5e6470); font: 500 0.8125rem/1.4 'Inter Variable', system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; } .ds-text-action:hover { color: var(--ink, #0f1115); } .ds-text-action:active { color: var(--accent, #c24a2b); } .ds-text-action:focus-visible { outline: 2px solid var(--accent, #c24a2b); outline-offset: 3px; border-radius: 3px; }"
+    },
+    {
+      "name": "Ruled Book Row",
+      "kind": "custom",
+      "refersTo": "ruled-book-row",
+      "description": "The signature continuous scanning row for a library book.",
+      "html": "<button class=\"ds-book-row\"><span class=\"ds-book-cover\" aria-hidden=\"true\"></span><span class=\"ds-book-copy\"><strong>Calculus Made Easy</strong><span>Silvanus P. Thompson</span></span><span class=\"ds-book-progress\">Chapter X · 42%</span></button>",
+      "css": ".ds-book-row { width: 100%; min-height: 76px; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 8px; border: 0; border-block-end: 1px solid var(--rule, #e5e7eb); border-radius: 6px; background: transparent; color: var(--ink, #0f1115); text-align: left; } .ds-book-row:hover { background: color-mix(in oklch, var(--rule, #e5e7eb) 40%, transparent); } .ds-book-row:focus-visible { outline: 2px solid var(--accent, #c24a2b); outline-offset: 3px; } .ds-book-cover { width: 38px; aspect-ratio: 2 / 3; background: var(--accent, #c24a2b); border-radius: 2px; } .ds-book-copy { display: grid; gap: 4px; min-width: 0; font: 400 0.8125rem/1.4 'Inter Variable', system-ui, sans-serif; } .ds-book-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 1.125rem/1.3 'Source Serif 4 Variable', Georgia, serif; } .ds-book-copy span, .ds-book-progress { color: var(--muted, #5e6470); font: 400 0.6875rem/1.4 'Inter Variable', system-ui, sans-serif; }"
+    },
+    {
+      "name": "Reader Toolbar",
+      "kind": "nav",
+      "description": "Compact reader identity and quiet access to complete adjacent surfaces.",
+      "html": "<nav class=\"ds-reader-toolbar\" aria-label=\"Reader\"><strong>Bookhand</strong><span>Calculus Made Easy</span><button>Contents</button><button>Study</button><button aria-pressed=\"true\">Text</button></nav>",
+      "css": ".ds-reader-toolbar { min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 4px 10px; border-block-end: 1px solid var(--rule, #e5e7eb); background: var(--canvas, #fafafa); color: var(--ink, #0f1115); font: 500 0.8125rem/1.4 'Inter Variable', system-ui, sans-serif; } .ds-reader-toolbar strong { font: 600 1.125rem/1.3 'Source Serif 4 Variable', Georgia, serif; } .ds-reader-toolbar span { min-width: 0; margin-inline-end: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted, #5e6470); } .ds-reader-toolbar button { min-width: 44px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; } .ds-reader-toolbar button:hover { background: var(--accent-quiet, #f8e9e4); } .ds-reader-toolbar button[aria-pressed='true'] { color: var(--accent, #c24a2b); background: var(--accent-quiet, #f8e9e4); } .ds-reader-toolbar button:focus-visible { outline: 2px solid var(--accent, #c24a2b); outline-offset: 2px; }"
+    },
+    {
+      "name": "Reader Panel",
+      "kind": "custom",
+      "refersTo": "reader-panel",
+      "description": "One header and one scroll body for Contents, Text, or Study.",
+      "html": "<section class=\"ds-reader-panel\"><header><strong>Contents</strong><button aria-label=\"Close Contents\">×</button></header><div><a href=\"#\">X. Geometrical Meaning of Differentiation</a><a href=\"#\">XI. Maxima and Minima</a></div></section>",
+      "css": ".ds-reader-panel { width: min(320px, 100%); min-height: 240px; border-inline-start: 1px solid var(--rule, #e5e7eb); background: var(--canvas, #fafafa); color: var(--ink, #0f1115); font: 400 0.8125rem/1.5 'Inter Variable', system-ui, sans-serif; } .ds-reader-panel header { min-height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 4px 14px; border-block-end: 1px solid var(--rule, #e5e7eb); } .ds-reader-panel header button { width: 44px; height: 44px; border: 0; border-radius: 6px; background: transparent; color: inherit; font-size: 1.25rem; } .ds-reader-panel header button:hover { background: var(--accent-quiet, #f8e9e4); } .ds-reader-panel header button:focus-visible, .ds-reader-panel a:focus-visible { outline: 2px solid var(--accent, #c24a2b); outline-offset: 2px; } .ds-reader-panel div { display: grid; padding: 10px 14px; } .ds-reader-panel a { padding: 10px 0; border-block-end: 1px solid var(--rule, #e5e7eb); color: inherit; text-decoration: none; } .ds-reader-panel a:hover { color: var(--accent, #c24a2b); }"
+    },
+    {
+      "name": "Grounded Study Quotation",
+      "kind": "custom",
+      "description": "A native study artifact that leads with the source-grounded learning material.",
+      "html": "<figure class=\"ds-study-quote\"><blockquote>Let the distance x increase by a small amount.</blockquote><figcaption>Chapter X · Return to source</figcaption></figure>",
+      "css": ".ds-study-quote { margin: 0; padding: 14px 16px; border: 0; border-inline-start: 2px solid var(--accent, #c24a2b); background: transparent; color: var(--ink, #0f1115); } .ds-study-quote blockquote { margin: 0; font: 400 1rem/1.6 'Source Serif 4 Variable', Georgia, serif; } .ds-study-quote figcaption { margin-block-start: 10px; color: var(--muted, #5e6470); font: 500 0.6875rem/1.4 'Inter Variable', system-ui, sans-serif; } .ds-study-quote:hover { background: color-mix(in oklch, var(--rule, #e5e7eb) 30%, transparent); } .ds-study-quote:focus-within { outline: 2px solid var(--accent, #c24a2b); outline-offset: 3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Working Library",
+    "overview": "Bookhand begins as a quiet private library, not a dashboard. The interface recedes while a person reads, then becomes an active place of study when the reader asks for it. Its warmth comes from real book artwork, literary type, and one restrained accent rather than beige product chrome, decorative texture, or nostalgia pasted onto controls.\n\nThe default world is calm, precise, quietly warm, and flat by default. Fine rules, compact typography, honest state changes, and clear spatial transitions carry hierarchy. The Study surface may become richer and more expressive than the library, but it remains a composed learning artifact rather than a chat transcript or a grid of equally weighted records.\n\nThis system is also an embedded design prompt. It describes how the shipped world achieves harmony so people and agents can create different coherent worlds. The default palette and components are reference-quality starting points, not a restriction on customization.",
+    "keyCharacteristics": [
+      "Reader-first, with chrome that yields to the book.",
+      "Ruled and typographic rather than card-based.",
+      "One rare accent voice, used for meaning rather than decoration.",
+      "Complete theme worlds, not an EPUB rectangle inside unrelated chrome.",
+      "User-controlled customization with preview, reset, and Undo where persistent.",
+      "Native study artifacts that remain visibly grounded in their sources."
+    ],
+    "rules": [
+      { "name": "The Whole-World Theme Rule", "body": "A reading theme changes every visible reader surface: EPUB, chrome, panels, controls, overlays, focus, Study artifacts, and status UI. Never leave a bright application frame around a dark book or apply a new accent without checking it against every surface it touches.", "section": "colors" },
+      { "name": "The One Accent Voice Rule", "body": "A customized world may replace Terracotta Spine with any deliberate accent, but ordinary chrome should still speak with one primary accent occupying roughly ten percent or less of the surface. Additional highlight colors label user meaning; they do not become competing brand colors.", "section": "colors" },
+      { "name": "The Two Voices Rule", "body": "Keep one literary voice and one operational voice. Custom typography may replace either family, but must preserve the role contrast and cannot leak application type rules into publisher content.", "section": "typography" },
+      { "name": "The Book Gets the Space Rule", "body": "Reader chrome and agent activity must justify every permanent pixel. Navigation can overlay or recede on mobile; it must not reserve broad rails that make the book feel like a preview.", "section": "layout" },
+      { "name": "The Structural Depth Rule", "body": "Prefer a rule, tonal change, or spatial move to a shadow. Shadows appear only when an element temporarily floats above reading content; never combine broad soft shadows with ornamental borders.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do treat the shipped themes as excellent examples of a semantic system, not as the only palettes Bookhand may support.",
+      "Do define a complete token world before applying an agent-authored theme.",
+      "Do preserve hierarchy, contrast, source grounding, user control, and a visible reset path when experimenting boldly.",
+      "Do inspect customization on library, reader, panels, Study, mobile, desktop, error, focus, and reduced-motion states.",
+      "Do let the artifact dominate Study and keep tool history secondary.",
+      "Do use real book content and real product state in demonstrations."
+    ],
+    "donts": [
+      "Don't turn Bookhand into a generic dashboard, chat transcript, card grid, fake bookshelf, or collection of equally weighted controls.",
+      "Don't equate “bookish” with beige application chrome, parchment texture, paper grain, ornamental shadows, or nostalgic decoration.",
+      "Don't apply dark or sepia only inside the EPUB while leaving the shell in another world.",
+      "Don't let custom CSS, model text, diagrams, or labs escape their bounded rendering surfaces or silently rewrite publisher content.",
+      "Don't hard-code the current terracotta palette into new study primitives; consume semantic tokens so user-created worlds remain coherent.",
+      "Don't preserve a weak customization merely because an agent created it; preview, validate, revise, and keep Reset or Undo visible."
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 # Current work
 
-Last updated: 2026-09-01
+Last updated: 2026-09-02
 
 ## Goal
 
@@ -55,6 +55,16 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
   hidden-book arrow navigation is guarded; and Study authoring targets meet 44
   pixels. The larger mobile chrome/gesture redesign and remaining W1 trust work
   are still open.
+- Impeccable 4.1.3 project context is reconciled with the shipped product.
+  `PRODUCT.md` now follows the current product schema, and `DESIGN.md` plus
+  `.impeccable/design.json` define “The Working Library” as both the strong
+  default and an embedded composition guide for user- and agent-authored
+  worlds. Customization remains intentionally broad, but agents are guided to
+  use complete semantic theme roles, preserve hierarchy and contrast, preview
+  all reader and study surfaces, and keep reset or Undo available. Impeccable
+  stays code-first by default to conserve image-generation tokens and latency;
+  a task may explicitly use a visual comp when that reference would materially
+  improve a novel surface.
 - Bookhand naming and the approved Slice 1 visual system are committed; the
   reader/library implementation mission is now active.
 - Slice 1 scope, work topology, and reviewed validation contracts live in

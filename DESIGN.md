@@ -1,93 +1,312 @@
-# Bookhand design system
+---
+name: Bookhand
+description: A working library that recedes for reading and opens into grounded study.
+colors:
+  clear-canvas: "oklch(98.51% 0 89.88)"
+  library-ink: "oklch(17.73% 0.0089 264.32)"
+  quiet-graphite: "oklch(50.23% 0.0205 264.37)"
+  fine-rule: "oklch(92.76% 0.0058 264.53)"
+  terracotta-spine: "oklch(56.66% 0.1606 35.42)"
+  raised-leaf: "oklch(100% 0 0)"
+  sepia-canvas: "#f4efe4"
+  sepia-ink: "#29231b"
+  sepia-muted: "#655c50"
+  sepia-rule: "#d8cdbb"
+  sepia-accent: "#9b3b21"
+  sepia-raised: "#fffaf0"
+  night-canvas: "#171717"
+  night-ink: "#f4efe9"
+  night-muted: "#b8b0a7"
+  night-rule: "#3b3733"
+  night-accent: "#ff9a76"
+  night-raised: "#232220"
+  highlight-amber: "#d69e2e"
+  highlight-sky: "#3b82f6"
+  highlight-moss: "#48946a"
+typography:
+  literary-display:
+    fontFamily: "Source Serif 4 Variable, Iowan Old Style, Georgia, serif"
+    fontSize: "2rem"
+    fontWeight: 600
+    lineHeight: 1.15
+    letterSpacing: "-0.02em"
+  literary-title:
+    fontFamily: "Source Serif 4 Variable, Iowan Old Style, Georgia, serif"
+    fontSize: "1.125rem"
+    fontWeight: 600
+    lineHeight: 1.3
+    letterSpacing: "-0.01em"
+  body:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.9375rem"
+    fontWeight: 400
+    lineHeight: 1.5
+    letterSpacing: "normal"
+  label:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.8125rem"
+    fontWeight: 500
+    lineHeight: 1.4
+    letterSpacing: "normal"
+  micro-label:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.6875rem"
+    fontWeight: 500
+    lineHeight: 1.4
+    letterSpacing: "0.06em"
+  code:
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace"
+    fontSize: "0.8125rem"
+    fontWeight: 400
+    lineHeight: 1.45
+rounded:
+  focus: "3px"
+  compact: "4px"
+  control: "6px"
+spacing:
+  tight: "6px"
+  compact: "10px"
+  standard: "14px"
+  comfortable: "18px"
+  section: "28px"
+components:
+  button-primary:
+    backgroundColor: "{colors.terracotta-spine}"
+    textColor: "{colors.clear-canvas}"
+    typography: "{typography.label}"
+    rounded: "{rounded.control}"
+    padding: "0 16px"
+    height: "44px"
+  button-quiet:
+    backgroundColor: "{colors.raised-leaf}"
+    textColor: "{colors.library-ink}"
+    typography: "{typography.label}"
+    rounded: "{rounded.control}"
+    padding: "0 16px"
+    height: "44px"
+  ruled-book-row:
+    backgroundColor: "transparent"
+    textColor: "{colors.library-ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.control}"
+    padding: "14px 8px"
+  reader-panel:
+    backgroundColor: "{colors.clear-canvas}"
+    textColor: "{colors.library-ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.focus}"
+---
 
-Last confirmed: 2026-09-01
+# Design System: Bookhand
 
-## Product posture
+## Overview
 
-Bookhand is a clean, polished private library whose interface recedes while a
-person reads. The product uses a soft-light theme by default and keeps the book
-as the primary visual surface. It should feel warm through typography, real book
-artwork, and one restrained terracotta accent rather than through beige chrome,
-decorative texture, or ornamental panels.
+**Creative North Star: "The Working Library"**
 
-The approved Slice 1 north star is the quiet-catalog direction: a compact
-library header, ruled book rows, a calm reader, a lightweight table of contents,
-and one-surface-at-a-time mobile adaptation. Generated mocks are composition
-references, not assets to rasterize or sources of fake product state.
+Bookhand begins as a quiet private library, not a dashboard. The interface
+recedes while a person reads, then becomes an active place of study when the
+reader asks for it. Its warmth comes from real book artwork, literary type, and
+one restrained accent rather than beige product chrome, decorative texture, or
+nostalgia pasted onto controls.
 
-- Approved palette specimen: `docs/design/slice-1-palette.png`
-- Approved library/reader north star: `docs/design/slice-1-north-star.png`
+The default world is calm, precise, quietly warm, and flat by default. Fine
+rules, compact typography, honest state changes, and clear spatial transitions
+carry hierarchy. The Study surface may become richer and more expressive than
+the library, but it remains a composed learning artifact rather than a chat
+transcript or a grid of equally weighted records.
 
-## Identity
+This system is also an embedded design prompt. It describes how the shipped
+world achieves harmony so people and agents can create different coherent
+worlds. The default palette and components are reference-quality starting
+points, not a restriction on customization.
 
-- Use the open-book mark with a terracotta center spine and the Bookhand
-  wordmark. Do not reuse Agent Connect's colored-dot motif.
-- The app canvas is a true near-white. Book content may use its own theme and
-  publisher CSS inside the reader boundary.
-- Fine rules, space, and weight establish hierarchy. Avoid card grids, fake
-  shelves, parchment textures, broad shadows, glass effects, and decorative
-  gradients.
+**Key Characteristics:**
 
-## Palette
+- Reader-first, with chrome that yields to the book.
+- Ruled and typographic rather than card-based.
+- One rare accent voice, used for meaning rather than decoration.
+- Complete theme worlds, not an EPUB rectangle inside unrelated chrome.
+- User-controlled customization with preview, reset, and Undo where persistent.
+- Native study artifacts that remain visibly grounded in their sources.
 
-Use OKLCH tokens in implementation while preserving these approved targets:
+Approved composition references remain at
+`docs/design/slice-1-north-star.png` and
+`docs/design/slice-1-palette.png`. They are references, not fake product state
+or assets to rasterize into the application.
 
-- Canvas: `#fafafa`
-- Ink: `#0f1115`
-- Muted: `#5e6470`
-- Rule: `#e5e7eb`
-- Accent: `#c24a2b`
+## Colors
 
-Accent should occupy less than roughly ten percent of ordinary product chrome.
-It identifies primary actions, progress, selection, and the book-spine motif;
-it is not decoration. Body and muted text must meet WCAG AA contrast.
+The default library uses Clear Canvas, Library Ink, Quiet Graphite, Fine Rule,
+Raised Leaf, and the rare Terracotta Spine accent. Reader themes are complete
+semantic sets: Reading Sepia and Night Reading replace canvas, ink, muted,
+rule, accent, and raised-surface roles together. Publisher mode preserves the
+EPUB's own presentation while the application shell remains a neutral,
+accessible frame.
+
+**The Whole-World Theme Rule.** A reading theme changes every visible reader
+surface: EPUB, chrome, panels, controls, overlays, focus, Study artifacts, and
+status UI. Never leave a bright application frame around a dark book or apply a
+new accent without checking it against every surface it touches.
+
+**The One Accent Voice Rule.** A customized world may replace Terracotta Spine
+with any deliberate accent, but ordinary chrome should still speak with one
+primary accent occupying roughly ten percent or less of the surface. Additional
+highlight colors label user meaning; they do not become competing brand colors.
+
+### Custom theme grammar
+
+A person or agent may replace the shipped colors freely. Define the semantic
+roles first—canvas, raised surface, ink, muted ink, rule, accent, quiet accent,
+focus, selection, and error—then apply them consistently. Check ordinary text
+at WCAG AA, meaningful non-text state at 3:1, focus visibility, disabled state,
+and selection contrast. Preview the world across the book, Contents, Text,
+Study, annotations, errors, mobile, and desktop before persisting it. Always
+retain a visible route back to a named shipped theme or the publisher baseline.
 
 ## Typography
 
-- Inter carries product headings, controls, labels, metadata, and status text.
-- Source Serif 4 is reserved for the Bookhand wordmark and occasional literary
-  moments in the library. It is not used for product controls.
-- EPUB typography remains isolated behind `ReaderAdapter`; app CSS must not
-  leak into publisher content.
-- Product type uses a fixed, compact scale. Reading type is user-adjustable and
-  capped to a comfortable measure.
+**Literary Font:** Source Serif 4 Variable, with Iowan Old Style and Georgia as
+fallbacks.
 
-## Library
+**Product Font:** Inter Variable, with the system sans stack as fallback.
 
-- Start in the library, with one bundled judging-period EPUB represented as a
-  normal local book. The bundled book is removable after judging without
-  redesigning the empty state.
-- The primary actions are Continue/Open and Open EPUB.
-- A continue-reading section appears only after meaningful progress exists.
-- All books use a ruled list: cover, title, author, format, progress, last-read
-  context, and bounded actions. Do not add search, collections, or metrics until
-  library scale requires them.
-- The footer states the local storage boundary plainly.
+**Code Font:** the platform monospace stack.
 
-## Reader
+The pairing says “working library”: serif marks the Bookhand identity, library
+titles, quotations, and occasional literary moments; sans-serif operates the
+product. EPUB typography remains isolated behind `ReaderAdapter` and stays
+user-adjustable.
 
-- Desktop chrome contains Library/back, book and chapter identity, Contents,
-  Study, and Text controls. The book is the largest and calmest region.
-- Contents is an adjacent drawer; reading settings are an adjacent panel. Do
-  not layer both over the book simultaneously.
-- Previous and next navigation have large hit areas and low visual emphasis.
-- Selection exposes a small `Study this` affordance and an exact source range.
-- Slice 1 may open a sparse study-board shell, but it does not implement study
-  items, annotations, or agent behavior from later slices.
-- Custom book CSS is previewable, visible, persistable, and resettable.
+### Hierarchy
 
-## Responsive behavior
+- **Literary display:** library title and rare high-level literary moments.
+- **Literary title:** wordmark and compact bookish identity.
+- **Body:** ordinary product text and authored study prose.
+- **Label:** controls, metadata, status, panel headings, and values.
+- **Micro label:** format tags, study kinds, and dense tool history; uppercase
+  tracking is allowed only where the content is genuinely a compact category.
+- **Code:** custom CSS, raw equations until typeset, tool names, and diagnostic
+  values.
 
-- Mobile keeps one primary surface at a time. It never squeezes reader and
-  board into two columns.
-- Contents and Text use full-height sheets. Study switches surface.
-- Bottom actions use at least 44 by 44 CSS-pixel targets and respect safe-area
-  insets. Core behavior cannot depend on hover.
-- The physical Pixel 7 is the acceptance surface for touch selection and
-  lifecycle claims; viewport emulation proves layout only.
+**The Two Voices Rule.** Keep one literary voice and one operational voice.
+Custom typography may replace either family, but must preserve the role
+contrast and cannot leak application type rules into publisher content.
 
-## Motion
+## Layout
 
-Motion communicates state: panels enter and leave in 150–250 ms, selections and
-saved state acknowledge briefly, and no page-load choreography delays reading.
-Every transition has a reduced-motion path.
+The library is a centered working catalog capped near 900px. It uses a compact
+masthead, a conditional Continue section, and full-width ruled book rows rather
+than shelves or cards. Covers, titles, progress, and last-read context align to
+a clear scanning grid and collapse intentionally on small screens.
+
+The desktop reader gives the book the largest and calmest region. Contents and
+Text occupy an adjacent panel; Study may dock or expand while preserving the
+reading location. Mobile uses one primary surface at a time. Contents, Text,
+and Study become complete surfaces rather than squeezing beside the book.
+
+Spacing follows a compact six-to-eighteen-pixel control rhythm and opens to
+larger section gaps only when the information hierarchy changes. Coarse-pointer
+targets are at least 44 by 44 CSS pixels. Safe-area insets and 320px-wide reflow
+are part of the layout, not later patches.
+
+**The Book Gets the Space Rule.** Reader chrome and agent activity must justify
+every permanent pixel. Navigation can overlay or recede on mobile; it must not
+reserve broad rails that make the book feel like a preview.
+
+## Elevation & Depth
+
+Bookhand is flat by default. One-pixel rules, background tone, whitespace, and
+ordering establish depth. Raised Leaf distinguishes controls or transient
+selection actions without turning every region into a card. The only current
+shadow is a tight, low selection-action shadow used to separate a temporary
+control from book content.
+
+**The Structural Depth Rule.** Prefer a rule, tonal change, or spatial move to a
+shadow. Shadows appear only when an element temporarily floats above reading
+content; never combine broad soft shadows with ornamental borders.
+
+## Shapes
+
+Shapes are compact and quiet. Controls use gently squared six-pixel corners;
+fields and compact states use four pixels; focus treatment may use three. Book
+covers retain their physical rectangular silhouette. Full pills, oversized
+rounding, floating glass panels, and decorative blobs do not belong to the
+default world.
+
+Custom worlds may change the corner language, but must do so systemically. Pick
+a small scale, apply it by component role, and keep touch targets and focus
+outlines intact.
+
+## Components
+
+Components are restrained and quietly tactile. State comes from border tone,
+background tone, text color, and direct movement—not ornamental elevation.
+
+### Buttons
+
+- **Primary:** Terracotta Spine fill, Clear Canvas text, compact corners, and a
+  44px minimum height. Use for the one action that advances the current task.
+- **Quiet:** raised surface, Fine Rule border, and normal ink. Use for reversible
+  tools, toggles, and secondary actions.
+- **Text:** underlined Quiet Graphite with no container. Use for low-emphasis
+  local actions; do not use it where a 44px mobile target is required without
+  a larger hit region.
+- **Icon:** 44px square minimum, stable accessible name, and visible focus.
+
+### Ruled book row
+
+The signature library component is one continuous scanning row: cover, book
+identity, progress, and last-read context. Rows are separated by Fine Rule and
+gain only a quiet tonal hover state. They never become a grid of independent
+cards as the library grows.
+
+### Reader chrome and panels
+
+Reader chrome carries back/library, book identity, Contents, Study, and Text.
+Pressed state uses the active theme accent. Panels have one header, one scroll
+body, and a clear close path; mobile panels replace the reading surface and
+restore focus when closed.
+
+### Study artifacts
+
+Study content leads with the learning artifact and its source relationship.
+Authoring controls and agent telemetry are secondary disclosure. Quotations,
+equations, steps, questions, diagrams, and interactive plots use native,
+theme-aware rendering. Agent-created work identifies its origin and exposes
+the appropriate Return to source, Reset, Undo, or Delete action.
+
+### Motion
+
+State transitions use the current 180ms timing or stay within 150–250ms.
+Motion communicates panel, paging, focus, and persistence state; it never
+delays reading. Reduced motion removes nonessential travel while preserving an
+immediate, understandable state change.
+
+## Do's and Don'ts
+
+### Do:
+
+- **Do** treat the shipped themes as excellent examples of a semantic system,
+  not as the only palettes Bookhand may support.
+- **Do** define a complete token world before applying an agent-authored theme.
+- **Do** preserve hierarchy, contrast, source grounding, user control, and a
+  visible reset path when experimenting boldly.
+- **Do** inspect customization on library, reader, panels, Study, mobile,
+  desktop, error, focus, and reduced-motion states.
+- **Do** let the artifact dominate Study and keep tool history secondary.
+- **Do** use real book content and real product state in demonstrations.
+
+### Don't:
+
+- **Don't** turn Bookhand into a generic dashboard, chat transcript, card grid,
+  fake bookshelf, or collection of equally weighted controls.
+- **Don't** equate “bookish” with beige application chrome, parchment texture,
+  paper grain, ornamental shadows, or nostalgic decoration.
+- **Don't** apply dark or sepia only inside the EPUB while leaving the shell in
+  another world.
+- **Don't** let custom CSS, model text, diagrams, or labs escape their bounded
+  rendering surfaces or silently rewrite publisher content.
+- **Don't** hard-code the current terracotta palette into new study primitives;
+  consume semantic tokens so user-created worlds remain coherent.
+- **Don't** preserve a weak customization merely because an agent created it;
+  preview, validate, revise, and keep Reset or Undo visible.
