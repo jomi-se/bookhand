@@ -4,12 +4,23 @@ Last updated: 2026-09-02
 
 ## Next action
 
-W1 (source and persistence trust), then W2 (one observable mutation surface).
-W0 is done. A separate Pixel 7 diagnosis is parked at
-`docs/reviews/2026-09-02-pixel-7-reader-diagnosis.md`: it found that `.reader`
-declares no grid columns, so the reading surface is max-content sized and the
-whole app blows out horizontally on a phone. That is W3's territory and it is
-the largest single mobile defect found so far.
+Continue W1. `VAL-RANGE-OWNERSHIP` and `VAL-MATH-PASSAGE` are implemented;
+`VAL-DURABLE-STORAGE-REQUEST`, `VAL-STUDY-ID-OWNERSHIP`,
+`VAL-ACTION-PROVENANCE-UNDO`, and `VAL-MUTATION-ERRORS` remain.
+
+The wave order is being read as a dependency graph rather than a chain, because
+the deadline is 2026-09-03T20:00Z. W2 needs W1's error/provenance primitives,
+W3 needs W2's shared style/view state, and W5 needs W3's theme/layout
+primitives — each a narrow interface, not a whole wave. The intended path is
+W1, then those three interfaces, then W5, with W3's remaining mobile contracts
+and W4 taken after. W5 is what makes the submission worth judging: without it
+there is a well-behaved reader and nothing to demonstrate.
+
+Defect 1 of `docs/reviews/2026-09-02-pixel-7-reader-diagnosis.md` is fixed ahead
+of W3, because it made every mobile observation unreliable: `.reader` declared
+no grid column, so the reading surface was max-content sized and the whole app
+blew out horizontally. Defects 2 through 8 in that review are still open and
+belong to W3.
 
 ## Goal
 

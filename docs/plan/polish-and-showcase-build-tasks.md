@@ -53,6 +53,21 @@ Targets: `VAL-RANGE-OWNERSHIP`, `VAL-MATH-PASSAGE`,
 `VAL-DURABLE-STORAGE-REQUEST`, `VAL-STUDY-ID-OWNERSHIP`,
 `VAL-ACTION-PROVENANCE-UNDO`, and `VAL-MUTATION-ERRORS`.
 
+`VAL-RANGE-OWNERSHIP` implemented 2026-09-02. `save_annotation` and any study
+item carrying a `sourceRange` must state the `bookId` and the exact quote;
+`BookhandCommands` resolves the range against the open book and rejects
+wrong-book, stale-range, stale-fingerprint, partial-quote, and invented-quote
+before attempting any write. `tests/unit/source-verification.test.ts`
+re-derives the contract's normalization independently of the implementation.
+
+`VAL-MATH-PASSAGE` implemented 2026-09-02. Passages are serialized rather than
+concatenated, preferring `data-tex`, then MathML `alttext`/TeX annotation, then
+image `alt`, then SVG title and description, each replacing its element so
+nothing is stated twice. This mattered more than expected: the bundled book has
+no MathML, so every passage previously reached agents with the mathematics
+removed. Chapter X now reads with `\dfrac{dy}{d x}` intact through the genuine
+WebMCP runtime.
+
 - Enforce current-book range, fingerprint, and normalized-quote ownership at
   the command boundary.
 - Make exact/visible passage extraction preserve inline math and figure text.
