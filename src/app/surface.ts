@@ -61,6 +61,15 @@ export class SurfaceStore {
     }
   }
 
+  /**
+   * Start again for a different book. The reversal in particular has to go: it
+   * names a layout on a board that is no longer open.
+   */
+  reset(): void {
+    this.#state = { panel: null, focusNonce: 0 }
+    for (const listener of this.#listeners) listener(this.#state)
+  }
+
   setPanel(panel: ReaderPanel): void {
     if (this.#state.panel === panel) return
     this.#set({ panel })

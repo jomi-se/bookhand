@@ -465,21 +465,18 @@ export class BookhandCommands {
   ): Promise<MutationReceipt<StudyBoardSnapshot>> {
     const origin = caller.origin ?? 'user'
     const actionGroupId = caller.actionGroupId ?? this.#id('view')
-    const prior: StudyBoardSnapshot = {
-      view: this.#boardView,
-      open: this.#context.surface.boardOpen,
-    }
+    const prior = this.#boardSnapshot()
 
     let persisted = false
     if (mode === 'docked' || mode === 'expanded') {
-      const board = await this.#context.client.setBoardView(this.#context.board.id, mode)
-      this.#boardView = board.view
-      this.#board = board
+      await this.#storeBoardView(mode)
       persisted = true
       this.#context.surface.openBoard()
       // Only a tool change needs taking back; the person just did this one.
       this.#context.surface.recordBoardReversal(
-        origin === 'agent' ? { origin, actionGroupId, priorView: prior.view, priorOpen: prior.open } : undefined,
+        origin === 'agent'
+          ? { origin, actionGroupId, priorView: prior.view, priorOpen: prior.open }
+          : undefined,
       )
     } else if (mode === 'focus') {
       this.#context.surface.openBoard({ focus: true })
@@ -488,20 +485,7 @@ export class BookhandCommands {
     }
 
     this.#changed()
-    return {
-      operation: 'update',
-      origin,
-      actionGroupId,
-      prior,
-      applied: { view: this.#boardView, open: this.#context.surface.boardOpen },
-      scope:
-        mode === 'docked' || mode === 'expanded'
-          ? 'How the study board is laid out beside the book. The reading position does not change.'
-          : 'What is on screen right now. Nothing is stored, deleted, or reordered, and the reading position does not change.',
-      warnings: [],
-      persisted,
-      actions: [UNDO_BOARD_VIEW_ACTION],
-    }
+    return this.#boardReceipt({ origin, actionGroupId, prior, persisted })
   }
 
   /** The board as it stands, whoever changed it last. */
@@ -516,14 +500,63 @@ export class BookhandCommands {
     return this.setStudyBoardView(this.#boardView === 'expanded' ? 'docked' : 'expanded', caller)
   }
 
-  /** Put back the layout an agent changed. */
+  /**
+   * Put back the layout an agent changed, including whether the board was on
+   * screen at all.
+   *
+   * Deliberately not routed through `setStudyBoardView`: that always opens the
+   * board, so an undo of a change that had opened it would have left it open,
+   * and handed back a receipt saying so.
+   */
   async undoStudyBoardView(): Promise<MutationReceipt<StudyBoardSnapshot> | undefined> {
     const reversal = this.#context.surface.state.boardReversal
     if (!reversal) return undefined
-    const receipt = await this.setStudyBoardView(reversal.priorView, { origin: 'user' })
-    if (!reversal.priorOpen) this.#context.surface.closeBoard()
+    const prior = this.#boardSnapshot()
+
+    await this.#storeBoardView(reversal.priorView)
+    if (reversal.priorOpen) this.#context.surface.openBoard()
+    else this.#context.surface.closeBoard()
     this.#context.surface.recordBoardReversal(undefined)
-    return receipt
+
+    this.#changed()
+    return this.#boardReceipt({
+      origin: 'user',
+      actionGroupId: reversal.actionGroupId,
+      prior,
+      persisted: true,
+    })
+  }
+
+  async #storeBoardView(view: StudyBoardView): Promise<void> {
+    const board = await this.#context.client.setBoardView(this.#context.board.id, view)
+    this.#board = board
+    this.#boardView = board.view
+  }
+
+  #boardSnapshot(): StudyBoardSnapshot {
+    return { view: this.#boardView, open: this.#context.surface.boardOpen }
+  }
+
+  /** Built from live state, after everything has been applied. */
+  #boardReceipt(about: {
+    origin: MutationOrigin
+    actionGroupId: string
+    prior: StudyBoardSnapshot
+    persisted: boolean
+  }): MutationReceipt<StudyBoardSnapshot> {
+    return {
+      operation: 'update',
+      origin: about.origin,
+      actionGroupId: about.actionGroupId,
+      prior: about.prior,
+      applied: this.#boardSnapshot(),
+      scope: about.persisted
+        ? 'How the study board is laid out beside the book. The reading position does not change.'
+        : 'What is on screen right now. Nothing is stored, deleted, or reordered, and the reading position does not change.',
+      warnings: [],
+      persisted: about.persisted,
+      actions: [UNDO_BOARD_VIEW_ACTION],
+    }
   }
 
   async #nextOrder(): Promise<number> {

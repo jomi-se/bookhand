@@ -78,15 +78,22 @@ export function useReaderChrome({
     hideLater(idleMs)
   }, [hideLater, idleMs])
 
+  // Reads the current value rather than deciding inside a state updater: an
+  // updater may be run more than once, and scheduling a timer from inside one
+  // would schedule it more than once too.
+  const shown = useRef(true)
+  useEffect(() => {
+    shown.current = visible
+  }, [visible])
+
   const toggle = useCallback(() => {
-    setVisible((current) => {
-      if (current) {
-        clear()
-        return false
-      }
-      hideLater(idleMs)
-      return true
-    })
+    if (shown.current) {
+      clear()
+      setVisible(false)
+      return
+    }
+    setVisible(true)
+    hideLater(idleMs)
   }, [clear, hideLater, idleMs])
 
   /**

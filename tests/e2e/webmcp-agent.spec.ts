@@ -368,3 +368,35 @@ test('the study board can be focused and closed without changing the layout', as
   await page.getByRole('button', { name: 'Undo' }).first().click()
   await expect(page.locator('.reader')).toHaveAttribute('data-board', 'docked')
 })
+
+test('a highlight survives the reflow a style change causes', async ({ page }) => {
+  await openBook(page)
+  await expect.poll(() => agentToolNames(page)).toContain('set_reading_style')
+
+  const context = await agentCall(page, 'get_reading_context')
+  const bookId = /Book id: (\S+)/.exec(context.text)?.[1]
+  const range = JSON.parse(/Visible range: (\{.*\})/.exec(context.text)?.[1] ?? 'null')
+  const quote = /<<<BOOK\n([\s\S]*?)\nBOOK/.exec(context.text)?.[1]
+
+  await agentCall(page, 'save_annotation', { bookId, range, quote, color: 'sky' })
+  const drawn = () =>
+    page.evaluate(() => {
+      const view = document.querySelector('foliate-view') as unknown as {
+        renderer?: { getContents?: () => { overlayer?: { element?: Element } }[] }
+      }
+      return (
+        view?.renderer?.getContents?.()[0]?.overlayer?.element?.querySelectorAll('rect').length ?? 0
+      )
+    })
+  await expect.poll(drawn).toBeGreaterThan(0)
+
+  // Everything about the page geometry changes here. The mark is anchored to a
+  // range CFI, not to coordinates, so it has to be redrawn where the words went.
+  await agentCall(page, 'set_reading_style', { fontSizePercent: 170, measureCh: 45 })
+  await expect.poll(drawn).toBeGreaterThan(0)
+
+  // And the passage the block cites still resolves to the same words.
+  const after = await agentCall(page, 'get_passage', { range })
+  expect(after.isError).toBe(false)
+  expect(after.text).toContain(quote!.slice(0, 40))
+})

@@ -127,4 +127,19 @@ describe('the reading presentation store', () => {
 
     expect(apply).toHaveBeenCalledTimes(1) // only the one install performs
   })
+
+  it('starts clean for a different book', () => {
+    // The store outlives any one book, but reading style is stored per book.
+    // Without this, the second book kept the first one's settings — and, once
+    // anything had been committed, `hydrate` would refuse to replace them.
+    const { presentation } = store()
+    void presentation.commit({ theme: 'dark' }, 'agent')
+
+    presentation.beginBook(DEFAULT_READER_STYLE)
+
+    expect(presentation.committed).toEqual(DEFAULT_READER_STYLE)
+    expect(presentation.view.reversible).toBeUndefined()
+    presentation.hydrate({ ...DEFAULT_READER_STYLE, theme: 'sepia' })
+    expect(presentation.committed.theme).toBe('sepia')
+  })
 })

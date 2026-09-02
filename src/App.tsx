@@ -97,6 +97,9 @@ function App() {
   if (reading) {
     return (
       <ReaderScreen
+        // Keyed by book, so opening another one builds a fresh reader rather
+        // than handing the new book the old book's adapter and study board.
+        key={reading.id}
         entry={reading}
         client={runtime.client}
         ports={runtime.ports}

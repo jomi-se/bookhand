@@ -68,6 +68,24 @@ export class PresentationStore {
   }
 
   /**
+   * Start again for a different book.
+   *
+   * Reading style is stored per book, but this store outlives any one of them.
+   * Without this, opening a second book showed the first one's style until its
+   * own was restored — and if anything had already been committed, `hydrate`
+   * would decline to restore it at all and the second book would simply keep
+   * the first one's settings.
+   */
+  beginBook(initial: ReaderStyle): void {
+    this.#committed = initial
+    this.#preview = undefined
+    this.#reversible = undefined
+    this.#warnings = []
+    this.#settled = false
+    this.#push()
+  }
+
+  /**
    * Adopt the style found in storage when the book opens.
    *
    * Ignored once anything has been committed. A book takes time to open, and

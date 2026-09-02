@@ -17,6 +17,7 @@ import type { StorageClient } from '../storage/client.ts'
 import { ContentsPanel } from './ContentsPanel.tsx'
 import { ReaderHost } from './ReaderHost.tsx'
 import { TextPanel } from './TextPanel.tsx'
+import { DEFAULT_READER_STYLE } from './FoliateReaderAdapter.ts'
 import { useReader } from './useReader.ts'
 import { useReaderChrome } from './useReaderChrome.ts'
 
@@ -68,6 +69,14 @@ export function ReaderScreen({
   const bookHost = useRef<HTMLDivElement>(null)
   const [surfaceState, setSurfaceState] = useState(surface.state)
   useEffect(() => surface.subscribe(setSurfaceState), [surface])
+
+  // Both stores outlive any one book, and this screen is keyed by book, so
+  // this runs exactly once per book opened. Without it a second book inherits
+  // the first one's style and its board's Undo.
+  useEffect(() => {
+    presentation.beginBook(DEFAULT_READER_STYLE)
+    surface.reset()
+  }, [presentation, surface])
   const panel = surfaceState.panel
   const setPanel = useCallback((next: ReaderPanel) => surface.setPanel(next), [surface])
   const panelInvoker = useRef<HTMLElement | null>(null)

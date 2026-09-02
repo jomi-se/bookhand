@@ -470,16 +470,29 @@ describe('the study board view', () => {
     expect(surface.state.boardReversal).toMatchObject({ origin: 'agent', priorView: 'expanded' })
   })
 
-  it('undoes an agent layout change back to what was there', async () => {
+  it('undoes an agent layout change back to what was there, and says so', async () => {
     const { commands, surface } = setup()
     await commands.setStudyBoardView('expanded', { origin: 'agent' })
     const undone = await commands.undoStudyBoardView()
 
-    expect(undone?.applied.view).toBe('docked')
-    // The board was closed before the agent opened it, so Undo closes it again.
+    // The board was closed before the agent opened it, so Undo closes it
+    // again — and the receipt has to report that, not the state the undo
+    // passed through on its way there.
+    expect(undone?.applied).toEqual({ view: 'docked', open: false })
+    expect(undone?.prior).toEqual({ view: 'expanded', open: true })
     expect(surface.boardOpen).toBe(false)
     expect(surface.state.boardReversal).toBeUndefined()
     expect(await commands.undoStudyBoardView()).toBeUndefined()
+  })
+
+  it('leaves a board the person already had open, open', async () => {
+    const { commands, surface } = setup()
+    surface.openBoard()
+    await commands.setStudyBoardView('expanded', { origin: 'agent' })
+    const undone = await commands.undoStudyBoardView()
+
+    expect(undone?.applied).toEqual({ view: 'docked', open: true })
+    expect(surface.boardOpen).toBe(true)
   })
 
   it('toggles from the layout in force, not from one read earlier', async () => {
