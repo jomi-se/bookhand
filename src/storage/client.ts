@@ -13,6 +13,10 @@ import type {
   StorageWorkerRequest,
   StorageWorkerResponse,
   StorageWorkerResult,
+  IndexChunk,
+  IndexCursor,
+  IndexState,
+  SearchResult,
 } from '../domain/index.ts'
 import {
   BOOK_IMPORT_DEADLINE_MS,
@@ -281,6 +285,34 @@ export class StorageClient {
   async listStudyItems(boardId: string): Promise<readonly StudyItem[]> {
     return expectResult(await this.request({ type: 'list-study-items', boardId }), 'study-items')
       .items
+  }
+
+  async getIndexState(bookId: string): Promise<IndexState | null> {
+    return expectResult(await this.request({ type: 'get-index-state', bookId }), 'index-state').state
+  }
+
+  async beginIndex(bookId: string, sectionsTotal: number): Promise<IndexState> {
+    return expectResult(await this.request({ type: 'begin-index', bookId, sectionsTotal }), 'index-state').state!
+  }
+
+  async commitIndexBatch(bookId: string, epoch: number, expected: IndexCursor, chunks: readonly IndexChunk[], next: IndexCursor, sectionsIndexed: number): Promise<IndexState> {
+    return expectResult(await this.request({ type: 'commit-index-batch', bookId, epoch, expected, chunks, next, sectionsIndexed }), 'index-state').state!
+  }
+
+  async completeIndex(bookId: string, epoch: number): Promise<IndexState> {
+    return expectResult(await this.request({ type: 'complete-index', bookId, epoch }), 'index-state').state!
+  }
+
+  async failIndex(bookId: string, epoch: number, message: string): Promise<IndexState> {
+    return expectResult(await this.request({ type: 'fail-index', bookId, epoch, message }), 'index-state').state!
+  }
+
+  async cancelIndex(bookId: string, epoch: number): Promise<IndexState> {
+    return expectResult(await this.request({ type: 'cancel-index', bookId, epoch }), 'index-state').state!
+  }
+
+  async searchBook(bookId: string, query: string, limit: number): Promise<SearchResult> {
+    return expectResult(await this.request({ type: 'search-book', bookId, query, limit }), 'search-results').result
   }
 
   /** Idempotent, and never rejects: teardown must be safe from a cleanup path. */

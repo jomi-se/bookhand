@@ -16,6 +16,7 @@ import type {
   SourceExcerpt,
   SourceOwnership,
   TocItem,
+  SearchResult,
 } from '../domain/index.ts'
 import { createSourceExcerpt, SOURCE_EXTRACTION_VERSION } from '../domain/source.ts'
 import {
@@ -222,6 +223,10 @@ export class BookhandCommands {
   async navigateBook(target: BookTarget): Promise<ReadingContext> {
     await this.#adapter().navigate(target)
     return this.getReadingContext()
+  }
+
+  async searchBook(query: string, limit = 5): Promise<SearchResult> {
+    return this.#context.client.searchBook(this.#context.bookId, query, limit)
   }
 
   /**

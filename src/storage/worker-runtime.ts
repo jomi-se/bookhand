@@ -10,7 +10,7 @@ import type {
   StorageWorkerResult,
 } from '../domain/index.ts'
 import { sha256BookId } from './hash.ts'
-import { LibraryRepository } from './library-repository.ts'
+import { LibraryRepository, type IndexRepositoryHooks } from './library-repository.ts'
 import { assertStorageWorkerRequest } from './protocol.ts'
 import { initializeSchema, STORAGE_SCHEMA_VERSION } from './schema.ts'
 
@@ -19,6 +19,11 @@ const SAHPOOL_DIRECTORY = '/bookhand-sahpool'
 const SAHPOOL_VFS_NAME = 'bookhand-opfs-sahpool'
 
 type SqliteInitializer = () => Promise<Sqlite3Static>
+
+export interface StorageRuntimeHooks extends IndexRepositoryHooks {
+  afterIndexBatch?(request: Extract<StorageWorkerRequest, { type: 'commit-index-batch' }>): Promise<void> | void
+  beforeIndexCancel?(request: Extract<StorageWorkerRequest, { type: 'cancel-index' }>): void
+}
 
 interface InstallOptions {
   readonly name: string
@@ -101,8 +106,13 @@ export class StorageWorkerRuntime {
   private repository: LibraryRepository | undefined
   private pool: SAHPoolUtil | undefined
   private mode: StorageDiagnostics['mode'] | undefined
-  constructor(initializeSqlite: SqliteInitializer = initializeOfficialSqlite) {
+  private readonly hooks: StorageRuntimeHooks
+  constructor(
+    initializeSqlite: SqliteInitializer = initializeOfficialSqlite,
+    hooks: StorageRuntimeHooks = {},
+  ) {
     this.initializeSqlite = initializeSqlite
+    this.hooks = hooks
   }
 
   async handle(rawRequest: unknown): Promise<StorageWorkerResult> {
@@ -212,6 +222,24 @@ export class StorageWorkerRuntime {
           type: 'study-items',
           items: this.requireRepository().listStudyItems(request.boardId),
         }
+      case 'get-index-state':
+        return { type: 'index-state', state: this.requireRepository().getIndexState(request.bookId) }
+      case 'begin-index':
+        return { type: 'index-state', state: this.requireRepository().beginIndex(request.bookId, request.sectionsTotal, new Date().toISOString()) }
+      case 'commit-index-batch': {
+        const state = this.requireRepository().commitIndexBatch(request.bookId, request.epoch, request.expected, request.chunks, request.next, request.sectionsIndexed, new Date().toISOString())
+        await this.hooks.afterIndexBatch?.(request)
+        return { type: 'index-state', state }
+      }
+      case 'complete-index':
+        return { type: 'index-state', state: this.requireRepository().completeIndex(request.bookId, request.epoch, new Date().toISOString()) }
+      case 'fail-index':
+        return { type: 'index-state', state: this.requireRepository().failIndex(request.bookId, request.epoch, request.message, new Date().toISOString()) }
+      case 'cancel-index':
+        this.hooks.beforeIndexCancel?.(request)
+        return { type: 'index-state', state: this.requireRepository().cancelIndex(request.bookId, request.epoch, new Date().toISOString()) }
+      case 'search-book':
+        return { type: 'search-results', result: this.requireRepository().searchBook(request.bookId, request.query, request.limit) }
     }
   }
 
@@ -263,7 +291,7 @@ export class StorageWorkerRuntime {
         )(options)
         this.db = new this.pool.OpfsSAHPoolDb(DATABASE_FILE)
         initializeSchema(this.db)
-        this.repository = new LibraryRepository(this.db)
+        this.repository = new LibraryRepository(this.db, this.hooks)
         this.mode = 'persistent'
         return
       } catch (error) {
@@ -298,7 +326,7 @@ export class StorageWorkerRuntime {
     if (!this.sqlite) throw new Error('SQLite is not initialized')
     this.db = new this.sqlite.oo1.DB(':memory:', 'c')
     initializeSchema(this.db)
-    this.repository = new LibraryRepository(this.db)
+    this.repository = new LibraryRepository(this.db, this.hooks)
     this.mode = 'session-only'
   }
 

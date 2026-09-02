@@ -84,6 +84,78 @@ describe('storage worker runtime over the official SQLite artifact', () => {
     ).rejects.toThrow(TypeError)
   })
 
+  it('drives named-chunk rollback through the real runtime protocol', async () => {
+    const runtime = new StorageWorkerRuntime(
+      () => sqlite3InitModule(),
+      { beforeIndexChunk: (chunk) => {
+        if (chunk.id === 'fail-here') throw new Error('Injected before named chunk')
+      } },
+    )
+    await runtime.handle({ requestId: '1', type: 'initialize' })
+    const written = await runtime.handle({ requestId: '2', type: 'import-book', book: input })
+    if (written.type !== 'book-written') throw new Error('Expected imported book')
+    const begun = await runtime.handle({ requestId: '3', type: 'begin-index', bookId: written.bookId, sectionsTotal: 2 })
+    if (begun.type !== 'index-state' || !begun.state) throw new Error('Expected index state')
+    const range = { startCfi: 'start', endCfi: 'end', sectionIndex: 0, textFingerprint: 'fnv1a-runtime' }
+    const prior = await runtime.handle({
+      requestId: '4', type: 'commit-index-batch', bookId: written.bookId,
+      epoch: begun.state.epoch, expected: begun.state.cursor,
+      chunks: [{ id: 'prior', bookId: written.bookId, sectionIndex: 0, sectionTitle: 'One', sectionChunkIndex: 0, globalOrder: 0, text: 'prior searchable passage', range }],
+      next: { sectionIndex: 1, sectionChunkIndex: 0, globalOrder: 1 }, sectionsIndexed: 1,
+    })
+    if (prior.type !== 'index-state' || !prior.state) throw new Error('Expected committed state')
+
+    await expect(runtime.handle({
+      requestId: '5', type: 'commit-index-batch', bookId: written.bookId,
+      epoch: prior.state.epoch, expected: prior.state.cursor,
+      chunks: [
+        { id: 'rolled-back', bookId: written.bookId, sectionIndex: 1, sectionTitle: 'Two', sectionChunkIndex: 0, globalOrder: 1, text: 'must not remain', range: { ...range, sectionIndex: 1 } },
+        { id: 'fail-here', bookId: written.bookId, sectionIndex: 1, sectionTitle: 'Two', sectionChunkIndex: 1, globalOrder: 2, text: 'failure point', range: { ...range, sectionIndex: 1 } },
+      ],
+      next: { sectionIndex: 2, sectionChunkIndex: 0, globalOrder: 3 }, sectionsIndexed: 2,
+    })).rejects.toThrow(/Injected before named chunk/)
+    await expect(runtime.handle({ requestId: '6', type: 'search-book', bookId: written.bookId, query: 'prior', limit: 5 })).resolves.toMatchObject({
+      type: 'search-results', result: { availability: 'partial', hits: [{ id: 'prior' }] },
+    })
+    await expect(runtime.handle({ requestId: '7', type: 'search-book', bookId: written.bookId, query: 'remain', limit: 5 })).resolves.toMatchObject({
+      type: 'search-results', result: { hits: [] },
+    })
+    runtime.close()
+  })
+
+  it('can cancel at the genuine post-commit worker boundary before another batch starts', async () => {
+    let release!: () => void
+    let paused!: () => void
+    const reachedPause = new Promise<void>((resolve) => { paused = resolve })
+    const runtime = new StorageWorkerRuntime(
+      () => sqlite3InitModule(),
+      {
+        afterIndexBatch: () => {
+          paused()
+          return new Promise<void>((resolve) => { release = resolve })
+        },
+        beforeIndexCancel: () => release(),
+      },
+    )
+    await runtime.handle({ requestId: '1', type: 'initialize' })
+    const written = await runtime.handle({ requestId: '2', type: 'import-book', book: input })
+    if (written.type !== 'book-written') throw new Error('Expected imported book')
+    const begun = await runtime.handle({ requestId: '3', type: 'begin-index', bookId: written.bookId, sectionsTotal: 2 })
+    if (begun.type !== 'index-state' || !begun.state) throw new Error('Expected index state')
+    const range = { startCfi: 'start', endCfi: 'end', sectionIndex: 0, textFingerprint: 'fnv1a-pause' }
+    const commit = runtime.handle({
+      requestId: '4', type: 'commit-index-batch', bookId: written.bookId,
+      epoch: begun.state.epoch, expected: begun.state.cursor,
+      chunks: [{ id: 'paused', bookId: written.bookId, sectionIndex: 0, sectionTitle: 'One', sectionChunkIndex: 0, globalOrder: 0, text: 'committed before pause', range }],
+      next: { sectionIndex: 1, sectionChunkIndex: 0, globalOrder: 1 }, sectionsIndexed: 1,
+    })
+    await reachedPause
+    const cancelled = await runtime.handle({ requestId: '5', type: 'cancel-index', bookId: written.bookId, epoch: begun.state.epoch })
+    await expect(commit).resolves.toMatchObject({ type: 'index-state', state: { committedChunks: 1 } })
+    expect(cancelled).toMatchObject({ type: 'index-state', state: { status: 'partial', committedChunks: 1 } })
+    runtime.close()
+  })
+
   it('does not disguise a sahpool ownership failure as session storage', async () => {
     class MockFileHandle {
       createSyncAccessHandle() {}

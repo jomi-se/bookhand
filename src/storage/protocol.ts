@@ -294,6 +294,22 @@ function isDiagnostics(value: unknown): value is StorageDiagnostics {
   )
 }
 
+function isCursor(value: unknown): boolean {
+  return isRecord(value) && Number.isInteger(value.sectionIndex) && Number(value.sectionIndex) >= 0 && Number.isInteger(value.sectionChunkIndex) && Number(value.sectionChunkIndex) >= 0 && Number.isInteger(value.globalOrder) && Number(value.globalOrder) >= 0
+}
+
+function isIndexState(value: unknown): boolean {
+  return isRecord(value) && isString(value.bookId, 256) && ['partial', 'failed', 'complete'].includes(String(value.status)) && Number.isInteger(value.epoch) && isCursor(value.cursor) && Number.isInteger(value.committedChunks) && isString(value.updatedAt) && (value.failure === undefined || isString(value.failure, 500))
+}
+
+function isIndexChunk(value: unknown): boolean {
+  return isRecord(value) && isString(value.id, 256) && isString(value.bookId, 256) && Number.isInteger(value.sectionIndex) && Number(value.sectionIndex) >= 0 && Number.isInteger(value.sectionChunkIndex) && Number(value.sectionChunkIndex) >= 0 && Number.isInteger(value.globalOrder) && Number(value.globalOrder) >= 0 && isString(value.sectionTitle, 1000) && isString(value.text, 1_200) && value.text.length > 0 && isBookRange(value.range)
+}
+
+function isSearchResult(value: unknown): boolean {
+  return isRecord(value) && isString(value.query, 300) && ['unavailable', 'partial', 'ready'].includes(String(value.availability)) && ['results', 'no-results'].includes(String(value.outcome)) && Array.isArray(value.hits) && value.hits.length <= 10 && value.hits.every((hit) => isRecord(hit) && isString(hit.id, 256) && isString(hit.bookId, 256) && Number.isInteger(hit.sectionIndex) && isString(hit.sectionTitle, 1000) && isString(hit.text, 1200) && isString(hit.startCfi) && isString(hit.endCfi) && isString(hit.textFingerprint, 200))
+}
+
 export function assertStorageWorkerRequest(value: unknown): asserts value is StorageWorkerRequest {
   if (!isRecord(value) || !isString(value.requestId, 200) || !isString(value.type, 100)) {
     throw new TypeError('Invalid storage worker request envelope')
@@ -308,6 +324,7 @@ export function assertStorageWorkerRequest(value: unknown): asserts value is Sto
       return
     case 'get-book':
     case 'get-reading-state':
+    case 'get-index-state':
       if (isString(value.bookId, 256)) return
       break
     case 'import-book':
@@ -346,6 +363,22 @@ export function assertStorageWorkerRequest(value: unknown): asserts value is Sto
       break
     case 'list-study-items':
       if (isString(value.boardId, 256)) return
+      break
+    case 'begin-index':
+      if (isString(value.bookId, 256) && Number.isInteger(value.sectionsTotal) && Number(value.sectionsTotal) >= 0) return
+      break
+    case 'commit-index-batch':
+      if (isString(value.bookId, 256) && Number.isInteger(value.epoch) && isCursor(value.expected) && isCursor(value.next) && Number.isInteger(value.sectionsIndexed) && Array.isArray(value.chunks) && value.chunks.length <= 250 && value.chunks.every(isIndexChunk)) return
+      break
+    case 'complete-index':
+    case 'cancel-index':
+      if (isString(value.bookId, 256) && Number.isInteger(value.epoch)) return
+      break
+    case 'fail-index':
+      if (isString(value.bookId, 256) && Number.isInteger(value.epoch) && isString(value.message, 500)) return
+      break
+    case 'search-book':
+      if (isString(value.bookId, 256) && isString(value.query, 300) && Number.isInteger(value.limit) && Number(value.limit) >= 1 && Number(value.limit) <= 10) return
       break
   }
   throw new TypeError(`Invalid storage worker request: ${String(value.type)}`)
@@ -421,6 +454,12 @@ export function assertStorageWorkerResponse(
       break
     case 'study-items':
       if (Array.isArray(result.items) && result.items.every(isStudyItem)) return
+      break
+    case 'index-state':
+      if (result.state === null || isIndexState(result.state)) return
+      break
+    case 'search-results':
+      if (isSearchResult(result.result)) return
       break
   }
   throw new TypeError(`Invalid storage worker result: ${String(result.type)}`)

@@ -12,6 +12,7 @@ import type {
   StudyBoardView,
   StudyMutation,
 } from './study.ts'
+import type { IndexChunk, IndexCursor, IndexState, SearchResult } from './search.ts'
 
 export type StorageMode = 'persistent' | 'session-only' | 'locked'
 
@@ -133,6 +134,13 @@ export type StorageWorkerRequest =
     }
   | { readonly requestId: string; readonly type: 'delete-study-item'; readonly itemId: string }
   | { readonly requestId: string; readonly type: 'list-study-items'; readonly boardId: string }
+  | { readonly requestId: string; readonly type: 'get-index-state'; readonly bookId: string }
+  | { readonly requestId: string; readonly type: 'begin-index'; readonly bookId: string; readonly sectionsTotal: number }
+  | { readonly requestId: string; readonly type: 'commit-index-batch'; readonly bookId: string; readonly epoch: number; readonly expected: IndexCursor; readonly chunks: readonly IndexChunk[]; readonly next: IndexCursor; readonly sectionsIndexed: number }
+  | { readonly requestId: string; readonly type: 'complete-index'; readonly bookId: string; readonly epoch: number }
+  | { readonly requestId: string; readonly type: 'fail-index'; readonly bookId: string; readonly epoch: number; readonly message: string }
+  | { readonly requestId: string; readonly type: 'cancel-index'; readonly bookId: string; readonly epoch: number }
+  | { readonly requestId: string; readonly type: 'search-book'; readonly bookId: string; readonly query: string; readonly limit: number }
 
 export type StorageWorkerResult =
   | { readonly type: 'initialized'; readonly diagnostics: StorageDiagnostics }
@@ -153,6 +161,8 @@ export type StorageWorkerResult =
   | { readonly type: 'study-item-undone'; readonly item: StudyItem | null }
   | { readonly type: 'study-item-deleted'; readonly itemId: string }
   | { readonly type: 'study-items'; readonly items: readonly StudyItem[] }
+  | { readonly type: 'index-state'; readonly state: IndexState | null }
+  | { readonly type: 'search-results'; readonly result: SearchResult }
 
 export type StorageWorkerResponse =
   | {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Highlighter, LayoutPanelLeft, List, RotateCw, Type } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Highlighter, LayoutPanelLeft, List, RotateCw, Search, Type } from 'lucide-react'
 
 import type { BookCatalogEntry, BookRange, StudyItemPayload } from '../domain/index.ts'
 import { StudyBoardPanel } from '../study/StudyBoardPanel.tsx'
@@ -15,11 +15,13 @@ import type { ReaderPortBridge } from '../app/reader-bridge.ts'
 import type { RuntimePorts } from '../runtime/ports.ts'
 import type { StorageClient } from '../storage/client.ts'
 import { ContentsPanel } from './ContentsPanel.tsx'
+import { SearchPanel } from './SearchPanel.tsx'
 import { ReaderHost } from './ReaderHost.tsx'
 import { TextPanel } from './TextPanel.tsx'
 import { DEFAULT_READER_STYLE } from './FoliateReaderAdapter.ts'
 import { useReader } from './useReader.ts'
 import { useReaderChrome } from './useReaderChrome.ts'
+import { useBookIndex } from './useBookIndex.ts'
 
 export type { ReaderPanel }
 
@@ -62,6 +64,7 @@ export function ReaderScreen({
   agent,
 }: ReaderScreenProps) {
   const reader = useReader({ entry, client, ports, bridge, presentation })
+  const bookIndex = useBookIndex({ bookId: entry.id, phase: reader.phase, client, bridge })
   const study = useStudy({ entry, client, bridge, presentation, surface })
   // Panel visibility is shared state, not local state: a tool can open, focus,
   // and close the study board, and the person can do the same, and neither may
@@ -231,7 +234,7 @@ export function ReaderScreen({
       data-chrome={chrome.visible ? 'shown' : 'hidden'}
     >
       <header className="reader-chrome">
-        <button type="button" className="button button-quiet button-back" onClick={onExit}>
+        <button type="button" className="button button-quiet button-back" onClick={() => { bookIndex.cancel(); onExit() }}>
           <ChevronLeft size={16} aria-hidden="true" />
           Library
         </button>
@@ -245,6 +248,18 @@ export function ReaderScreen({
           ) : null}
         </p>
         <div className="reader-tools">
+          <button
+            type="button"
+            className="button button-quiet"
+            aria-label="Search"
+            aria-pressed={panel === 'search'}
+            aria-expanded={panel === 'search'}
+            aria-controls="reader-search-panel"
+            onClick={() => toggle('search')}
+          >
+            <Search size={16} aria-hidden="true" />
+            <span className="tool-label">Search</span>
+          </button>
           <button
             type="button"
             className="button button-quiet"
@@ -316,6 +331,22 @@ export function ReaderScreen({
               study.commands &&
               study.run('undo that text change', () => study.commands!.undoReadingStyle())
             }
+            onClose={closePanel}
+          />
+        ) : null}
+
+        {panel === 'search' ? (
+          <SearchPanel
+            indexState={bookIndex.state}
+            indexLoaded={bookIndex.loaded}
+            indexing={bookIndex.running}
+            onRetryIndex={() => { void bookIndex.retry() }}
+            onCancelIndex={bookIndex.cancel}
+            onSearch={(query, limit) => client.searchBook(entry.id, query, limit)}
+            onActivate={(hit) => {
+              void reader.navigate({ kind: 'cfi', cfi: hit.startCfi })
+              if (isCompactSurface()) setPanel(null)
+            }}
             onClose={closePanel}
           />
         ) : null}
@@ -453,6 +484,7 @@ export function ReaderScreen({
             hostRef={bookHost}
             className="reader-surface"
             onReady={reader.attach}
+            onDispose={reader.detach}
             options={{
               onLocationChange: reader.onLocationChange,
               onSelectionChange: reader.onSelectionChange,

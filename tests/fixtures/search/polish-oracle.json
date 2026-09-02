@@ -14,23 +14,24 @@
     {
       "book": "calculus",
       "query": "differential coefficient tangent slope",
-      "maxRank": 1,
+      "maxRank": 2,
       "sourceHref": "OEBPS/7731425094544341602_33283-h-17.htm.xhtml",
       "sourceFragment": "CHAPTER_X",
       "sectionLabel": "CHAPTER X. GEOMETRICAL MEANING OF DIFFERENTIATION.",
       "mustContain": "This tangent to the curve has evidently the same slope",
-      "requiredCitationFields": ["bookId", "sectionTitle", "text", "startCfi", "endCfi", "textFingerprint"],
+      "requiredCitationFields": ["bookId", "sectionIndex", "sectionTitle", "text", "startCfi", "endCfi", "textFingerprint"],
       "rangeRule": "startCfi and endCfi resolve in the named source to exact text containing mustContain"
     },
     {
       "book": "calculus",
-      "query": "45 degrees dy dx equals one",
+      "query": "curve sloping 45",
       "maxRank": 3,
       "sourceHref": "OEBPS/7731425094544341602_33283-h-17.htm.xhtml",
       "sourceFragment": "CHAPTER_X",
       "sectionLabel": "CHAPTER X. GEOMETRICAL MEANING OF DIFFERENTIATION.",
-      "mustContain": "If a curve is sloping up at 45",
-      "requiredCitationFields": ["bookId", "sectionTitle", "text", "startCfi", "endCfi", "textFingerprint"],
+      "mustContain": "If a curve is sloping up at \\({45^{\\circ}}\\)",
+      "mustContainMath": ["\\({45^{\\circ}}\\)", "\\({\\dfrac{dy}{d x}=1}\\)"],
+      "requiredCitationFields": ["bookId", "sectionIndex", "sectionTitle", "text", "startCfi", "endCfi", "textFingerprint"],
       "rangeRule": "startCfi and endCfi resolve in the named source to exact text containing mustContain"
     },
     {
@@ -41,7 +42,7 @@
       "sourceFragment": "selection-anchor",
       "sectionLabel": "Foundations",
       "mustContain": "This sentence is the deterministic selection anchor.",
-      "requiredCitationFields": ["bookId", "sectionTitle", "text", "startCfi", "endCfi", "textFingerprint"],
+      "requiredCitationFields": ["bookId", "sectionIndex", "sectionTitle", "text", "startCfi", "endCfi", "textFingerprint"],
       "rangeRule": "startCfi and endCfi resolve in the named source to exact text containing mustContain"
     }
   ],

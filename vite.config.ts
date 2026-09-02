@@ -58,23 +58,33 @@ function developmentCsp(): Plugin {
 
 const testControlModuleId = 'virtual:bookhand-test-controls'
 const resolvedTestControlModuleId = `\0${testControlModuleId}`
+const workerTestControlModuleId = 'virtual:bookhand-worker-test-controls'
+const resolvedWorkerTestControlModuleId = `\0${workerTestControlModuleId}`
 
 function testControlBoundary(mode: string): Plugin {
   return {
     name: 'bookhand-test-control-boundary',
     resolveId(id) {
       if (id === testControlModuleId) return resolvedTestControlModuleId
+      if (id === workerTestControlModuleId) return resolvedWorkerTestControlModuleId
     },
     load(id) {
+      if (id === resolvedWorkerTestControlModuleId) {
+        if (mode !== 'test-harness') return 'export const createStorageRuntimeHooks = () => ({})'
+        const workerImplementation = normalizePath(
+          resolve('tests/support/browser-worker-test-controls.ts'),
+        )
+        return `export { createStorageRuntimeHooks } from ${JSON.stringify(`/@fs/${workerImplementation}`)}`
+      }
       if (id !== resolvedTestControlModuleId) return
       if (mode !== 'test-harness') {
-        return 'export const prepareRuntimePorts = ports => ports'
+        return 'export const prepareRuntimePorts = ports => ports; export const prepareStorageClient = client => client'
       }
 
       const implementation = normalizePath(
         resolve('tests/support/browser-test-controls.ts'),
       )
-      return `export { prepareRuntimePorts } from ${JSON.stringify(`/@fs/${implementation}`)}`
+      return `export { prepareRuntimePorts, prepareStorageClient } from ${JSON.stringify(`/@fs/${implementation}`)}`
     },
   }
 }
@@ -104,6 +114,11 @@ export default defineConfig(({ mode }) => ({
       ],
     }),
   ],
+  // Workers are bundled in a separate plugin pipeline. Keep the test-only
+  // index fault hooks behind the same mode boundary as the window controls.
+  worker: {
+    plugins: () => [testControlBoundary(mode)],
+  },
   server: {
     headers: { 'Content-Security-Policy': developmentContentSecurityPolicy },
     allowedHosts: ['.ts.net'],

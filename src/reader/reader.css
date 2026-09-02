@@ -12,6 +12,112 @@
   color-scheme: light;
 }
 
+.search-index-status {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.search-form {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
+}
+
+.search-form label {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.search-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.search-input-row input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--ink);
+  padding: 0.7rem 0.75rem;
+}
+
+.search-limit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search-limit input {
+  width: 4rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--ink);
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+}
+
+.search-message {
+  color: var(--muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.search-index-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.search-results {
+  display: grid;
+  gap: 0;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-results li + li {
+  border-top: 1px solid var(--rule);
+}
+
+.search-results button {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 0.9rem 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-results button:hover {
+  color: var(--accent);
+}
+
+.search-results span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.search-results q {
+  display: -webkit-box;
+  overflow: hidden;
+  font-family: var(--serif);
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
 .reader[data-reader-theme='sepia'] {
   --canvas: #f4efe4;
   --ink: #29231b;
@@ -83,6 +189,7 @@
 }
 
 .reader[data-panel='contents'] .reader-stage,
+.reader[data-panel='search'] .reader-stage,
 .reader[data-panel='text'] .reader-stage,
 .reader[data-panel='study'] .reader-stage {
   grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
@@ -91,6 +198,7 @@
 .reader-panel {
   display: flex;
   flex-direction: column;
+  min-inline-size: 0;
   min-block-size: 0;
   border-inline-end: 1px solid var(--rule);
   background: var(--canvas);
@@ -105,6 +213,10 @@
   border-block-end: 1px solid var(--rule);
 }
 
+.panel-head > :first-child {
+  min-inline-size: 0;
+}
+
 .panel-head h2 {
   margin: 0;
   font-size: var(--step-0);
@@ -113,7 +225,9 @@
 
 .panel-body {
   flex: 1;
+  min-inline-size: 0;
   min-block-size: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 14px 18px calc(24px + env(safe-area-inset-bottom));
@@ -410,6 +524,7 @@
   /* One surface at a time: a panel takes the whole stage rather than
      squeezing the book into a second column. */
   .reader[data-panel='contents'] .reader-stage,
+  .reader[data-panel='search'] .reader-stage,
   .reader[data-panel='text'] .reader-stage,
   .reader[data-panel='study'] .reader-stage {
     grid-template-columns: minmax(0, 1fr);
@@ -424,21 +539,25 @@
    * of the accessibility tree while a panel is showing.
    */
   .reader[data-panel='contents'] .reader-stage,
+  .reader[data-panel='search'] .reader-stage,
   .reader[data-panel='text'] .reader-stage,
   .reader[data-panel='study'] .reader-stage {
     grid-template-areas: 'surface';
   }
 
   .reader[data-panel='contents'] .reader-panel,
+  .reader[data-panel='search'] .reader-panel,
   .reader[data-panel='text'] .reader-panel,
   .reader[data-panel='study'] .reader-panel,
   .reader[data-panel='contents'] .reader-book-area,
+  .reader[data-panel='search'] .reader-book-area,
   .reader[data-panel='text'] .reader-book-area,
   .reader[data-panel='study'] .reader-book-area {
     grid-area: surface;
   }
 
   .reader[data-panel='contents'] .reader-book-area,
+  .reader[data-panel='search'] .reader-book-area,
   .reader[data-panel='text'] .reader-book-area,
   .reader[data-panel='study'] .reader-book-area {
     visibility: hidden;
@@ -446,6 +565,7 @@
   }
 
   .reader[data-panel='contents'] .reader-panel,
+  .reader[data-panel='search'] .reader-panel,
   .reader[data-panel='text'] .reader-panel,
   .reader[data-panel='study'] .reader-panel {
     z-index: 1;
@@ -457,6 +577,7 @@
   }
 
   .reader[data-panel='contents'] .reader-footer,
+  .reader[data-panel='search'] .reader-footer,
   .reader[data-panel='text'] .reader-footer,
   .reader[data-panel='study'] .reader-footer {
     display: none;

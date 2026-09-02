@@ -120,6 +120,8 @@ export interface ReaderAdapter {
   getPassageAtLocation?(range: BookRange): Promise<Passage>
   listSections(): readonly BookSection[]
   getSectionSnapshot(sectionIndex: number): Promise<BookSectionSnapshot>
+  /** Serializable, exact-CFI chunks for the local lexical index. */
+  getSectionChunks(sectionIndex: number): Promise<readonly import('./search.ts').SectionChunk[]>
   navigate(target: BookTarget): Promise<void>
   applyStyle(style: ReaderStyle): void
   getStyle(): ReaderStyle

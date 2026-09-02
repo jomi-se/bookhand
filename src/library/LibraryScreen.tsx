@@ -88,7 +88,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
           type="button"
           className="button button-quiet"
           onClick={() => fileInput.current?.click()}
-          disabled={importing}
+          disabled={importing || phase !== 'ready'}
         >
           <FolderOpen size={16} aria-hidden="true" />
           {importing ? 'Adding…' : 'Open EPUB'}
@@ -96,6 +96,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
         <input
           ref={fileInput}
           type="file"
+          disabled={importing || phase !== 'ready'}
           accept=".epub,application/epub+zip"
           className="visually-hidden"
           onChange={(event) => {

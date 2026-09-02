@@ -320,6 +320,35 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
         }),
     },
     {
+      name: 'search_book',
+      description:
+        'Search the locally indexed text of the open book. This never scans the live EPUB, moves the reader, or changes the selection. Results include exact CFIs; call navigate_book separately only when the person wants to see one.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', minLength: 1, maxLength: 300, description: 'Words or a phrase containing at least one letter or number.' },
+          limit: { type: 'integer', minimum: 1, maximum: 10, default: 5 },
+        },
+        required: ['query'],
+        additionalProperties: false,
+      },
+      execute: (input) =>
+        run('search_book', (result) => `${(result as ToolResult).isError ? 'could not search' : 'searched this book'}`, async () => {
+          if (typeof input.query !== 'string') return errorResult('query must be a string.')
+          const limit = input.limit === undefined ? 5 : input.limit
+          if (!Number.isInteger(limit) || Number(limit) < 1 || Number(limit) > 10) {
+            return errorResult('limit must be an integer from 1 to 10.')
+          }
+          const result = await commands.searchBook(input.query, Number(limit))
+          const summary = result.hits.length
+            ? result.hits.map((hit, index) => `${index + 1}. ${hit.sectionTitle}\n${quoteBookContent('Passage', hit.text)}\nRange: ${JSON.stringify({ startCfi: hit.startCfi, endCfi: hit.endCfi, sectionIndex: hit.sectionIndex, textFingerprint: hit.textFingerprint })}`).join('\n\n')
+            : result.availability === 'unavailable'
+              ? 'Local search is not ready yet. The person can keep reading while the index prepares.'
+              : `No passages found for “${result.query}”.`
+          return textResult(`Availability: ${result.availability}. Outcome: ${result.outcome}.\n\n${summary}`, { search: result })
+        }),
+    },
+    {
       name: 'save_annotation',
       description:
         'Highlight a passage in the book and optionally attach a note. The highlight appears in the book and in the study board, is stored locally across reloads, belongs to the person, and remains removable by them.',

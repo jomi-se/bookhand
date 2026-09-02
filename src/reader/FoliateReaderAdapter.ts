@@ -40,8 +40,10 @@ import {
   extractDocumentText,
   fingerprintText,
   normalizeBookText,
+  passageFromAnchoredRange,
   passageFromRange,
 } from './text.ts'
+import { buildSectionChunks } from './chunking.ts'
 
 export interface ReaderAdapterEvents {
   readonly onLocationChange?: (location: ReaderLocation) => void
@@ -196,7 +198,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     const resolved = document.createRange()
     resolved.setStart(start.startContainer, start.startOffset)
     resolved.setEnd(end.endContainer, end.endOffset)
-    return passageFromRange(
+    return passageFromAnchoredRange(
       resolved,
       range.sectionIndex,
       this.#chapterBreadcrumb(range.sectionIndex),
@@ -226,6 +228,30 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       startCfi: view.getCFI(sectionIndex, start),
       endCfi: view.getCFI(sectionIndex, end),
     }
+  }
+
+  async getSectionChunks(sectionIndex: number) {
+    const { view } = this.#requireActive()
+    const document = await this.#createSectionDocument(sectionIndex)
+    const title = this.#sectionLabel(sectionIndex) ?? `Section ${sectionIndex + 1}`
+    const chunks = buildSectionChunks(
+      document,
+      sectionIndex,
+      title,
+      (range) => view.getCFI(sectionIndex, range),
+    )
+    // Do not persist an anchor merely because Foliate emitted it. Resolve it
+    // through a fresh section document and retain only exact round trips.
+    for (const chunk of chunks) {
+      const resolved = await this.getPassageAtLocation(chunk.range)
+      if (
+        resolved.range.textFingerprint !== chunk.range.textFingerprint ||
+        !resolved.text.includes(chunk.text)
+      ) {
+        throw new Error(`Section ${sectionIndex + 1} produced an unstable search anchor.`)
+      }
+    }
+    return chunks
   }
 
   async navigate(target: BookTarget): Promise<void> {

@@ -9,13 +9,16 @@ export interface ReaderHostProps {
   readonly hostRef?: RefObject<HTMLDivElement | null>
   readonly options?: FoliateReaderAdapterOptions
   readonly onReady: (adapter: ReaderAdapter) => void
+  /** Clears every shared reference before Foliate tears the adapter down. */
+  readonly onDispose?: (adapter: ReaderAdapter) => void
 }
 
 /** Owns the one DOM node Foliate may render into; callers receive only ReaderAdapter. */
-export function ReaderHost({ className, hostRef: exposed, options, onReady }: ReaderHostProps) {
+export function ReaderHost({ className, hostRef: exposed, options, onReady, onDispose }: ReaderHostProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const optionsRef = useRef(options)
   const onReadyRef = useRef(onReady)
+  const onDisposeRef = useRef(onDispose)
 
   useEffect(() => {
     optionsRef.current = options
@@ -26,11 +29,18 @@ export function ReaderHost({ className, hostRef: exposed, options, onReady }: Re
   }, [onReady])
 
   useEffect(() => {
+    onDisposeRef.current = onDispose
+  }, [onDispose])
+
+  useEffect(() => {
     const host = hostRef.current
     if (!host) return
     const adapter = new FoliateReaderAdapter(host, bindLatestOptions(() => optionsRef.current))
     onReadyRef.current(adapter)
-    return () => void adapter.close()
+    return () => {
+      onDisposeRef.current?.(adapter)
+      void adapter.close()
+    }
   }, [])
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import type { RuntimePorts } from '../runtime/ports.ts'
-import { prepareRuntimePortsForBrowser } from '../runtime/test-control-bridge.ts'
+import { prepareRuntimePortsForBrowser, prepareStorageClientForBrowser } from '../runtime/test-control-bridge.ts'
 import { StorageClient } from '../storage/client.ts'
 import { DEFAULT_READER_STYLE } from '../reader/FoliateReaderAdapter.ts'
 import { DesignStateStore } from './design-state.ts'
@@ -22,14 +22,15 @@ export interface AppRuntime {
 }
 
 export function createAppRuntime(client: StorageClient = new StorageClient()): AppRuntime {
+  const preparedClient = prepareStorageClientForBrowser(client)
   const reader = new ReaderPortBridge()
   const ports = prepareRuntimePortsForBrowser({
-    persistence: { initialize: () => client.initialize() },
-    library: { listBooks: () => client.listBooks() },
+    persistence: { initialize: () => preparedClient.initialize() },
+    library: { listBooks: () => preparedClient.listBooks() },
     reader: { openBook: reader.openBook, loadSection: reader.loadSection },
   })
   return {
-    client,
+    client: preparedClient,
     ports,
     reader,
     designState: new DesignStateStore(),

@@ -11,6 +11,8 @@ const forbiddenTokens = [
   'fail-library-list-immediately',
   'fail-section-load',
   'dump-raw-state',
+  'indexPauseAfterCommittedBatch',
+  'indexFailBeforeChunk',
   'Injected OPFS initialization failure',
   'Injected library-list failure',
   'Injected section-load failure',

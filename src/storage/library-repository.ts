@@ -16,11 +16,28 @@ import type {
   StudyItemPayload,
   StudyMutation,
   SourceLink,
+  IndexChunk,
+  IndexState,
+  SearchHit,
 } from '../domain/index.ts'
 import { canonicalize, OwnershipError } from '../domain/provenance.ts'
 import { fingerprintText } from '../reader/text.ts'
+import {
+  INDEX_CHUNK_VERSION,
+  INDEX_TOKENIZER_VERSION,
+  SEARCH_RESULT_MAX_CHARACTERS,
+  normalizeSearchQuery,
+  searchAvailability,
+  type SearchResult,
+} from '../domain/search.ts'
+import { SOURCE_EXTRACTION_VERSION } from '../domain/source.ts'
 
 type Row = Record<string, SqlValue>
+
+export interface IndexRepositoryHooks {
+  /** Test harnesses may throw here to prove the surrounding transaction rolls back. */
+  beforeIndexChunk?(chunk: IndexChunk): void
+}
 
 interface FlattenedMetadata {
   readonly title: string
@@ -81,9 +98,11 @@ function finalize(statement: { finalize(): void }): void {
 
 export class LibraryRepository {
   private readonly db: Database
+  private readonly indexHooks: IndexRepositoryHooks
 
-  constructor(db: Database) {
+  constructor(db: Database, indexHooks: IndexRepositoryHooks = {}) {
     this.db = db
+    this.indexHooks = indexHooks
   }
 
   importBook(bookId: string, book: ImportBookInput): string {
@@ -641,6 +660,216 @@ export class LibraryRepository {
         ]) ?? -1,
       ) + 1
     )
+  }
+
+  getIndexState(bookId: string): IndexState | null {
+    const row = this.db.selectObject('SELECT * FROM index_meta WHERE book_id = ?', [bookId])
+    if (!row) return null
+    return this.#indexStateFromRow(row)
+  }
+
+  beginIndex(bookId: string, sectionsTotal: number, now: string): IndexState {
+    return this.db.transaction('IMMEDIATE', () => {
+      const current = this.getIndexState(bookId)
+      const versionsMatch =
+        current?.extractionVersion === SOURCE_EXTRACTION_VERSION &&
+        current.chunkVersion === INDEX_CHUNK_VERSION &&
+        current.tokenizerVersion === INDEX_TOKENIZER_VERSION
+      if (current && versionsMatch && current.status === 'complete') return current
+      if (current && versionsMatch) {
+        const epoch = current.epoch + 1
+        this.db.exec({
+          sql: `UPDATE index_meta SET status = 'partial', completed = 0,
+                  failure_message = NULL, sections_total = ?, index_epoch = ?,
+                  updated_at = ? WHERE book_id = ?`,
+          bind: [sectionsTotal, epoch, now, bookId],
+        })
+        return this.getIndexState(bookId)!
+      }
+
+      const epoch = (current?.epoch ?? 0) + 1
+      this.db.exec({ sql: 'DELETE FROM vector_batches WHERE book_id = ?', bind: [bookId] })
+      this.db.exec({ sql: 'DELETE FROM chunks WHERE book_id = ?', bind: [bookId] })
+      this.db.exec({
+        sql: `INSERT INTO index_meta (
+                book_id, schema_version, tokenizer_version, index_epoch,
+                next_chunk_order, completed, status, extraction_version,
+                chunk_version, next_section_index, next_section_chunk,
+                sections_indexed, sections_total, failure_message, updated_at
+              ) VALUES (?, 4, ?, ?, 0, 0, 'partial', ?, ?, 0, 0, 0, ?, NULL, ?)
+              ON CONFLICT(book_id) DO UPDATE SET
+                schema_version = 4, tokenizer_version = excluded.tokenizer_version,
+                index_epoch = excluded.index_epoch, next_chunk_order = 0,
+                completed = 0, status = 'partial',
+                extraction_version = excluded.extraction_version,
+                chunk_version = excluded.chunk_version, next_section_index = 0,
+                next_section_chunk = 0, sections_indexed = 0,
+                sections_total = excluded.sections_total, failure_message = NULL,
+                updated_at = excluded.updated_at`,
+        bind: [bookId, INDEX_TOKENIZER_VERSION, epoch, SOURCE_EXTRACTION_VERSION, INDEX_CHUNK_VERSION, sectionsTotal, now],
+      })
+      return this.getIndexState(bookId)!
+    })
+  }
+
+  commitIndexBatch(
+    bookId: string,
+    epoch: number,
+    expected: IndexState['cursor'],
+    chunks: readonly IndexChunk[],
+    next: IndexState['cursor'],
+    sectionsIndexed: number,
+    now: string,
+  ): IndexState {
+    if (chunks.length > 250) throw new Error('An index batch may contain at most 250 chunks.')
+    return this.db.transaction('IMMEDIATE', () => {
+      const state = this.getIndexState(bookId)
+      if (!state || state.epoch !== epoch) throw new Error('That indexing work is stale. Retry from current index state.')
+      if (
+        state.cursor.sectionIndex !== expected.sectionIndex ||
+        state.cursor.sectionChunkIndex !== expected.sectionChunkIndex ||
+        state.cursor.globalOrder !== expected.globalOrder
+      ) throw new Error('That indexing cursor is stale. Retry from current index state.')
+      const advancesSection = next.sectionIndex === expected.sectionIndex + 1 && next.sectionChunkIndex === 0
+      const staysInSection =
+        chunks.length > 0 &&
+        next.sectionIndex === expected.sectionIndex &&
+        next.sectionChunkIndex === expected.sectionChunkIndex + chunks.length
+      if (
+        next.globalOrder !== expected.globalOrder + chunks.length ||
+        (!advancesSection && !staysInSection) ||
+        next.sectionIndex > state.sectionsTotal ||
+        sectionsIndexed !== next.sectionIndex
+      ) throw new Error('That index batch does not advance the committed cursor exactly.')
+
+      const sourceSectionIndex = chunks[0]?.sectionIndex
+      chunks.forEach((chunk, index) => {
+        if (
+          chunk.bookId !== bookId ||
+          chunk.sectionIndex !== sourceSectionIndex ||
+          chunk.range.sectionIndex !== sourceSectionIndex ||
+          chunk.sectionChunkIndex !== expected.sectionChunkIndex + index ||
+          chunk.globalOrder !== expected.globalOrder + index ||
+          chunk.text.length < 1 ||
+          chunk.text.length > SEARCH_RESULT_MAX_CHARACTERS
+        ) throw new Error('That index batch contains a chunk outside its exact cursor.')
+      })
+
+      const statement = this.db.prepare(`INSERT INTO chunks (
+          id, book_id, section_index, title_breadcrumb_json, start_cfi, end_cfi,
+          sort_order, text, text_hash, index_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      try {
+        for (const chunk of chunks) {
+          this.indexHooks.beforeIndexChunk?.(chunk)
+          statement.bind([
+            chunk.id, bookId, chunk.sectionIndex, JSON.stringify([chunk.sectionTitle]),
+            chunk.range.startCfi, chunk.range.endCfi, chunk.globalOrder,
+            chunk.text, chunk.range.textFingerprint,
+            SOURCE_EXTRACTION_VERSION * 1_000_000 + INDEX_CHUNK_VERSION * 1_000 + INDEX_TOKENIZER_VERSION,
+          ]).step()
+          statement.reset()
+        }
+      } finally { finalize(statement) }
+      this.db.exec({
+        sql: `UPDATE index_meta SET next_section_index = ?, next_section_chunk = ?,
+                next_chunk_order = ?, sections_indexed = ?, status = 'partial',
+                completed = 0, failure_message = NULL, updated_at = ?
+              WHERE book_id = ? AND index_epoch = ?`,
+        bind: [next.sectionIndex, next.sectionChunkIndex, next.globalOrder, sectionsIndexed, now, bookId, epoch],
+      })
+      return this.getIndexState(bookId)!
+    })
+  }
+
+  completeIndex(bookId: string, epoch: number, now: string): IndexState {
+    const current = this.getIndexState(bookId)
+    if (!current || current.epoch !== epoch) throw new Error('That indexing work is stale.')
+    if (current.cursor.sectionIndex !== current.sectionsTotal || current.cursor.sectionChunkIndex !== 0) {
+      throw new Error('The book index cannot complete before every section cursor is committed.')
+    }
+    this.db.exec({
+      sql: `UPDATE index_meta SET status = 'complete', completed = 1,
+              failure_message = NULL, sections_indexed = sections_total, updated_at = ?
+            WHERE book_id = ? AND index_epoch = ?`,
+      bind: [now, bookId, epoch],
+    })
+    const state = this.getIndexState(bookId)
+    if (!state || state.epoch !== epoch || state.status !== 'complete') throw new Error('That indexing work is stale.')
+    return state
+  }
+
+  failIndex(bookId: string, epoch: number, message: string, now: string): IndexState {
+    this.db.exec({
+      sql: `UPDATE index_meta SET status = 'failed', completed = 0,
+              failure_message = ?, updated_at = ? WHERE book_id = ? AND index_epoch = ?`,
+      bind: [message.slice(0, 500), now, bookId, epoch],
+    })
+    const state = this.getIndexState(bookId)
+    if (!state || state.epoch !== epoch) throw new Error('That indexing work is stale.')
+    return state
+  }
+
+  cancelIndex(bookId: string, epoch: number, now: string): IndexState {
+    this.db.exec({
+      sql: `UPDATE index_meta SET status = 'partial', completed = 0,
+              failure_message = NULL, updated_at = ? WHERE book_id = ? AND index_epoch = ?`,
+      bind: [now, bookId, epoch],
+    })
+    const state = this.getIndexState(bookId)
+    if (!state || state.epoch !== epoch) throw new Error('That indexing work is stale.')
+    return state
+  }
+
+  searchBook(bookId: string, rawQuery: string, limit: number): SearchResult {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 10) throw new Error('Search limit must be from 1 to 10.')
+    const { query, fts } = normalizeSearchQuery(rawQuery)
+    const state = this.getIndexState(bookId)
+    const availability = searchAvailability(state)
+    if (availability === 'unavailable') return { query, availability, outcome: 'no-results', hits: [] }
+    const rows = this.db.selectObjects(
+      `SELECT c.id, c.book_id, c.section_index, c.title_breadcrumb_json,
+              c.start_cfi, c.end_cfi, c.sort_order, c.text, c.text_hash,
+              bm25(chunks_fts) AS score
+       FROM chunks_fts JOIN chunks c ON c.rowid = chunks_fts.rowid
+       WHERE chunks_fts MATCH ? AND c.book_id = ?
+       ORDER BY score ASC, c.sort_order ASC, c.id ASC LIMIT ?`,
+      [fts, bookId, limit],
+    )
+    const hits: SearchHit[] = rows.map((row) => ({
+      id: asString(row.id, 'chunk id'),
+      bookId: asString(row.book_id, 'chunk book id'),
+      sectionIndex: Number(row.section_index),
+      sectionTitle: parseJson<string[]>(row.title_breadcrumb_json, 'chunk title')[0] ?? 'Untitled section',
+      text: asString(row.text, 'chunk text').slice(0, SEARCH_RESULT_MAX_CHARACTERS),
+      startCfi: asString(row.start_cfi, 'chunk start CFI'),
+      endCfi: asString(row.end_cfi, 'chunk end CFI'),
+      textFingerprint: asString(row.text_hash, 'chunk fingerprint'),
+    }))
+    return { query, availability, outcome: hits.length ? 'results' : 'no-results', hits }
+  }
+
+  #indexStateFromRow(row: Row): IndexState {
+    const bookId = asString(row.book_id, 'index book id')
+    const committedChunks = Number(this.db.selectValue('SELECT count(*) FROM chunks WHERE book_id = ?', [bookId]) ?? 0)
+    return {
+      bookId,
+      status: asString(row.status, 'index status') as IndexState['status'],
+      epoch: Number(row.index_epoch),
+      extractionVersion: Number(row.extraction_version),
+      chunkVersion: Number(row.chunk_version),
+      tokenizerVersion: Number(row.tokenizer_version),
+      cursor: {
+        sectionIndex: Number(row.next_section_index),
+        sectionChunkIndex: Number(row.next_section_chunk),
+        globalOrder: Number(row.next_chunk_order),
+      },
+      sectionsIndexed: Number(row.sections_indexed),
+      sectionsTotal: Number(row.sections_total),
+      committedChunks,
+      ...(row.failure_message === null ? {} : { failure: asString(row.failure_message, 'index failure') }),
+      updatedAt: asString(row.updated_at, 'index timestamp'),
+    }
   }
 
 }

@@ -66,6 +66,12 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
       progressPercent: 33,
       visible: { text: '', range, chapterBreadcrumb: [] },
     })),
+    searchBook: vi.fn(async (query: string, limit: number) => ({
+      query,
+      availability: 'ready' as const,
+      outcome: 'results' as const,
+      hits: [{ id: 'chunk-1', bookId: 'book-1', sectionIndex: 3, sectionTitle: 'Chapter X', text: 'The slope of a curve.', startCfi: range.startCfi, endCfi: range.endCfi, textFingerprint: range.textFingerprint }].slice(0, limit),
+    })),
     saveAnnotation: vi.fn(async () => ({ id: 'annotation-1' })),
     getReadingStyle: vi.fn(() => style),
     setReadingStyle: vi.fn(async () => styleReceipt),
@@ -121,6 +127,7 @@ describe('the WebMCP tool surface', () => {
       'get_table_of_contents',
       'get_passage',
       'navigate_book',
+      'search_book',
       'save_annotation',
       'set_reading_style',
       'upsert_study_item',
@@ -165,6 +172,22 @@ describe('the WebMCP tool surface', () => {
     await tool('navigate_book').execute({ direction: 'next' })
     expect(calls.map((call) => call.name)).toEqual(['get_reading_context', 'navigate_book'])
     expect(calls.every((call) => !call.failed)).toBe(true)
+  })
+
+  it('returns structured current-book search results without navigating', async () => {
+    const { tool, commands } = setup()
+    const result = await tool('search_book').execute({ query: ' slope ', limit: 1 })
+    expect(commands.searchBook).toHaveBeenCalledWith(' slope ', 1)
+    expect(commands.navigateBook).not.toHaveBeenCalled()
+    expect(result.structuredContent).toMatchObject({ ok: true, search: { availability: 'ready', outcome: 'results', hits: [{ bookId: 'book-1' }] } })
+  })
+
+  it('refuses invalid search bounds before reaching storage', async () => {
+    const { tool, commands } = setup()
+    for (const input of [{ query: '' }, { query: 'x'.repeat(301) }, { query: 'slope', limit: 0 }, { query: 'slope', limit: 11 }]) {
+      expect((await tool('search_book').execute(input)).isError).toBe(true)
+    }
+    expect(commands.searchBook).not.toHaveBeenCalled()
   })
 
   it('refuses a range the agent invented instead of one a tool returned', async () => {

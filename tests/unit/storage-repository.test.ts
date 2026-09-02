@@ -231,6 +231,126 @@ describe('official SQLite library repository', () => {
     ).toBe(1)
   })
 
+  it('commits resumable book-scoped index batches and searches only committed chunks', async () => {
+    const firstId = await sha256BookId(book.epubBytes)
+    const secondBook = { ...book, epubBytes: new Uint8Array([8, 6, 4, 2]) }
+    const secondId = await sha256BookId(secondBook.epubBytes)
+    repository.importBook(firstId, book)
+    repository.importBook(secondId, secondBook)
+    const state = repository.beginIndex(firstId, 1, readingState.updatedAt)
+    const range = { startCfi: 'start', endCfi: 'end', sectionIndex: 0, textFingerprint: 'fnv1a-search' }
+    const committed = repository.commitIndexBatch(
+      firstId,
+      state.epoch,
+      state.cursor,
+      [{ id: 'search-chunk', bookId: firstId, sectionIndex: 0, sectionTitle: 'Slope', sectionChunkIndex: 0, globalOrder: 0, text: 'The differential coefficient gives the tangent slope.', range }],
+      { sectionIndex: 1, sectionChunkIndex: 0, globalOrder: 1 },
+      1,
+      readingState.updatedAt,
+    )
+    expect(committed.status).toBe('partial')
+    expect(repository.searchBook(firstId, 'tangent slope', 5)).toMatchObject({ availability: 'partial', outcome: 'results', hits: [{ bookId: firstId, sectionTitle: 'Slope' }] })
+    expect(repository.searchBook(secondId, 'tangent slope', 5)).toMatchObject({ availability: 'unavailable', hits: [] })
+    expect(() => repository.commitIndexBatch(firstId, state.epoch, state.cursor, [], state.cursor, 0, readingState.updatedAt)).toThrow(/cursor is stale/)
+    expect(repository.completeIndex(firstId, state.epoch, readingState.updatedAt).status).toBe('complete')
+    expect(repository.searchBook(firstId, 'tangent', 1).availability).toBe('ready')
+  })
+
+  it('gives every resumed index a new epoch without discarding its committed cursor', async () => {
+    const bookId = await sha256BookId(book.epubBytes)
+    repository.importBook(bookId, book)
+    const first = repository.beginIndex(bookId, 2, readingState.updatedAt)
+    const range = { startCfi: 'start', endCfi: 'end', sectionIndex: 0, textFingerprint: 'fnv1a-owned' }
+    const committed = repository.commitIndexBatch(
+      bookId,
+      first.epoch,
+      first.cursor,
+      [{ id: 'owned-chunk', bookId, sectionIndex: 0, sectionTitle: 'One', sectionChunkIndex: 0, globalOrder: 0, text: 'owned committed passage', range }],
+      { sectionIndex: 1, sectionChunkIndex: 0, globalOrder: 1 },
+      1,
+      readingState.updatedAt,
+    )
+
+    const resumed = repository.beginIndex(bookId, 2, readingState.updatedAt)
+    expect(resumed).toMatchObject({ epoch: first.epoch + 1, cursor: committed.cursor, committedChunks: 1 })
+    expect(() => repository.cancelIndex(bookId, first.epoch, readingState.updatedAt)).toThrow(/stale/i)
+    expect(() => repository.failIndex(bookId, first.epoch, 'late failure', readingState.updatedAt)).toThrow(/stale/i)
+    expect(repository.getIndexState(bookId)).toMatchObject({ epoch: resumed.epoch, status: 'partial', committedChunks: 1 })
+  })
+
+  it('rejects index batches that skip or corrupt the exact resume cursor', async () => {
+    const bookId = await sha256BookId(book.epubBytes)
+    repository.importBook(bookId, book)
+    const state = repository.beginIndex(bookId, 2, readingState.updatedAt)
+    const range = { startCfi: 'start', endCfi: 'end', sectionIndex: 0, textFingerprint: 'fnv1a-cursor' }
+    const chunk = { id: 'cursor-chunk', bookId, sectionIndex: 0, sectionTitle: 'One', sectionChunkIndex: 0, globalOrder: 0, text: 'bounded text', range }
+
+    expect(() => repository.commitIndexBatch(
+      bookId, state.epoch, state.cursor, [chunk],
+      { sectionIndex: 1, sectionChunkIndex: 0, globalOrder: 2 }, 1, readingState.updatedAt,
+    )).toThrow(/advance the committed cursor exactly/)
+    expect(() => repository.commitIndexBatch(
+      bookId, state.epoch, state.cursor, [{ ...chunk, range: { ...range, sectionIndex: 1 } }],
+      { sectionIndex: 1, sectionChunkIndex: 0, globalOrder: 1 }, 1, readingState.updatedAt,
+    )).toThrow(/outside its exact cursor/)
+    expect(() => repository.completeIndex(bookId, state.epoch, readingState.updatedAt)).toThrow(/before every section cursor/)
+  })
+
+  it('rolls back the whole named-chunk batch and retains only prior committed work', async () => {
+    const bookId = await sha256BookId(book.epubBytes)
+    repository = new LibraryRepository(db, {
+      beforeIndexChunk: (chunk) => {
+        if (chunk.id === 'fail-here') throw new Error('injected before named chunk')
+      },
+    })
+    repository.importBook(bookId, book)
+    const first = repository.beginIndex(bookId, 3, readingState.updatedAt)
+    const range = { startCfi: 'start', endCfi: 'end', sectionIndex: 0, textFingerprint: 'fnv1a-batch' }
+    const prior = repository.commitIndexBatch(
+      bookId, first.epoch, first.cursor,
+      [{ id: 'prior', bookId, sectionIndex: 0, sectionTitle: 'One', sectionChunkIndex: 0, globalOrder: 0, text: 'prior searchable passage', range }],
+      { sectionIndex: 1, sectionChunkIndex: 0, globalOrder: 1 }, 1, readingState.updatedAt,
+    )
+    expect(() => repository.commitIndexBatch(
+      bookId, prior.epoch, prior.cursor,
+      [
+        { id: 'rolled-back', bookId, sectionIndex: 1, sectionTitle: 'Two', sectionChunkIndex: 0, globalOrder: 1, text: 'must not remain', range: { ...range, sectionIndex: 1 } },
+        { id: 'fail-here', bookId, sectionIndex: 1, sectionTitle: 'Two', sectionChunkIndex: 1, globalOrder: 2, text: 'failure point', range: { ...range, sectionIndex: 1 } },
+      ],
+      { sectionIndex: 2, sectionChunkIndex: 0, globalOrder: 3 }, 2, readingState.updatedAt,
+    )).toThrow(/injected before named chunk/)
+
+    expect(repository.getIndexState(bookId)).toMatchObject({ cursor: prior.cursor, committedChunks: 1 })
+    expect(repository.searchBook(bookId, 'prior', 5).hits).toHaveLength(1)
+    expect(repository.searchBook(bookId, 'remain', 5).hits).toHaveLength(0)
+  })
+
+  it('completes a genuinely empty book index', async () => {
+    const bookId = await sha256BookId(book.epubBytes)
+    repository.importBook(bookId, book)
+    const state = repository.beginIndex(bookId, 0, readingState.updatedAt)
+    expect(repository.completeIndex(bookId, state.epoch, readingState.updatedAt)).toMatchObject({
+      status: 'complete', committedChunks: 0, sectionsIndexed: 0, sectionsTotal: 0,
+    })
+    expect(repository.searchBook(bookId, 'anything', 5)).toMatchObject({ availability: 'ready', hits: [] })
+  })
+
+  it('cascades derived chunks and synchronized FTS rows when a book is removed', async () => {
+    const bookId = await sha256BookId(book.epubBytes)
+    repository.importBook(bookId, book)
+    const state = repository.beginIndex(bookId, 1, readingState.updatedAt)
+    const range = { startCfi: 'start', endCfi: 'end', sectionIndex: 0, textFingerprint: 'fnv1a-delete' }
+    repository.commitIndexBatch(
+      bookId, state.epoch, state.cursor,
+      [{ id: 'removed-chunk', bookId, sectionIndex: 0, sectionTitle: 'One', sectionChunkIndex: 0, globalOrder: 0, text: 'remove this indexed passage', range }],
+      { sectionIndex: 1, sectionChunkIndex: 0, globalOrder: 1 }, 1, readingState.updatedAt,
+    )
+    db.exec({ sql: 'DELETE FROM books WHERE id = ?', bind: [bookId] })
+    expect(db.selectValue('SELECT count(*) FROM chunks WHERE book_id = ?', [bookId])).toBe(0)
+    expect(db.selectValue("SELECT count(*) FROM chunks_fts WHERE chunks_fts MATCH 'indexed'")).toBe(0)
+    expect(repository.getIndexState(bookId)).toBeNull()
+  })
+
   it('rejects a study item id that already belongs to another book', async () => {
     const firstBookId = await sha256BookId(book.epubBytes)
     const secondBook = { ...book, epubBytes: new Uint8Array([2, 4, 6, 8]) }

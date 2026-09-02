@@ -8,6 +8,8 @@ const testControlNames = [
   'fail-library-list-immediately',
   'fail-section-load',
   'dump-raw-state',
+  'indexPauseAfterCommittedBatch',
+  'indexFailBeforeChunk',
 ] as const
 
 test('production cannot activate validation-only controls', async ({ page }) => {

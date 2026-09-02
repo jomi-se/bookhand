@@ -154,6 +154,11 @@ export function extractDocumentText(document: Document): string {
   return serializeContent(clone).text
 }
 
+/** Canonical text for sizing a transient range without minting or resolving a CFI. */
+export function extractRangeText(range: Range): string {
+  return serializeContent(range.cloneContents()).text
+}
+
 /**
  * Returns an equivalent range whose endpoints are text nodes.
  *
@@ -167,6 +172,30 @@ export function toTextRange(range: Range): Range {
   const startIsText = range.startContainer.nodeType === Node.TEXT_NODE
   const endIsText = range.endContainer.nodeType === Node.TEXT_NODE
   if (startIsText && endIsText) return range
+
+  // Search chunks are normally ranges over adjacent children of one section
+  // body. Resolve their edge descendants locally instead of walking and
+  // intersect-testing every text node in a long mathematical chapter.
+  if (
+    range.startContainer === range.endContainer &&
+    range.startContainer.nodeType === Node.ELEMENT_NODE
+  ) {
+    const container = range.startContainer
+    let first: Text | undefined
+    let last: Text | undefined
+    for (let index = range.startOffset; index < range.endOffset; index += 1) {
+      const child = container.childNodes[index]
+      first ??= child ? edgeText(child, 'first') : undefined
+      const tail = child ? edgeText(child, 'last') : undefined
+      if (tail) last = tail
+    }
+    if (first && last) {
+      const anchored = first.ownerDocument.createRange()
+      anchored.setStart(first, 0)
+      anchored.setEnd(last, last.nodeValue?.length ?? 0)
+      return anchored
+    }
+  }
 
   const root = range.commonAncestorContainer
   const document_ = root.ownerDocument
@@ -185,6 +214,21 @@ export function toTextRange(range: Range): Range {
   anchored.setStart(first, startIsText ? range.startOffset : 0)
   anchored.setEnd(last, endIsText ? range.endOffset : (last.nodeValue?.length ?? 0))
   return anchored
+}
+
+function edgeText(root: Node, edge: 'first' | 'last'): Text | undefined {
+  if (root.nodeType === Node.TEXT_NODE) {
+    return (root.nodeValue ?? '').trim() ? (root as Text) : undefined
+  }
+  const walker = root.ownerDocument?.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  if (!walker) return undefined
+  let found: Text | undefined
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!(node.nodeValue ?? '').trim()) continue
+    found = node as Text
+    if (edge === 'first') break
+  }
+  return found
 }
 
 const SEMANTIC_ELEMENTS = '[data-tex], math, img, svg'
@@ -297,24 +341,24 @@ function preserveSemanticEdges(source: Range, anchored: Range): Range {
     )
   if (!needsStart && !needsEnd) return anchored
 
-  const walker = document_.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let previous: Text | undefined
   let following: Text | undefined
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+  const before = document_.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  before.currentNode = first
+  for (let node = before.previousNode(); node; node = before.previousNode()) {
     const text = node as Text
-    if (!(text.nodeValue ?? '').trim()) continue
-    if (
-      !first.contains(text) &&
-      text.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING
-    ) {
+    if (!first.contains(text) && (text.nodeValue ?? '').trim()) {
       previous = text
+      break
     }
-    if (
-      !following &&
-      !last.contains(text) &&
-      last.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING
-    ) {
+  }
+  const after = document_.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  after.currentNode = last
+  for (let node = after.nextNode(); node; node = after.nextNode()) {
+    const text = node as Text
+    if (!last.contains(text) && (text.nodeValue ?? '').trim()) {
       following = text
+      break
     }
   }
 
@@ -350,6 +394,30 @@ export function passageFromRange(
   // `range.toString()` is not an option either: it concatenates raw text nodes,
   // losing image alts, `data-tex`, and MathML alternatives while including text
   // hidden from the reader.
+  return passageFromPreparedRange(source, range, sectionIndex, chapterBreadcrumb, getCfi)
+}
+
+/**
+ * Serialize a range that the caller has already made CFI-stable. Search
+ * chunking uses this to avoid repeating semantic-edge discovery for every
+ * finalized chunk in a large mathematical chapter.
+ */
+export function passageFromAnchoredRange(
+  range: Range,
+  sectionIndex: number,
+  chapterBreadcrumb: readonly string[],
+  getCfi: (range: Range) => string,
+): Passage {
+  return passageFromPreparedRange(range, range, sectionIndex, chapterBreadcrumb, getCfi)
+}
+
+function passageFromPreparedRange(
+  source: Range,
+  range: Range,
+  sectionIndex: number,
+  chapterBreadcrumb: readonly string[],
+  getCfi: (range: Range) => string,
+): Passage {
   const serialized = serializeContent(source.cloneContents())
   const text = serialized.text
   const start = range.cloneRange()

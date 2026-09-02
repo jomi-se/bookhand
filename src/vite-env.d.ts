@@ -4,6 +4,13 @@ declare module 'virtual:bookhand-test-controls' {
   import type { RuntimePorts } from './runtime/ports.ts'
 
   export function prepareRuntimePorts(ports: RuntimePorts): RuntimePorts
+  import type { StorageClient } from './storage/client.ts'
+  export function prepareStorageClient(client: StorageClient): StorageClient
+}
+
+declare module 'virtual:bookhand-worker-test-controls' {
+  import type { StorageRuntimeHooks } from './storage/worker-runtime.ts'
+  export function createStorageRuntimeHooks(): StorageRuntimeHooks
 }
 
 

@@ -4,13 +4,18 @@ Last updated: 2026-09-02
 
 ## Next executable wave
 
-Implement **W5: local lexical retrieval** from
-`docs/plan/polish-and-showcase-build-tasks.md`: build its transactional index
-lifecycle, cancellation, resume, and failure truth from the frozen contracts,
-then expose bounded current-book `search_book` through genuine WebMCP and prove
-it against the two-book oracle. An interrupted concurrent W5 draft was audited
-against its transcript and removed rather than being mistaken for accepted
-groundwork.
+Ship and verify **W5: local lexical retrieval**. Commit and push the accepted
+implementation, wait for Cloudflare Workers Builds to deploy that exact commit,
+then repeat the ChatGPT Desktop registration and intent-only search smoke on the
+deployed origin. Until that check passes, submission copy must continue to mark
+`search_book` as pending and the live surface as a twelve-tool build.
+
+Before implementing W6, resolve the proposed amendments in
+`docs/reviews/2026-09-02-w6-contract-amendment-proposal.md` into the canonical
+contracts. The recommended direction moves exact verified `focus_passage`
+navigation into W6, anchors persisted reading position during guidance, and
+treats learner navigation as a yielded session with a quiet Back affordance.
+W9 retains transient cue rendering. No W6 implementation has started.
 
 ## Active product direction
 
@@ -37,7 +42,7 @@ This direction is recorded in:
   reading, SQLite WASM persistence, highlights/notes, the native Study board,
   and genuine `document.modelContext` registration.
 - The current open-book runtime exposes twelve tools: three library/global
-  tools plus nine reading/study tools. `get_design_context` is the twelfth.
+  tools plus nine reading/study tools in the deployed W4 build.
 - W0 through W3 are implemented: runtime design-context discovery, source and
   persistence trust, shared observable style/board state, and the mobile/desktop
   reader reset.
@@ -64,11 +69,18 @@ This direction is recorded in:
   failure is not rendered, and removal is still permanent one-click behavior.
 - There is no tutor session, exact transient passage cue, item reveal target,
   temporary explanation, Back stack, or Stop-guiding action yet.
+- W5 is implemented locally: canonical Foliate chunks feed a schema-v4,
+  worker-owned FTS5 index with transactional batches, truthful lifecycle state,
+  cancellation, resume, failure recovery, and book/version isolation. Ordinary
+  Search exposes a bounded 1–10 result limit; genuine `search_book` returns
+  structured availability, outcomes, exact source envelopes, and never moves
+  the reader. This makes thirteen open-book tools after deployment.
 
 ## Accepted remaining topology
 
-- W4: runtime/tool truth and canonical source lifecycle.
-- W5: local lexical retrieval and `search_book`.
+- W4: complete — runtime/tool truth and canonical source lifecycle.
+- W5: complete locally — local lexical retrieval and `search_book`; deployment
+  confirmation remains.
 - W6: shared origin-aware navigation and non-persistent tutor-session core.
 - W7: first-class durable lesson domain, safe math/plot, atomic lifecycle, and
   recoverable removal.
@@ -104,7 +116,16 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
 - W4 passed independent post-fix scrutiny for WebMCP boundaries, real-Foliate
   math/figure meaning, canonical-source migration/repair, and genuine browser
   persistence. The separate real-surface lane also passed design-context and
-  WebMCP runtime checks. W5 remains unimplemented and is the next clean wave.
+  WebMCP runtime checks.
+- W5 passed independent scrutiny, the complete two-book frozen oracle, 288
+  unit/component checks (the real-book timing guard passed unchanged when run
+  without competing browser work), production build and bundle-exclusion
+  checks, the complete production Playwright suite, and the dedicated secure
+  lifecycle harness. Browser evidence covers genuine WebMCP ready/partial/
+  unavailable states, cancellation and reopen, injected transactional failure,
+  repeated Retry coalescing, explicit result navigation, non-navigation on
+  search alone, and narrow-panel containment with no console/page errors or
+  off-origin requests.
 - The bundled *Calculus Made Easy* is judging content, not a permanent product
   dependency.
 - Keep embeddings optional and after lexical retrieval.

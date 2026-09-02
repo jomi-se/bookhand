@@ -1,6 +1,6 @@
 import type { Database } from '@sqlite.org/sqlite-wasm'
 
-export const STORAGE_SCHEMA_VERSION = 3
+export const STORAGE_SCHEMA_VERSION = 4
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -135,7 +135,16 @@ CREATE TABLE IF NOT EXISTS index_meta (
   tokenizer_version INTEGER NOT NULL,
   index_epoch INTEGER NOT NULL,
   next_chunk_order INTEGER NOT NULL,
-  completed INTEGER NOT NULL CHECK (completed IN (0, 1))
+  completed INTEGER NOT NULL CHECK (completed IN (0, 1)),
+  status TEXT NOT NULL DEFAULT 'partial' CHECK (status IN ('partial', 'failed', 'complete')),
+  extraction_version INTEGER NOT NULL DEFAULT 0,
+  chunk_version INTEGER NOT NULL DEFAULT 0,
+  next_section_index INTEGER NOT NULL DEFAULT 0,
+  next_section_chunk INTEGER NOT NULL DEFAULT 0,
+  sections_indexed INTEGER NOT NULL DEFAULT 0,
+  sections_total INTEGER NOT NULL DEFAULT 0,
+  failure_message TEXT,
+  updated_at TEXT NOT NULL DEFAULT ''
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS vector_batches (
@@ -176,6 +185,18 @@ const VERSION_3_COLUMNS: readonly (readonly [string, string])[] = [
   ['study_item_versions', 'source_json TEXT'],
 ]
 
+const VERSION_4_COLUMNS: readonly (readonly [string, string])[] = [
+  ['index_meta', "status TEXT NOT NULL DEFAULT 'partial'"],
+  ['index_meta', 'extraction_version INTEGER NOT NULL DEFAULT 0'],
+  ['index_meta', 'chunk_version INTEGER NOT NULL DEFAULT 0'],
+  ['index_meta', 'next_section_index INTEGER NOT NULL DEFAULT 0'],
+  ['index_meta', 'next_section_chunk INTEGER NOT NULL DEFAULT 0'],
+  ['index_meta', 'sections_indexed INTEGER NOT NULL DEFAULT 0'],
+  ['index_meta', 'sections_total INTEGER NOT NULL DEFAULT 0'],
+  ['index_meta', 'failure_message TEXT'],
+  ['index_meta', "updated_at TEXT NOT NULL DEFAULT ''"],
+]
+
 /** Safe to run against a database a newer build has already migrated. */
 function addMissingColumns(
   db: Database,
@@ -204,6 +225,14 @@ export function initializeSchema(db: Database): void {
     db.exec(SCHEMA_SQL)
     if (from > 0 && from < 2) addMissingColumns(db, VERSION_2_COLUMNS)
     if (from > 0 && from < 3) addMissingColumns(db, VERSION_3_COLUMNS)
+    if (from > 0 && from < 4) {
+      addMissingColumns(db, VERSION_4_COLUMNS)
+      // Retrieval before v4 had no trustworthy state/cursor contract. Clear
+      // only derived retrieval data; books and learner-owned records remain.
+      db.exec('DELETE FROM vector_batches; DELETE FROM chunks; DELETE FROM index_meta;')
+    }
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS chunks_book_order ON chunks(book_id, sort_order);
+             CREATE INDEX IF NOT EXISTS chunks_book_section ON chunks(book_id, section_index, sort_order);`)
     db.exec(`PRAGMA user_version = ${STORAGE_SCHEMA_VERSION}`)
   })
 }

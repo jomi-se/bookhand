@@ -13,6 +13,7 @@
     "test:unit": "vitest run",
     "test:e2e": "npm run build && npm run verify:bundle && npm run test:e2e:built",
     "test:e2e:built": "playwright test",
+    "test:e2e:index-harness": "vite build --mode test-harness && BOOKHAND_TEST_HARNESS=1 playwright test tests/e2e/index-lifecycle.spec.ts",
     "typecheck": "tsc -b --pretty false",
     "verify:bundle": "node scripts/verify-production-bundle.mjs",
     "verify:setup": "node scripts/verify-agent-setup.mjs",

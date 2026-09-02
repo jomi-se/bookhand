@@ -1,8 +1,14 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { extractDocumentText } from '../../src/reader/index.ts'
-import { passageFromRange, toSemanticTextRange } from '../../src/reader/text.ts'
+import {
+  passageFromAnchoredRange,
+  passageFromRange,
+  toSemanticTextRange,
+} from '../../src/reader/text.ts'
 import { makeBook } from '../../src/reader/foliate-module.ts'
+import { buildSectionChunks } from '../../src/reader/chunking.ts'
+import { fingerprintText } from '../../src/reader/text.ts'
 
 describe('pinned Foliate fixture baseline', () => {
   it('parses real package metadata, nested navigation, XHTML, and accessible figure text', async () => {
@@ -83,6 +89,66 @@ describe('pinned Foliate fixture baseline', () => {
       book.destroy?.()
     }
   })
+
+  it('builds serializable exact-CFI chunks from the real tiny-book section', async () => {
+    const bytes = await readFile('tests/fixtures/epub/tiny-book.epub')
+    const book = await makeBook(new File([bytes], 'tiny-book.epub', { type: 'application/epub+zip' }))
+    try {
+      const section = book.sections[0]!
+      const document = await section.createDocument!()
+      // @ts-expect-error foliate-js does not publish declaration files
+      const CFI = await import('foliate-js/epubcfi.js')
+      const chunks = buildSectionChunks(document, 0, 'Foundations', (range) =>
+        CFI.joinIndir(section.cfi!, CFI.fromRange(range)),
+      )
+      const expected = chunks.find((chunk) => chunk.text.includes('deterministic selection anchor'))
+      expect(expected).toBeDefined()
+      const fresh = await section.createDocument!()
+      const start = (book.resolveCFI!(expected!.range.startCfi).anchor as (document: Document) => Range)(fresh)
+      const end = (book.resolveCFI!(expected!.range.endCfi).anchor as (document: Document) => Range)(fresh)
+      const resolved = fresh.createRange()
+      resolved.setStart(start.startContainer, start.startOffset)
+      resolved.setEnd(end.endContainer, end.endOffset)
+      const passage = passageFromRange(resolved, 0, ['Foundations'], (range) => CFI.joinIndir(section.cfi!, CFI.fromRange(range)))
+      expect(passage.text).toContain('This sentence is the deterministic selection anchor.')
+      expect(fingerprintText(passage.text)).toBe(expected!.range.textFingerprint)
+      expect(() => structuredClone(chunks)).not.toThrow()
+    } finally { book.destroy?.() }
+  })
+
+  it('keeps every Section 11 anchor stable and bounds the large Section 23 workload', async () => {
+    const bytes = await readFile('public/books/calculus-made-easy.epub')
+    const book = await makeBook(
+      new File([bytes], 'calculus-made-easy.epub', { type: 'application/epub+zip' }),
+    )
+    try {
+      // @ts-expect-error foliate-js does not publish declaration files
+      const CFI = await import('foliate-js/epubcfi.js')
+      for (const [sectionIndex, deadline] of [[10, 5_000], [22, 15_000]] as const) {
+        const section = book.sections[sectionIndex]!
+        const started = performance.now()
+        const document = await section.createDocument!()
+        const chunks = buildSectionChunks(document, sectionIndex, `Section ${sectionIndex + 1}`, (range) =>
+          CFI.joinIndir(section.cfi!, CFI.fromRange(range)),
+        )
+        const fresh = await section.createDocument!()
+        for (const chunk of chunks) {
+          const start = (book.resolveCFI!(chunk.range.startCfi).anchor as (document: Document) => Range)(fresh)
+          const end = (book.resolveCFI!(chunk.range.endCfi).anchor as (document: Document) => Range)(fresh)
+          const range = fresh.createRange()
+          range.setStart(start.startContainer, start.startOffset)
+          range.setEnd(end.endContainer, end.endOffset)
+          const resolved = passageFromAnchoredRange(range, sectionIndex, [], () => chunk.range.startCfi)
+          expect(resolved.range.textFingerprint).toBe(chunk.range.textFingerprint)
+          expect(resolved.text).toContain(chunk.text)
+          expect(chunk.text.length).toBeLessThanOrEqual(1_200)
+        }
+        expect(performance.now() - started).toBeLessThan(deadline)
+      }
+    } finally {
+      book.destroy?.()
+    }
+  }, 30_000)
 
 
   it('round-trips the bundled Chapter XIX figure and mathematics without semantic loss', async () => {

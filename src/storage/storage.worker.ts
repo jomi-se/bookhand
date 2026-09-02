@@ -2,8 +2,9 @@
 
 import type { StorageWorkerResponse } from '../domain/index.ts'
 import { StorageWorkerRuntime, storageWorkerError } from './worker-runtime.ts'
+import { createStorageRuntimeHooks } from 'virtual:bookhand-worker-test-controls'
 
-const runtime = new StorageWorkerRuntime()
+const runtime = new StorageWorkerRuntime(undefined, createStorageRuntimeHooks())
 
 self.addEventListener('message', async (event: MessageEvent<unknown>) => {
   const requestId =
@@ -25,4 +26,3 @@ self.addEventListener('message', async (event: MessageEvent<unknown>) => {
   }
   self.postMessage(response)
 })
-
