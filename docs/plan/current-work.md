@@ -12,6 +12,9 @@ run that proves the agent discovers the five remaster tools, reads actual XHTML,
 rewrites one chapter, and leaves the person able to compare, Undo, Reset, and
 reload the result.
 
+The exact morning preflight, intent-only prompts, fallback prompts, and 2:45
+shot order are in `docs/submission/demo-runbook.md`.
+
 The owner-visible **ChatGPT Desktop smoke** remains required after the next
 deployment. It must confirm the model discovers and uses the shipped tools from
 intent-only prompts; deterministic Playwright evidence proves the application
