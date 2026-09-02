@@ -110,7 +110,6 @@ function App() {
         presentation={runtime.presentation}
         surface={runtime.surface}
         guidance={runtime.guidance}
-        agent={agent}
       />
     )
   }

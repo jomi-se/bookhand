@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Maximize2, Minimize2, Plus, Trash2 } from 'lucide-react'
 
 import type {
@@ -26,6 +26,8 @@ export interface StudyBoardPanelProps {
   readonly onRelinkAnnotationSource: (annotation: Annotation) => void
   readonly mutationError?: { readonly message: string; readonly retry: () => void }
   readonly onDismissMutationError?: () => void
+  readonly loadError?: string
+  readonly onRetryLoad?: () => void
   readonly onGoToSource: (range: BookRange) => void
   readonly onDeleteAnnotation: (annotation: Annotation) => void
   readonly onEditNote: (annotation: Annotation, note: string) => void
@@ -35,7 +37,6 @@ export interface StudyBoardPanelProps {
   readonly agentChangedView?: boolean
   readonly onUndoView?: () => void
   readonly onClose: () => void
-  readonly agentActivity?: ReactNode
 }
 
 function NoteEditor({
@@ -104,7 +105,18 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
             </button>
           </p>
         ) : null}
-        {props.agentActivity}
+        {props.loadError ? (
+          <div className="study-mutation-error" role="alert">
+            <p>Study is temporarily unavailable. {props.loadError}</p>
+            {props.onRetryLoad ? (
+              <span className="study-mutation-error-tools">
+                <button type="button" className="button" onClick={props.onRetryLoad}>
+                  Try again
+                </button>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="add-row">
           {STUDY_ITEM_KINDS.map((kind) => (

@@ -4,8 +4,6 @@ import { ChevronLeft, ChevronRight, Highlighter, LayoutPanelLeft, List, RotateCw
 import type { BookCatalogEntry, BookRange, StudyItemPayload } from '../domain/index.ts'
 import { StudyBoardPanel } from '../study/StudyBoardPanel.tsx'
 import { useStudy } from '../study/useStudy.ts'
-import { AgentActivity } from '../webmcp/AgentActivity.tsx'
-import type { useWebMcpTools } from '../webmcp/useWebMcpTools.ts'
 import type { BookhandCommands } from '../app/commands.ts'
 import { splitTitle } from '../library/progress.ts'
 import type { DesignStateStore } from '../app/design-state.ts'
@@ -52,7 +50,6 @@ export interface ReaderScreenProps {
   /** Which panel is open. Shared, so a tool can open, focus, and close it. */
   readonly surface: SurfaceStore
   readonly guidance: GuidanceController
-  readonly agent: ReturnType<typeof useWebMcpTools>
 }
 
 export function ReaderScreen({
@@ -66,7 +63,6 @@ export function ReaderScreen({
   presentation,
   surface,
   guidance,
-  agent,
 }: ReaderScreenProps) {
   // Panel visibility is shared state, not local state: a tool can open, focus,
   // and close the study board, and the person can do the same, and neither may
@@ -465,6 +461,8 @@ export function ReaderScreen({
             }}
             mutationError={study.mutationError}
             onDismissMutationError={study.dismissMutationError}
+            loadError={study.error}
+            onRetryLoad={study.retryLoad}
             onGoToSource={goToSource}
             onDeleteAnnotation={(annotation) =>
               void study.commands?.deleteAnnotation(annotation.id)
@@ -490,14 +488,6 @@ export function ReaderScreen({
               study.run('change the board layout', () => study.commands!.toggleStudyBoardView())
             }
             onClose={closePanel}
-            agentActivity={
-              <AgentActivity
-                status={agent.status}
-                calls={agent.calls}
-                toolNames={agent.toolNames}
-                onClear={agent.clearHistory}
-              />
-            }
           />
         ) : null}
 

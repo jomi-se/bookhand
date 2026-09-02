@@ -59,47 +59,68 @@ export function useStudy({ entry, client, bridge, presentation, surface, guidanc
   const [items, setItems] = useState<readonly StudyItem[]>([])
   const [error, setError] = useState<string>()
   const [mutationError, setMutationError] = useState<MutationFailure>()
+  const [loadAttempt, setLoadAttempt] = useState(0)
 
   useEffect(() => {
     let alive = true
+    const makeCommands = (nextBoard: StudyBoard) => new BookhandCommands({
+      client,
+      bridge,
+      presentation,
+      surface,
+      guidance,
+      designContextVersion: DESIGN_CONTEXT_VERSION,
+      bookId: entry.id,
+      bookTitle: splitTitle(entry.metadata).title,
+      board: nextBoard,
+    })
     void (async () => {
       try {
         const loaded = await client.getBoard(entry.id)
         if (!alive) return
+        setError(undefined)
         setBoard(loaded)
-        setCommands(
-          new BookhandCommands({
-            client,
-            bridge,
-            presentation,
-            surface,
-            guidance,
-            designContextVersion: DESIGN_CONTEXT_VERSION,
-            bookId: entry.id,
-            bookTitle: splitTitle(entry.metadata).title,
-            board: loaded,
-          }),
-        )
+        setCommands(makeCommands(loaded))
       } catch (cause) {
-        if (alive) setError(cause instanceof Error ? cause.message : 'Study board unavailable')
+        if (!alive) return
+        const now = new Date().toISOString()
+        const unavailableBoard: StudyBoard = {
+          id: `board-${entry.id}`,
+          bookId: entry.id,
+          title: 'Study board',
+          view: 'docked',
+          createdAt: now,
+          updatedAt: now,
+        }
+        setBoard(unavailableBoard)
+        // Reading, navigation, search, styling, and guidance do not depend on
+        // Study storage. Keep their shared command authority alive even when
+        // the board cannot be loaded; Study calls then fail honestly at their
+        // own storage boundary instead of disappearing from WebMCP entirely.
+        setCommands(makeCommands(unavailableBoard))
+        setError(cause instanceof Error ? cause.message : 'Study board unavailable')
       }
     })()
     return () => {
       alive = false
     }
-  }, [bridge, client, entry.id, entry.metadata, guidance, presentation, surface])
+  }, [bridge, client, entry.id, entry.metadata, guidance, loadAttempt, presentation, surface])
 
   const reload = useCallback(async () => {
     if (!commands) return
-    const [nextAnnotations, nextItems] = await Promise.all([
-      commands.listAnnotations(),
-      commands.listStudyItems(),
-    ])
-    setAnnotations(nextAnnotations)
-    setItems(nextItems)
-    // The board is refreshed here too, so a layout change made through a tool
-    // shows without the interface having to be told about it separately.
-    setBoard(commands.studyBoard)
+    try {
+      const [nextAnnotations, nextItems] = await Promise.all([
+        commands.listAnnotations(),
+        commands.listStudyItems(),
+      ])
+      setAnnotations(nextAnnotations)
+      setItems(nextItems)
+      // The board is refreshed here too, so a layout change made through a tool
+      // shows without the interface having to be told about it separately.
+      setBoard(commands.studyBoard)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Study content unavailable')
+    }
   }, [commands])
 
   useEffect(() => {
@@ -139,6 +160,7 @@ export function useStudy({ entry, client, bridge, presentation, surface, guidanc
   }, [])
 
   const dismissMutationError = useCallback(() => setMutationError(undefined), [])
+  const retryLoad = useCallback(() => setLoadAttempt((attempt) => attempt + 1), [])
 
   return {
     board,
@@ -147,6 +169,7 @@ export function useStudy({ entry, client, bridge, presentation, surface, guidanc
     items,
     marks,
     error,
+    retryLoad,
     mutationError,
     dismissMutationError,
     run,
