@@ -134,15 +134,6 @@ Approved composition references remain at
 `docs/design/slice-1-palette.png`. They are references, not fake product state
 or assets to rasterize into the application.
 
-**Where the direction came from.** The owner named three of their own surfaces
-as the feeling to aim at: `jomi-se.github.io/ffmpeg-edge`,
-`agent-connect-demo.web.app`, and the light presentation of
-`jomi-se.com/posts/claude-code-prompt-caching/`. The brief was "clean, polished,
-warm library", favouring light — but *soft* light, not clinical white. One
-direction was explicitly rejected during Slice 1: a mark sitting alone in the
-top-left corner read as the Agent Connect demo rather than as Bookhand. The
-library identity is a literary wordmark in the masthead, not a logo badge.
-
 ## Colors
 
 The default library uses Clear Canvas, Library Ink, Quiet Graphite, Fine Rule,
@@ -346,6 +337,7 @@ immediate, understandable state change.
   consume semantic tokens so user-created worlds remain coherent.
 - **Don't** preserve a weak customization merely because an agent created it;
   preview, validate, revise, and keep Reset or Undo visible.
-- **Don't** reintroduce a corner logo badge. It was tried and rejected for
-  reading as another product's demo; identity lives in the wordmark and the
-  book artwork.
+- **Don't** mark identity with a logo badge floating in a corner. Bookhand is
+  named by the wordmark in the masthead and by the book artwork itself; a badge
+  is product chrome asserting itself in an interface whose whole intent is to
+  recede.
