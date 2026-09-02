@@ -212,6 +212,7 @@ Start with these tools:
 
 | Tool | Purpose |
 | --- | --- |
+| `get_design_context` | Read compact, versioned composition guidance plus current surface/theme state before styling or composing study material. |
 | `get_reading_context` | Book metadata, current location, selected/visible passage, nearby structure, active board summary. |
 | `get_table_of_contents` | Bounded TOC tree with stable navigation targets. |
 | `get_passage` | Exact text and neighbors for a CFI/range or structural target. |
@@ -229,6 +230,37 @@ retry updates rather than duplicates.
 Every tool result that quotes the book returns `bookId`, `startCfi`, `endCfi`,
 `sectionTitle`, and text. Every persistent mutation becomes visible in the UI
 and can be undone or deleted by the user.
+
+### Agent-facing design context
+
+The page-owned WebMCP surface is the delivery mechanism for design guidance.
+Repository skills and `DESIGN.md` help implementation agents, but a browser
+agent cannot be assumed to see either. Keep `get_design_context` read-only,
+available before and after a book opens, and backed by a compact versioned
+runtime artifact rather than shipping the complete design document as prompt
+text.
+
+The result is selected by `surface` (`library`, `reader`, or `study`) and
+contains current state, supported primitives, semantic roles, mutation scope,
+four to six relevant composition invariants, accessibility expectations, and
+the available Preview, Apply, Undo, Reset, or Delete path. It must also state
+the creative freedom plainly: semantic roles, containment, source integrity,
+and user control are stable; palette, typography, shape language, and
+composition may change coherently.
+
+Descriptions for presentation and study-composition tools direct the agent to
+this context rather than duplicating it. High-expression calls such as custom
+book CSS, a custom semantic theme, or a multi-block study experience carry the
+design-context version they used. A stale version fails before mutation and
+invites a refresh; ordinary named-theme and one-block operations stay simple.
+Mutation results return an observable receipt with prior/applied state,
+sanitizer warnings, visible scope, provenance, and the exact reversal route.
+
+Do not treat raw application-shell CSS or JavaScript as a customization API.
+A custom whole-application world requires a separate decision defining a
+declarative semantic-token schema, persistence, preview/apply lifecycle,
+provenance, Undo/Reset, and permitted surfaces. Bounded EPUB CSS and trusted
+native study rendering remain separate containment domains.
 
 ## Study-board content
 

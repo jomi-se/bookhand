@@ -163,6 +163,33 @@ and selection contrast. Preview the world across the book, Contents, Text,
 Study, annotations, errors, mobile, and desktop before persisting it. Always
 retain a visible route back to a named shipped theme or the publisher baseline.
 
+<!-- bookhand:agent-design-context:start -->
+### Runtime agent design context
+
+- **Creative freedom:** The shipped aesthetic is a strong example, not a
+  boundary. Palette, typography, shape language, and composition may change
+  radically when the result remains coherent within the supported surface.
+- **Complete worlds:** Define canvas, raised surface, ink, muted ink, rule,
+  accent, quiet accent, focus, selection, and error roles before applying a
+  theme. Check the book, chrome, panels, Study, annotations, and status states
+  together.
+- **Reader and source first:** Give the book the calmest and largest reading
+  region. Study artifacts lead with the learning material and keep exact,
+  navigable source relationships; they do not default to chat transcripts or
+  equally weighted card grids.
+- **Accessible by construction:** Preserve WCAG AA text contrast, 3:1
+  meaningful non-text state, visible focus, disabled and selection contrast,
+  44px coarse-pointer targets, reduced motion, and mobile reflow.
+- **Visible user control:** Preview expressive changes before persistence.
+  Identify agent-created work and expose the applicable Apply, Cancel, Undo,
+  Reset, Return to source, or Delete action.
+- **Truthful containment:** Custom EPUB CSS stays inside publisher content and
+  native Study artifacts consume semantic roles. Whole-application custom
+  worlds remain unavailable until their declarative schema, persistence,
+  security boundary, and lifecycle contract are implemented; raw caller CSS
+  or JavaScript never styles the parent application.
+<!-- bookhand:agent-design-context:end -->
+
 ## Typography
 
 **Literary Font:** Source Serif 4 Variable, with Iowan Old Style and Georgia as

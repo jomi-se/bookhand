@@ -45,8 +45,11 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
   validation contracts are `docs/plan/polish-and-showcase-mission.md` and
   `docs/contracts/polish/`.
 - Five sequential independent contract-review passes closed every material
-  acceptance-oracle issue; the final pass approved task planning. The frozen
-  dependency waves are in `docs/plan/polish-and-showcase-build-tasks.md`.
+  acceptance-oracle issue in the original mission. The topology was reopened
+  on 2026-09-02 for the newly identified browser-agent design-context gap.
+  Three sequential review rounds resolved the amended contract and ownership
+  issues, and final verification passed; W0 through W6 are frozen again in
+  `docs/plan/polish-and-showcase-build-tasks.md`.
 - First post-audit fixes are implemented: the real file-import path reaches the
   one-time durable-storage request; SQLite rejects study-item IDs owned by a
   different book; the unnecessary Cloudflare COOP header is removed; reader
@@ -55,13 +58,16 @@ Deliver one polished reader-to-tutor vertical slice for the WebMCP hackathon.
   hidden-book arrow navigation is guarded; and Study authoring targets meet 44
   pixels. The larger mobile chrome/gesture redesign and remaining W1 trust work
   are still open.
-- Impeccable 4.1.3 project context is reconciled with the shipped product.
+- Impeccable 4.1.3 project context is reconciled with the repository-facing
+  product and design sources.
   `PRODUCT.md` now follows the current product schema, and `DESIGN.md` plus
   `.impeccable/design.json` define “The Working Library” as both the strong
   default and an embedded composition guide for user- and agent-authored
-  worlds. Customization remains intentionally broad, but agents are guided to
-  use complete semantic theme roles, preserve hierarchy and contrast, preview
-  all reader and study surfaces, and keep reset or Undo available. Impeccable
+  worlds. Runtime browser agents do not receive that guidance yet. The required
+  page-owned `get_design_context` surface, version handshake, mutation receipts,
+  and semantic-rendering integration are planned in
+  `docs/plan/agent-facing-design-guidance.md` and
+  `VAL-AGENT-DESIGN-CONTEXT`. Impeccable
   stays code-first by default to conserve image-generation tokens and latency;
   a task may explicitly use a visual comp when that reference would materially
   improve a novel surface.
@@ -144,15 +150,20 @@ The WebMCP Challenge closes 2026-09-03T20:00Z. Required and still open:
 
 ## Next actions
 
-1. Complete the trust reset: exact source verification, observable shared
+1. Implement W0's browser-agent design context: the bounded, page-owned
+   `get_design_context` tool, safe live state, canonical-block digest, tool
+   description pointers, and visible read activity. Full application-shell
+   custom worlds remain behind the explicit ADR gate in
+   `docs/plan/agent-facing-design-guidance.md`.
+2. Complete the trust reset: exact source verification, observable shared
    style/board mutations, book-scoped study IDs, real durable-storage prompting,
    math-faithful passages, visible mutation errors, and the COOP decision.
-2. Complete the mobile reading reset: shell-wide themes, immersive navigation,
+3. Complete the mobile reading reset: shell-wide themes, immersive navigation,
    intentional gestures, coherent panels/focus, and mobile browser evidence.
-3. Implement local lexical retrieval and the bounded native
+4. Implement local lexical retrieval and the bounded native
    slope-microscope experience, then run an actual compatible model through the
    deployed tool surface.
-4. Confirm the real storage mode and the hero flow in the ChatGPT **desktop**
+5. Confirm the real storage mode and the hero flow in the ChatGPT **desktop**
    app's built-in browser, the judged surface under ADR 0003 and its 2026-09-01
    amendment. The Pixel 7 cannot close this: WebMCP shipped in the ChatGPT
    desktop app, not the Android one. An in-app browser may also refuse OPFS sync
@@ -164,10 +175,10 @@ The WebMCP Challenge closes 2026-09-03T20:00Z. Required and still open:
    `tests/e2e/webmcp-agent.spec.ts` exercises the production build through the
    real runtime and passes. What remains untested is that browser's presentation
    and storage policy, not the tool contract.
-5. Deploy to bookhand.dev and confirm the live URL in the judged surface.
-6. Keep embeddings optional and after lexical retrieval. Slice 5's first rich
+6. Deploy to bookhand.dev and confirm the live URL in the judged surface.
+7. Keep embeddings optional and after lexical retrieval. Slice 5's first rich
    artifact is a trusted declarative experience, not arbitrary generated code.
-7. Use the real Chapter X content from the bundled EPUB; the approved mock's
+8. Use the real Chapter X content from the bundled EPUB; the approved mock's
    prose and figure are illustrative and must not be copied into the reader.
 
 ## Handoff notes

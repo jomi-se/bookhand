@@ -15,6 +15,9 @@ useful-without-an-agent product boundary.
   disciplined reading workspace on desktop.
 - UI actions and WebMCP actions must produce the same visible, persisted domain
   state.
+- Browser agents receive compact, versioned, page-owned design guidance before
+  expressive styling or study composition; repository skills are not a product
+  delivery mechanism.
 - Source-linked mutations must be verified against the current EPUB rather
   than trusted from caller input.
 - The first rich learning artifact is rendered by trusted native code from a
@@ -111,6 +114,9 @@ target manifest.
 
 - Populate CFI-anchored chunks and FTS5 for bounded non-mutating `search_book`.
 - Add a cohesive native study-experience schema and atomic command/tool.
+- Expose the active design grammar and live surface state through a bounded
+  read-only `get_design_context` tool, and bind expressive study composition to
+  the context version it used.
 - Add trusted math rendering and a declarative interactive-plot primitive.
 - Persist source links, provenance, action grouping, and Undo.
 - Build and polish the Chapter X slope-microscope flow, including a follow-up
@@ -165,6 +171,7 @@ Reader quality:
 
 Retrieval and showcase:
 
+- `VAL-AGENT-DESIGN-CONTEXT`
 - `VAL-INDEX-LIFECYCLE`
 - `VAL-SEARCH-BOOK`
 - `VAL-STUDY-SCHEMA-SECURITY`

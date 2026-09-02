@@ -3,15 +3,33 @@
 Last updated: 2026-09-02
 
 The active target manifest in `polish-and-showcase-mission.md` defines done.
-This file freezes implementation ownership after five sequential contract
-reviews; it does not weaken or merge their assertions.
+The original topology was frozen after five sequential contract reviews. It
+was reopened on 2026-09-02 only to incorporate the newly identified
+browser-agent design-context requirement. Three sequential review rounds
+resolved the amended contract and ownership issues, and a final clean
+verification passed; this topology is frozen again.
+
+## W0: browser-agent design context foundation
+
+Targets: `VAL-AGENT-DESIGN-CONTEXT`.
+Depends on: none.
+
+- Add the compact versioned runtime design artifact and globally available
+  `get_design_context`.
+- Compose safe live library/reader/study state without returning book text, raw
+  custom CSS, or user-authored values.
+- Advertise the context from design-bearing mutation tools, record reads in
+  Agent Activity, and bind the runtime version to the canonical design source.
+- Compute the version from the exact marked canonical block in `DESIGN.md`; do
+  not use a matching hand-written constant as the drift oracle.
+- Report supported EPUB/Study scopes and the pending whole-application-world
+  boundary truthfully while preserving explicit creative freedom.
 
 ## W1: source and persistence trust
 
 Targets: `VAL-RANGE-OWNERSHIP`, `VAL-MATH-PASSAGE`,
 `VAL-DURABLE-STORAGE-REQUEST`, `VAL-STUDY-ID-OWNERSHIP`,
-`VAL-ACTION-PROVENANCE-UNDO`, `VAL-MUTATION-ERRORS`,
-`VAL-DEPLOYMENT-HEADERS`, and `VAL-TEST-CONTROL-INTEGRITY`.
+`VAL-ACTION-PROVENANCE-UNDO`, and `VAL-MUTATION-ERRORS`.
 
 - Enforce current-book range, fingerprint, and normalized-quote ownership at
   the command boundary.
@@ -21,12 +39,15 @@ Targets: `VAL-RANGE-OWNERSHIP`, `VAL-MATH-PASSAGE`,
   cross-book/agent-to-user rejection.
 - Add provenance/action groups and bounded visible failures for existing
   mutations.
-- Remove COOP and extend production fault-seam exclusion.
+- Return the contracted prior/applied/scope/warnings/persistence/reversal
+  receipt for native study-item mutations.
+- Remove COOP, then contribute deployed-header evidence and the W1 fault seams
+  to the final header and test-control targets owned by W6.
 
 ## W2: one observable mutation surface
 
 Targets: `VAL-STYLE-PARITY` and `VAL-BOARD-VIEW-PARITY`.
-Depends on: W1 error/provenance primitives.
+Depends on: W0 design context and W1 error/provenance primitives.
 
 - Route interface and tool style mutations through one React-visible,
   persisted command path with prior state, Undo, and Reset.
@@ -38,8 +59,9 @@ Depends on: W1 error/provenance primitives.
 
 Targets: `VAL-MOBILE-THEME`, `VAL-MOBILE-CHROME`,
 `VAL-MOBILE-GESTURES`, `VAL-MOBILE-PANELS`,
-`VAL-MOBILE-ACCESSIBILITY`, `VAL-DESKTOP-READER`, and the reactivated legacy
-reader contracts.
+`VAL-MOBILE-ACCESSIBILITY`, `VAL-DESKTOP-READER`, `VAL-READER-STYLE`,
+`VAL-READER-RESPONSIVE`, `VAL-READER-ACCESSIBILITY`, and
+`VAL-READER-SELECTION`.
 Depends on: W2 shared style/view state.
 
 - Apply full-shell reader themes with measured contrast.
@@ -52,40 +74,50 @@ Depends on: W2 shared style/view state.
 
 ## W4: local lexical retrieval
 
-Targets: `VAL-INDEX-LIFECYCLE`, `VAL-SEARCH-BOOK`, and
-`VAL-TEST-CONTROL-INTEGRITY`.
+Targets: `VAL-INDEX-LIFECYCLE` and `VAL-SEARCH-BOOK`.
 Depends on: W1 math-faithful passage extraction.
 
 - Add versioned, batch-transactional CFI chunks and synchronized FTS rows.
 - Add cancellation/failure seams, committed-batch resume, and truthful states.
 - Add bounded current-book `search_book` through genuine WebMCP.
 - Validate against the frozen two-book oracle without production shortcuts.
+- Contribute indexing fault seams to the final production test-control
+  exclusion scan owned by W6.
 
 ## W5: cohesive native study experience
 
-Targets: `VAL-STUDY-SCHEMA-SECURITY`, `VAL-INTERACTIVE-PLOT`,
-`VAL-STUDY-EXPERIENCE-LIFECYCLE`, and `VAL-TEST-CONTROL-INTEGRITY`.
-Depends on: W1 ownership/provenance and W3 theme/layout primitives.
+Targets: `VAL-STUDY-SCHEMA-SECURITY`, `VAL-INTERACTIVE-PLOT`, and
+`VAL-STUDY-EXPERIENCE-LIFECYCLE`.
+Depends on: W0 design context, W1 ownership/provenance, and W3 theme/layout
+primitives.
 
 - Implement the frozen generic block vocabulary and safe declarative math AST.
 - Render accessible native content, locked-down Mermaid, and the interactive
-  plot without executable caller expressions.
+  plot without executable caller expressions; all consume semantic theme
+  roles rather than hard-coded shipped colors.
 - Add atomic create/update, provenance, action groups, Undo/Reset/Delete,
-  reversible source jumps, persistence, and failure recovery.
+  reversible source jumps, persistence, context-version checks, design
+  receipts, and failure recovery.
 - Validate slope, non-slope, and hostile fixtures before hero composition.
+- Contribute experience fault seams to the final production test-control
+  exclusion scan owned by W6.
 
 ## W6: real-model hero and evidence closure
 
 Targets: `VAL-HERO-MODEL-RUN`, `VAL-GATE-STABILITY`,
-`VAL-DEPLOYED-RUNTIME-TRUTH`, and `VAL-DOCUMENTATION-TRUTH`.
-Depends on: W1 through W5 and owner access to the compatible ChatGPT desktop
+`VAL-DEPLOYED-RUNTIME-TRUTH`, `VAL-DEPLOYMENT-HEADERS`,
+`VAL-DOCUMENTATION-TRUTH`, and `VAL-TEST-CONTROL-INTEGRITY`.
+Depends on: W0 through W5 and owner access to the compatible ChatGPT desktop
 agent surface.
 
 - Deploy an identified commit and assert the exact dynamic tool sets.
 - Run the intent-only Chapter X request and follow-up through a named real
-  model, preserving the independently witnessed transcript and runtime trace.
+  model, preserving the independently witnessed transcript and runtime trace;
+  the model discovers and calls `get_design_context` before composition.
 - Close three-run gate stability, live sentinel persistence, deployed headers,
   source-of-truth updates, and final visual evidence.
+- Own the final production scan proving that W1, W4, and W5 fault seams are
+  unreachable from shipped UI, WebMCP, messages, and bundles.
 
 ## Review and integration rules
 
@@ -95,4 +127,3 @@ agent surface.
 - Integrate in dependency order. A later wave may prototype behind domain
   types, but it may not weaken an earlier trust boundary to proceed.
 - Run focused checks while editing and `npm run verify` at each completed wave.
-

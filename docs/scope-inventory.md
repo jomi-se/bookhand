@@ -102,6 +102,18 @@ Atomic inventory IDs map to contracts as follows:
 - `P-LEGACY-SELECTION` -> amended and reactivated `VAL-READER-SELECTION`
 - `P-INDEX-LIFECYCLE` -> `VAL-INDEX-LIFECYCLE`
 - `P-SEARCH` -> `VAL-SEARCH-BOOK`
+- `P-AGENT-DESIGN-DISCOVERY` and `P-AGENT-DESIGN-CONTEXT` ->
+  `VAL-AGENT-DESIGN-CONTEXT`: browser-only discovery of bounded, versioned,
+  page-owned semantic design guidance and live surface state.
+- `P-AGENT-CUSTOMIZATION-SAFETY` -> `VAL-AGENT-DESIGN-CONTEXT` plus
+  `VAL-STYLE-PARITY`: context-version checks for expressive style changes,
+  truthful scope/warnings, Preview/Apply, persistence, provenance, Undo, and
+  Reset. Whole-application custom worlds additionally require the ADR named in
+  `docs/plan/agent-facing-design-guidance.md` before entering active scope.
+- `P-AGENT-STUDY-COMPOSITION` -> `VAL-AGENT-DESIGN-CONTEXT`,
+  `VAL-STUDY-SCHEMA-SECURITY`, and `VAL-STUDY-EXPERIENCE-LIFECYCLE`: agents
+  receive source-first composition guidance while native renderers consume the
+  active semantic roles.
 - `P-STUDY-SECURITY` -> `VAL-STUDY-SCHEMA-SECURITY`
 - `P-STUDY-PLOT` -> `VAL-INTERACTIVE-PLOT`
 - `P-STUDY-LIFECYCLE` -> `VAL-STUDY-EXPERIENCE-LIFECYCLE`
@@ -114,6 +126,10 @@ Atomic inventory IDs map to contracts as follows:
 
 The mission boundary, legacy assertion manifest, device exception, and cut line
 are in `docs/plan/polish-and-showcase-mission.md`.
+
+The runtime delivery shape and the explicit boundary between EPUB CSS, native
+Study rendering, and future application-shell worlds are in
+`docs/plan/agent-facing-design-guidance.md`.
 
 ## Unbuilt slices
 

@@ -136,6 +136,15 @@ compound, and naturally grounded in the application's data model:
 - save the explanation next to the passage and later update it;
 - reformat the book for a specific learning need and offer an immediate reset.
 
+The agent must not need repository access or a harness-specific skill to learn
+how Bookhand's design surfaces compose. The page owns a compact, versioned
+design context exposed through WebMCP. It describes the current surface,
+semantic roles, available primitives, containment boundaries, accessibility
+expectations, and reversal paths while explicitly leaving palette,
+typography, composition, and expressive direction open to the user and agent.
+This is runtime product context, not a hidden system prompt and not a copy of
+the complete developer-facing design document.
+
 The application remains usable when no agent is present. WebMCP is essential to
 the *open-ended tutor behavior*, not to basic reading.
 
@@ -163,6 +172,9 @@ to its gateway or to Codex.
   locations and the user can return easily.
 - **Persistent effects are visible and reversible.** Notes, styles, and study
   material belong to the user.
+- **Guidance enables creative freedom.** Browser agents receive the semantic
+  roles and safety context needed to compose coherently, without Bookhand
+  prescribing one acceptable aesthetic.
 - **Local-first and judgeable.** No account, private gateway, or model bill is
   required to understand the submission.
 - **Prove one magical path before generalizing.** A polished passage-to-lesson
