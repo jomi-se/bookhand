@@ -3,15 +3,18 @@
 Last updated: 2026-09-02
 
 The active target manifest in `polish-and-showcase-mission.md` defines done.
-The original topology was frozen after five sequential contract reviews. It
-was reopened on 2026-09-02 only to incorporate the newly identified
-browser-agent design-context requirement. Three sequential review rounds
-resolved the amended contract and ownership issues, and a final clean
-verification passed; this topology is frozen again.
+W0 through W3 preserve the implemented trust, shared-state, and reader work.
+The topology from W4 onward was reopened on 2026-09-02 after live ChatGPT
+Desktop use and a formal Impeccable critique showed that Study still presents
+records rather than lessons and that Bookhand lacks transient tutor guidance.
+Two sequential independent reviews of the amended contracts and dependencies
+were completed and incorporated on 2026-09-02; the W4-through-W11 topology is
+now frozen.
 
 ## W0: browser-agent design context foundation — implemented 2026-09-02
 
-Targets: `VAL-AGENT-DESIGN-CONTEXT`.
+Implemented baseline: the pre-amendment `VAL-AGENT-DESIGN-CONTEXT`. W4 solely
+owns the active amended target.
 Depends on: none.
 
 Implemented as `get_design_context`, registered from first load beside the
@@ -25,23 +28,26 @@ so a style change does not re-register the tool set. Evidence:
 `tests/e2e/webmcp-design-context.spec.ts`, the latter through genuine
 `document.modelContext`.
 
-Two things W0 could not fix and left for their owning waves:
+That guidance-only digest was correct for the original W0 contract. The W4
+amendment adds canonical live capability data to the digest and removes stale
+hand-written capability prose; W0 is historical evidence, not a claim that the
+amendment is already implemented.
 
-- A tool style mutation does not reach React state, so the design context reads
-  the adapter rather than the interface. W2 (`VAL-STYLE-PARITY`) owns closing
-  that; until it does, the two paths agree only because W0 reads the lower one.
-- The reading tools register as soon as the study board exists, which is before
-  `useReader` has finished restoring the stored style. A style mutation landing
-  in that window is silently overwritten by the restore. W2 owns the shared
-  command path where this becomes fixable; the browser test documents the race
-  by waiting the reader out.
+Two things W0 could not fix were subsequently closed by W2:
+
+- A tool style mutation did not reach React state, so the original design
+  context read the adapter rather than the interface.
+- The reading tools registered before `useReader` finished restoring style, so
+  a mutation in that window could be overwritten. W2's shared command path and
+  race coverage now own the resolved behavior.
 
 - Add the compact versioned runtime design artifact and globally available
   `get_design_context`.
 - Compose safe live library/reader/study state without returning book text, raw
   custom CSS, or user-authored values.
 - Advertise the context from design-bearing mutation tools, record reads in
-  Agent Activity, and bind the runtime version to the canonical design source.
+  separate diagnostics, and bind the runtime version to canonical design and
+  capability sources.
 - Compute the version from the exact marked canonical block in `DESIGN.md`; do
   not use a matching hand-written constant as the drift oracle.
 - Report supported EPUB/Study scopes and the pending whole-application-world
@@ -49,7 +55,8 @@ Two things W0 could not fix and left for their owning waves:
 
 ## W1: source and persistence trust
 
-Targets: `VAL-RANGE-OWNERSHIP`, `VAL-MATH-PASSAGE`,
+Implemented baselines: `VAL-RANGE-OWNERSHIP`, the pre-amendment
+`VAL-MATH-PASSAGE`,
 `VAL-DURABLE-STORAGE-REQUEST`, `VAL-STUDY-ID-OWNERSHIP`,
 `VAL-ACTION-PROVENANCE-UNDO`, and `VAL-MUTATION-ERRORS`.
 
@@ -92,7 +99,7 @@ WebMCP runtime.
 - Return the contracted prior/applied/scope/warnings/persistence/reversal
   receipt for native study-item mutations.
 - Remove COOP, then contribute deployed-header evidence and the W1 fault seams
-  to the final header and test-control targets owned by W6.
+  to the final header and test-control targets owned by W10.
 
 ## W2: one observable mutation surface
 
@@ -122,72 +129,122 @@ Depends on: W2 shared style/view state.
 - Preserve the disciplined desktop docked/expanded workspace.
 - Add the mobile/desktop/zoom/safe-area browser evidence matrix.
 
-## W4: local lexical retrieval
+## W4: runtime truth and canonical source lifecycle
+
+Targets: `VAL-AGENT-DESIGN-CONTEXT`, `VAL-WEBMCP-TOOL-CONTRACTS`, amended
+`VAL-MATH-PASSAGE`, and `VAL-SOURCE-EXCERPT-LIFECYCLE`.
+Depends on: W0 and W1.
+
+- Remove the false design-context claim that Preview and Undo are unavailable;
+  derive capability guidance and its version from canonical runtime truth.
+- Make `open_book`, study-item, and reading-style schemas unambiguous and
+  non-empty; preserve declared structured results through the real runtime.
+- Close image-only, MathML `aria-label`, figure-only CFI, and mixed-math
+  extraction gaps.
+- Add versioned canonical source excerpts, source-derived quotation
+  canonicalization, old-record refresh/stale state, and reindex semantics.
+
+This is the next executable wave. It prevents every later surface from
+composing on contradictory capabilities or damaged source meaning.
+
+## W5: local lexical retrieval
 
 Targets: `VAL-INDEX-LIFECYCLE` and `VAL-SEARCH-BOOK`.
-Depends on: W1 math-faithful passage extraction.
+Depends on: W4 canonical source excerpts.
 
 - Add versioned, batch-transactional CFI chunks and synchronized FTS rows.
 - Add cancellation/failure seams, committed-batch resume, and truthful states.
-- Add bounded current-book `search_book` through genuine WebMCP.
-- Validate against the frozen two-book oracle without production shortcuts.
-- Contribute indexing fault seams to the final production test-control
-  exclusion scan owned by W6.
+- Add bounded current-book `search_book` with structured results through
+  genuine WebMCP and validate against the frozen two-book oracle.
 
-## W5: cohesive native study experience
+## W6: shared navigation and tutor-session core
 
-Targets: `VAL-STUDY-SCHEMA-SECURITY`, `VAL-INTERACTIVE-PLOT`, and
-`VAL-STUDY-EXPERIENCE-LIFECYCLE`.
-Depends on: W0 design context, W1 ownership/provenance, and W3 theme/layout
-primitives.
+Target: `VAL-TUTOR-SESSION-LIFECYCLE`.
+Depends on: W2 shared board state and W3 reader interaction.
 
-- Implement the frozen generic block vocabulary and safe declarative math AST.
-- Render accessible native content, locked-down Mermaid, and the interactive
-  plot without executable caller expressions; all consume semantic theme
-  roles rather than hard-coded shipped colors.
-- Add atomic create/update, provenance, action groups, Undo/Reset/Delete,
-  reversible source jumps, persistence, context-version checks, design
-  receipts, and failure recovery.
-- Validate slope, non-slope, and hostile fixtures before hero composition.
-- Contribute experience fault seams to the final production test-control
-  exclusion scan owned by W6.
+- Route deliberate reader movement through one origin-aware controller.
+- Add one non-persistent, revision-guarded tutor session with a ten-entry stack.
+- Implement the attributed guidance indicator, Back, Stop, manual-takeover,
+  book-close, detach, and reload semantics.
+- Spike and select a transient overlay path that cannot replace a permanent
+  annotation at the same CFI.
 
-## W6: real-model hero and evidence closure
+## W7: cohesive durable study domain
+
+Targets: `VAL-STUDY-SCHEMA-SECURITY`, `VAL-STUDY-MATH-RENDERING`,
+`VAL-INTERACTIVE-PLOT`, `VAL-STUDY-EXPERIENCE-LIFECYCLE`, and
+`VAL-STUDY-SAFE-REMOVAL`.
+Depends on: W4 amended design context/source lifecycle, W6 shared navigation, and
+the existing W1 ownership/provenance primitives.
+
+- Add a first-class titled experience with ordered blocks, shared/differing
+  sources, annotation references, revision, provenance, and one atomic action.
+- Implement strict accessible math, the frozen native block vocabulary, and
+  safe declarative plot; consume semantic theme roles.
+- Add atomic create/update, structured receipts, source navigation, Undo,
+  Reset, and recoverable removal without treating `actionGroupId` as hierarchy.
+- Validate slope, non-slope, damaged-source, and hostile fixtures.
+
+## W8: Study workspace composition and recovery
+
+Targets: `VAL-STUDY-COMPOSITION-HIERARCHY`,
+`VAL-AGENT-ACTIVITY-PRESENTATION`, `VAL-STUDY-WORKSPACE-RESPONSIVE`, and
+`VAL-STUDY-LOAD-RECOVERY`.
+Depends on: W7 and W3 theme/layout primitives.
+
+- Remove all raw activity/log UI from Study and move it to a separate bounded
+  diagnostics surface.
+- Make lesson title and conceptual sequence outrank storage types; collapse
+  shared sources and keep annotations as a compact index/reference.
+- Put existing learning content before authoring; provide one clear manual
+  create path with additional content kinds progressively disclosed so Study
+  remains fully useful without an agent.
+- Give docked desktop, expanded desktop, and focused mobile genuinely different
+  compositions while preserving source context and focus lifecycle.
+- Render initial-load and every mutation-family failure with bounded recovery.
+- Run a formal two-pass Impeccable critique on stable deployed desktop and
+  phone-size surfaces and preserve the scored evidence.
+
+## W9: embodied tutor interactions
+
+Targets: `VAL-TUTOR-PASSAGE-FOCUS`, `VAL-TUTOR-STUDY-REVEAL`, and
+`VAL-TUTOR-PRESENTATION-SAFETY`.
+Depends on: W5 search, W6 session core, W7 stable lesson IDs, and W8 stable
+study destinations.
+
+- Register `focus_passage`, `reveal_study_item`, `present_explanation`, and
+  `control_guidance` through the shared commands and genuine WebMCP runtime.
+- Prove exact source focus, permanent-highlight coexistence, semantic status,
+  meaningful target focus, bounded inert explanations, Back, Stop, takeover,
+  and zero persistence.
+
+## W10: combined real-model hero and evidence closure
 
 Targets: `VAL-HERO-MODEL-RUN`, `VAL-GATE-STABILITY`,
 `VAL-DEPLOYED-RUNTIME-TRUTH`, `VAL-DEPLOYMENT-HEADERS`,
 `VAL-DOCUMENTATION-TRUTH`, and `VAL-TEST-CONTROL-INTEGRITY`.
-Depends on: W0 through W5 and owner access to the compatible ChatGPT desktop
+Depends on: W0 through W9 and owner access to the compatible ChatGPT Desktop
 agent surface.
 
-- Deploy an identified commit and assert the exact dynamic tool sets.
-- Run the intent-only Chapter X request and follow-up through a named real
-  model, preserving the independently witnessed transcript and runtime trace;
-  the model discovers and calls `get_design_context` before composition.
-- Close three-run gate stability, live sentinel persistence, deployed headers,
-  source-of-truth updates, and final visual evidence.
-- Own the final production scan proving that W1, W4, and W5 fault seams are
-  unreachable from shipped UI, WebMCP, messages, and bundles.
+- Deploy an identified commit and assert the exact canonical tool manifest.
+- Run one intent-only sequence: context, search, focus, temporary explanation,
+  Back/Stop, opt-in durable lesson, reveal, follow-up update, and reload.
+- Preserve the independently witnessed transcript, runtime trace, visible
+  result, bounded failure, persistence, and transient-state disappearance.
+- Close repeated gate stability, deployed headers, documentation truth, and
+  production exclusion scans for every new fault seam.
 
-## W7: does the agent actually compose anything good?
+## W11: does the agent actually compose anything good?
 
 Target: `VAL-COMPOSITION-QUALITY`.
-Depends on: W5, and on W6's real-model access.
-
-Added 2026-09-02, after the owner observed that no wave in this mission measures
-whether a frontier model, given these affordances, produces study surfaces worth
-having. W6 proves a real model originated the calls and did not replay a
-fixture. It does not ask whether the result was any good, and it would pass on a
-lesson nobody would want to read.
+Depends on: W10's deployed real-model access.
 
 - Freeze at least twelve intent-only prompts across at least three chapters.
-- Run them against the deployed build through a named model and version.
-- Score grounding by the product's own source rejections, plus design-context
-  discovery, first-attempt schema validity, and completion.
-- Report the worst outputs beside the best; a table of successes is marketing.
-
-This is the measure that answers the project's actual question. It cannot run
-before W5, because an eval of a surface that does not exist measures nothing.
+- Score product-verified grounding, design discovery, first-attempt schema
+  validity, and completion.
+- Record a separate human qualitative read without pretending the composing
+  model can grade itself.
+- Report the worst outputs beside the best; a success-only table is marketing.
 
 ## Review and integration rules
 

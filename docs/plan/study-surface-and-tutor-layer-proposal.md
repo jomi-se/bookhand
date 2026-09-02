@@ -2,16 +2,18 @@
 
 Date: 2026-09-02
 
-Status: **proposal only; not part of the frozen active mission yet**
+Status: **accepted direction; integrated into the active polish mission on
+2026-09-02**
 
 This document sequences the findings in:
 
 - `docs/reviews/2026-09-02-study-surface-code-review.md`
 - `docs/reviews/2026-09-02-embodied-tutor-layer-review.md`
 
-It deliberately does not modify `current-work.md`, the active mission, or its
-contracts while another implementation pass is in progress. Rebase this plan
-against the resulting HEAD before activation.
+The implementation pass is complete and the proposal was reconciled against
+`92ab862`. The active contract manifest and executable ordering now live in
+`polish-and-showcase-mission.md` and `polish-and-showcase-build-tasks.md`; this
+document preserves the reasoning and cut line.
 
 ## Outcome
 
@@ -67,8 +69,9 @@ Existing primary targets:
 
 Goal: learning content owns attention; protocol diagnostics remain available.
 
-- Replace raw default activity with a compact semantic outcome and collapsed
-  diagnostics.
+- Remove raw activity and diagnostics from Study. Put observability in a
+  separate surface; reserve Study status only for an active tutoring state and
+  its learner controls.
 - Establish the native visual grammar for prose, quotations, math, steps,
   questions, citations, and annotation references.
 - Remove storage-type labels from ordinary reading hierarchy.
@@ -139,15 +142,9 @@ If time is tight, cut in this order:
 4. broad study block vocabulary; retain prose, source, equation, and question;
 5. visual pulse; retain stable accessible emphasis.
 
-## Activation checklist
+## Activation record
 
-Before moving this proposal into the active mission:
-
-1. wait for the concurrent reader pass to land;
-2. re-run the source/code line audit at the new HEAD;
-3. reconcile overlaps with the existing W4/W5 contracts and remove duplicate
-   targets;
-4. assign one owner per behavior and one independent validator per target;
-5. freeze contracts before implementation;
-6. update `docs/plan/current-work.md` with the accepted sequence and first
-   executable target.
+The concurrent pass landed, the current code was re-audited at `92ab862`, and
+overlap with retrieval and the earlier W5 contracts was reconciled. The active
+mission owns validation and dependency order; implementation must still satisfy
+its two sequential contract-review passes before the amended topology freezes.

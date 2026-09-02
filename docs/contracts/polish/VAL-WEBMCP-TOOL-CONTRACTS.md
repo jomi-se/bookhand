@@ -1,0 +1,6 @@
+# VAL-WEBMCP-TOOL-CONTRACTS: Tools are narrow, unambiguous, and structured
+
+Surface: tool schemas, handlers, command API, genuine WebMCP runtime, and browser.
+Needs: current dynamic tool registry and mutation receipt contracts.
+Behavior: `open_book` accepts exactly one discriminated selector; exact identity wins only by schema, while ambiguous fuzzy titles return bounded candidates and make no change. Study-item inputs are kind-discriminated with required non-empty content and cannot be made valid by handler defaults. Reading-style input is a non-empty explicit operation. Every tool returns a concise human-readable content block plus stable `structuredContent` matching a declared output schema for success and failure; tests and clients preserve rather than discard it. Descriptions state persistence, visibility, reversal, and ambiguity truthfully. No schema advertises grouped Undo or another capability the command layer lacks.
+Evidence: serialized input/output schemas; neither/both/ambiguous book-selector cases; every study discriminator and empty-content rejection; empty-style rejection; genuine runtime success/failure structured results; consumer preservation tests; description-to-command capability audit.

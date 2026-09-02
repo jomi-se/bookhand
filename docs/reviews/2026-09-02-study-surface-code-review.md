@@ -62,7 +62,7 @@ shared source references, provenance, one atomic action boundary, and an
 explicit relationship to annotations. Keep `StudyItem` for truly standalone
 notes. Do not use `actionGroupId` as a substitute for presentation hierarchy.
 
-### P0 — agent telemetry owns the learning viewport
+### P0 — observability is embedded in the wrong product surface
 
 Agent Activity is inserted before authoring controls and content. It always
 shows connection state and, when present, every raw tool name and summary. The
@@ -73,11 +73,11 @@ behavior. **[LIVE-USER] [CODE: `src/study/StudyBoardPanel.tsx:94-105`,
 `src/webmcp/useWebMcpTools.ts:25-39`, `src/study/study.css:280-339`,
 `tests/e2e/webmcp-agent.spec.ts:164-172`]**
 
-**[PROPOSAL]** Default to one semantic outcome row, such as “Agent added four
-lesson blocks and one highlight.” Keep failures immediately visible. Put tool
-identifiers, timestamps, and raw calls under a collapsed diagnostics disclosure
-or developer mode. Transparency should explain what changed, not make protocol
-plumbing the page's subject.
+**[PROPOSAL]** Remove tool logs and general agent observability from Study.
+Place identifiers, timestamps, calls, and diagnostics in a separate activity or
+developer surface. Study may show only a compact, semantic tutoring-status
+indicator while guidance is active, with Back and Stop. Learning transparency
+should explain and control the live teaching state, not expose protocol plumbing.
 
 ### P1 — equations are rendered as code by design
 
@@ -145,7 +145,7 @@ asserts the mode attribute, not a meaningfully different workspace.
 
 **[PROPOSAL]** Docked mode should be a concise companion. Expanded mode should
 be a study workspace with centered lesson measure and, when useful, a lesson
-contents rail, compact annotations/activity rail, and source preview. On a
+contents rail, compact annotations rail, and source preview. On a
 phone, “expanded” should mean focused study, not a squeezed desktop grid.
 
 ## Source-fidelity correction and remaining risks
@@ -196,7 +196,7 @@ resource, and execution boundary.
 - Steps: aligned markers and larger inter-step rhythm.
 - Question: contained prompt with a clear native reveal control.
 - Highlights: compact annotation index/filter, not a duplicate document stream.
-- Agent activity: semantic outcome first; diagnostics on demand.
+- Agent activity: absent from Study; a separate diagnostics surface owns it.
 
 Existing prose restraint, quotation treatment, ordered steps, native
 `<details>` answer reveal, verified source claims, visible provenance, and

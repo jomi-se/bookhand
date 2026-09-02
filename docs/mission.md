@@ -15,8 +15,10 @@ changes.
 
 A judge can open the application, load the bundled hero book (currently a
 placeholder calculus text), connect a compatible WebMCP agent, ask for help
-understanding a passage, and watch the agent use book context to build a useful
-in-page study artifact. The demo must make the difference between browser
+understanding a passage, and watch the agent use book context in a teaching
+sequence: first transiently finding and pointing to the exact source with
+learner-controlled Back and Stop, then—when asked—building one coherent,
+persistent study lesson. The demo must make the difference between browser
 automation and a semantic WebMCP interface visible without requiring Agent
 Connect or private infrastructure.
 

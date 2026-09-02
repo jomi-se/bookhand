@@ -40,4 +40,4 @@ successes is not evidence, it is marketing.
 
 Status: identified 2026-09-02, after W0 and part of W1. Not schedulable before
 `VAL-STUDY-EXPERIENCE-LIFECYCLE` exists — an eval of a surface that has not been
-built measures nothing. It is the first thing to run once W5 lands.
+built measures nothing. It is the first thing to run once W10 lands.

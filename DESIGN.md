@@ -210,7 +210,8 @@ user-adjustable.
 - **Literary title:** wordmark and compact bookish identity.
 - **Body:** ordinary product text and authored study prose.
 - **Label:** controls, metadata, status, panel headings, and values.
-- **Micro label:** format tags, study kinds, and dense tool history; uppercase
+- **Micro label:** format tags, study kinds, and compact diagnostic metadata;
+  raw agent/tool history belongs only in the separate diagnostics surface; uppercase
   tracking is allowed only where the content is genuinely a compact category.
 - **Code:** custom CSS, raw equations until typeset, tool names, and diagnostic
   values.
@@ -236,7 +237,7 @@ larger section gaps only when the information hierarchy changes. Coarse-pointer
 targets are at least 44 by 44 CSS pixels. Safe-area insets and 320px-wide reflow
 are part of the layout, not later patches.
 
-**The Book Gets the Space Rule.** Reader chrome and agent activity must justify
+**The Book Gets the Space Rule.** Reader chrome and diagnostics must justify
 every permanent pixel. Navigation can overlay or recede on mobile; it must not
 reserve broad rails that make the book feel like a preview.
 
@@ -297,7 +298,9 @@ restore focus when closed.
 ### Study artifacts
 
 Study content leads with the learning artifact and its source relationship.
-Authoring controls and agent telemetry are secondary disclosure. Quotations,
+Authoring controls are secondary disclosure. Raw agent telemetry and tool
+history never appear in Study; a compact semantic active-tutor status may
+appear only to explain the current guidance and expose Back and Stop. Quotations,
 equations, steps, questions, diagrams, and interactive plots use native,
 theme-aware rendering. Agent-created work identifies its origin and exposes
 the appropriate Return to source, Reset, Undo, or Delete action.
@@ -320,7 +323,8 @@ immediate, understandable state change.
   visible reset path when experimenting boldly.
 - **Do** inspect customization on library, reader, panels, Study, mobile,
   desktop, error, focus, and reduced-motion states.
-- **Do** let the artifact dominate Study and keep tool history secondary.
+- **Do** let the artifact dominate Study and keep tool history in separate
+  diagnostics.
 - **Do** use real book content and real product state in demonstrations.
 
 ### Don't:

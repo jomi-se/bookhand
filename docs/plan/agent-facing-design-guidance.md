@@ -67,10 +67,11 @@ constrain creative direction.
 Design-bearing mutations return structured, human-readable receipts containing
 the previous and applied state, where the change is visible, sanitizer or
 validation warnings, provenance/action group, persistence state, and the exact
-reversal action. Agent Activity records both design-context reads and mutations.
+reversal action. Separate diagnostics record design-context reads and mutations.
 The ordinary UI exposes the matching Preview/Apply/Cancel and Undo/Reset/Delete
 controls, so an agent never gains an invisible design path unavailable to the
-person.
+person. Calls may be recorded in a separate diagnostics surface; protocol logs
+do not appear inside Study.
 
 ### 4. Native study surfaces consume semantic roles
 
@@ -85,7 +86,8 @@ JavaScript cannot escape into the application shell.
 
 1. **Runtime context foundation:** add the typed, versioned guidance manifest,
    `get_design_context`, dynamic library/reader/study state, bounded output, and
-   tool-description pointers. Make the call visible in Agent Activity.
+   tool-description pointers. Make the call inspectable in the separate
+   diagnostics surface without displacing reading or Study.
 2. **Presentation lifecycle:** extend the shared style path with truthful
    current/prior state, Preview/Apply/Cancel/Reset, sanitizer warnings,
    persistence, provenance, and Undo. Custom EPUB CSS carries the context

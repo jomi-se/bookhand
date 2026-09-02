@@ -1,12 +1,12 @@
 # Polish and showcase mission
 
-Last updated: 2026-09-01
+Last updated: 2026-09-02
 
 ## Objective
 
 Elevate the working Slice 3 checkpoint into a trustworthy, excellent reader
-and one compelling proof of model-composed study. Preserve the local-first,
-useful-without-an-agent product boundary.
+and one compelling proof of model-composed study plus transient, embodied
+tutoring. Preserve the local-first, useful-without-an-agent product boundary.
 
 ## Product boundary
 
@@ -22,6 +22,11 @@ useful-without-an-agent product boundary.
   than trusted from caller input.
 - The first rich learning artifact is rendered by trusted native code from a
   bounded declarative schema. Arbitrary generated JavaScript remains deferred.
+- Study is durable learner-owned knowledge. Tutor guidance is transient
+  attention with visible Back and Stop; it never silently becomes an
+  annotation or lesson.
+- Agent logs and tool telemetry are observability, not study content. They live
+  outside Study; only active tutor status belongs near the learning surface.
 - Lexical FTS retrieval precedes embeddings; it is sufficient for the first
   grounded whole-book showcase.
 
@@ -107,7 +112,7 @@ Targets: the mobile and desktop reader entries in the active target manifest.
 - Add a mobile Playwright matrix for themes, geometry, names, focus, gestures,
   selection, and reduced motion.
 
-### P3: grounded study showcase
+### P3: grounded study and tutor showcase
 
 Targets: the retrieval, study experience, and actual-model entries in the active
 target manifest.
@@ -123,6 +128,8 @@ target manifest.
   update to the same experience.
 - Run one actual compatible model through the deployed tool surface and record
   the prompts, calls, visible result, failure handling, and reload result.
+- Let the model search, visibly point to an exact passage, explain briefly, and
+  return before the learner elects to create durable study content.
 
 ## Cut line
 
@@ -133,7 +140,9 @@ this order:
 1. embeddings and semantic fusion;
 2. general plot vocabulary beyond the slope showcase;
 3. broad manual editing for the new experience;
-4. gesture flourish beyond a reliable thresholded snap.
+4. gesture flourish beyond a reliable thresholded snap;
+5. temporary explanation math; retain bounded plain text;
+6. multi-entry tutor history; retain one reliable Back target.
 
 Embeddings, semantic fusion, arbitrary generated applications, broad plot
 vocabulary, and physical Pixel validation are explicit non-gates. Physical
@@ -147,6 +156,7 @@ Trust and persistence:
 
 - `VAL-RANGE-OWNERSHIP`
 - `VAL-MATH-PASSAGE`
+- `VAL-SOURCE-EXCERPT-LIFECYCLE`
 - `VAL-STYLE-PARITY`
 - `VAL-BOARD-VIEW-PARITY`
 - `VAL-DURABLE-STORAGE-REQUEST`
@@ -175,9 +185,21 @@ Retrieval and showcase:
 - `VAL-INDEX-LIFECYCLE`
 - `VAL-SEARCH-BOOK`
 - `VAL-STUDY-SCHEMA-SECURITY`
+- `VAL-STUDY-MATH-RENDERING`
 - `VAL-INTERACTIVE-PLOT`
 - `VAL-STUDY-EXPERIENCE-LIFECYCLE`
+- `VAL-STUDY-COMPOSITION-HIERARCHY`
+- `VAL-AGENT-ACTIVITY-PRESENTATION`
+- `VAL-STUDY-WORKSPACE-RESPONSIVE`
+- `VAL-STUDY-SAFE-REMOVAL`
+- `VAL-STUDY-LOAD-RECOVERY`
+- `VAL-WEBMCP-TOOL-CONTRACTS`
+- `VAL-TUTOR-SESSION-LIFECYCLE`
+- `VAL-TUTOR-PASSAGE-FOCUS`
+- `VAL-TUTOR-STUDY-REVEAL`
+- `VAL-TUTOR-PRESENTATION-SAFETY`
 - `VAL-HERO-MODEL-RUN`
+- `VAL-COMPOSITION-QUALITY`
 
 Evidence:
 

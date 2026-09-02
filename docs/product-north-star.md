@@ -124,6 +124,23 @@ production sandboxing project. Basic containment and clear user control are
 enough. The purpose is to enable the demonstration, not to solve hostile-code
 execution for the web at large.
 
+## Durable study and live tutoring are different products
+
+Bookhand needs two complementary ways for an agent to teach:
+
+- **Study is durable knowledge.** Lessons, questions, quotations, diagrams,
+  notes, and annotations persist only when the learner chooses to keep them.
+- **Tutor guidance is transient attention.** During a live exchange, the agent
+  may take the learner to an exact passage, point at it, reveal a related study
+  item, or present a small anchored explanation. This state is visible,
+  stoppable, and never becomes an annotation or lesson implicitly.
+
+A permanent highlight is not a substitute for pointing. Tutor-directed
+navigation must always show who moved the surface, offer Back and Stop, yield
+to manual navigation, and disappear on reload. The same grounded source and
+navigation primitives should serve both experiences, but their persistence and
+consent boundaries must remain explicit.
+
 ## What WebMCP should make visible
 
 The best demo should contrast semantics with generic browser driving without
@@ -172,6 +189,8 @@ to its gateway or to Codex.
   locations and the user can return easily.
 - **Persistent effects are visible and reversible.** Notes, styles, and study
   material belong to the user.
+- **Attention remains under learner control.** Tutor cues are temporary,
+  clearly attributed, easy to stop, and never silently persisted.
 - **Guidance enables creative freedom.** Browser agents receive the semantic
   roles and safety context needed to compose coherently, without Bookhand
   prescribing one acceptable aesthetic.
@@ -187,12 +206,16 @@ The target experience is:
 1. The reader opens the bundled technical book and selects a difficult passage.
 2. They ask their compatible agent to help them truly understand it.
 3. The agent obtains exact passage and chapter context through WebMCP.
-4. It retrieves earlier definitions or examples from the book as needed.
-5. It creates a tailored study artifact—ideally something visual or interactive
-   that a static chat answer would not provide—inside the docked board.
-6. The reader expands the board, interacts with the lesson, and asks a follow-up.
-7. The artifact, citations, and relevant note persist, and the reader returns to
-   the exact source location.
+4. It retrieves an earlier definition or example, moves the reader there, and
+   temporarily points to the exact source with visible Back and Stop controls.
+5. It gives a short source-anchored explanation without creating permanent
+   content.
+6. When the learner asks to keep or deepen the explanation, it creates one
+   titled, coherent study lesson—ideally visual or interactive—rather than a
+   feed of unrelated records.
+7. The learner opens that lesson, asks a follow-up that updates the same unit,
+   reloads it successfully, and returns to the exact source location. The
+   temporary tutor state does not survive reload.
 
 If this feels obviously more useful than “chat with this PDF,” the project has
 proved its thesis.

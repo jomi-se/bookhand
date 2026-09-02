@@ -7,7 +7,7 @@
   presentation controls, and restore.
 - Persistent highlights, notes, one board per book, docked/expanded Study, and
   native prose, quotation, equation, steps, and question items.
-- Eleven dynamically registered tools through Chromium's genuine
+- Twelve dynamically registered tools through Chromium's genuine
   `document.modelContext`: library/open, reading context/TOC/passage/navigation,
   annotation/style, and study item/view operations.
 - A deployed Cloudflare Worker surface and a production browser/live-check
@@ -83,6 +83,7 @@ Atomic inventory IDs map to contracts as follows:
 
 - `P-TRUST-RANGE` -> `VAL-RANGE-OWNERSHIP`
 - `P-TRUST-MATH` -> `VAL-MATH-PASSAGE`
+- `P-SOURCE-EXCERPT` -> `VAL-SOURCE-EXCERPT-LIFECYCLE`
 - `P-TRUST-STYLE` -> `VAL-STYLE-PARITY`
 - `P-TRUST-BOARD` -> `VAL-BOARD-VIEW-PARITY`
 - `P-TRUST-DURABLE` -> `VAL-DURABLE-STORAGE-REQUEST`
@@ -117,7 +118,19 @@ Atomic inventory IDs map to contracts as follows:
 - `P-STUDY-SECURITY` -> `VAL-STUDY-SCHEMA-SECURITY`
 - `P-STUDY-PLOT` -> `VAL-INTERACTIVE-PLOT`
 - `P-STUDY-LIFECYCLE` -> `VAL-STUDY-EXPERIENCE-LIFECYCLE`
+- `P-STUDY-MATH` -> `VAL-STUDY-MATH-RENDERING`
+- `P-STUDY-HIERARCHY` -> `VAL-STUDY-COMPOSITION-HIERARCHY`
+- `P-AGENT-OBSERVABILITY` -> `VAL-AGENT-ACTIVITY-PRESENTATION`
+- `P-STUDY-WORKSPACE` -> `VAL-STUDY-WORKSPACE-RESPONSIVE`
+- `P-STUDY-REMOVAL` -> `VAL-STUDY-SAFE-REMOVAL`
+- `P-STUDY-RECOVERY` -> `VAL-STUDY-LOAD-RECOVERY`
+- `P-WEBMCP-CONTRACTS` -> `VAL-WEBMCP-TOOL-CONTRACTS`
+- `P-TUTOR-SESSION` -> `VAL-TUTOR-SESSION-LIFECYCLE`
+- `P-TUTOR-FOCUS` -> `VAL-TUTOR-PASSAGE-FOCUS`
+- `P-TUTOR-REVEAL` -> `VAL-TUTOR-STUDY-REVEAL`
+- `P-TUTOR-PRESENT` -> `VAL-TUTOR-PRESENTATION-SAFETY`
 - `P-HERO-MODEL` -> `VAL-HERO-MODEL-RUN`
+- `P-COMPOSITION-QUALITY` -> `VAL-COMPOSITION-QUALITY`
 - `P-EVIDENCE-GATE` -> `VAL-GATE-STABILITY`
 - `P-EVIDENCE-LIVE` -> `VAL-DEPLOYED-RUNTIME-TRUTH`
 - `P-EVIDENCE-DOCS` -> `VAL-DOCUMENTATION-TRUTH`

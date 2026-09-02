@@ -172,6 +172,6 @@ its limits, and the learner's way back.
   manual-navigation takeover; reduced motion; mobile panel behavior; item
   reveal focus; reload clears all tutor UI; malicious messages remain inert.
 - WebMCP: genuine `document.modelContext` registration and ordered multi-tool
-  choreography with semantic activity summaries.
+  choreography with semantic tutor status and separate diagnostic records.
 - Product: one real ChatGPT Desktop run that finds a passage, points to it,
   explains it, returns, and optionally saves a separate durable study artifact.

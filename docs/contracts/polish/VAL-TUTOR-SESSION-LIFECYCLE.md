@@ -1,0 +1,6 @@
+# VAL-TUTOR-SESSION-LIFECYCLE: Temporary guidance remains learner-controlled
+
+Surface: application session/navigation controller, command API, genuine WebMCP, reader and study UI, and browser.
+Needs: shared observable reader navigation and board state.
+Behavior: One runtime-owned tutor session records current book, revision, one active target, prior location/panel, and at most ten navigation entries. It is never persisted. New guidance supersedes old state; stale asynchronous work cannot resurrect it. A compact attributed indicator always offers Back and Stop. The `control_guidance` tool accepts exactly `{ action: "back" | "stop" }` and returns a structured prior/applied-state result. Back restores Bookhand's saved location/panel or returns a successful unchanged `no_back_target` result; Stop is idempotent and clears cue, explanation, and stack, including when already inactive. Manual navigation, book close, adapter detach, and reload yield control and clear guidance without changing annotations, lessons, styles, or preferences.
+Evidence: Serialized command/tool schema and genuine calls; structured active/no-target/idempotent results; unit races for supersession/revision and the ten-entry cap; Back/Stop/manual-takeover/close/detach browser traces; storage-write spy; preference/content snapshots; reload absence; mobile and reduced-motion behavior.
