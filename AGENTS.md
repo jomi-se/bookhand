@@ -29,6 +29,11 @@ agents from reopening settled choices during the short build.
   exposed through WebMCP.
 - Typography and book CSS customization, including an agent-applicable style
   surface with a user-visible reset.
+- Explicit document remastering: a browser agent may read and rewrite a
+  section's XHTML and CSS as source code, while Bookhand preserves the
+  publisher original and exposes comparison, revision history, Undo, and
+  Reset. Deterministic repair helpers are optional accelerators, not the
+  architecture or a limit on agent judgement. Never apply a remaster silently.
 - Study boards that work both docked beside the book and as a larger workspace.
 - Stable native blocks for common content, plus explicitly created generated
   labs for richer diagrams and interactive explanations. Keep generated work

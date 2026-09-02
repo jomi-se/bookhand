@@ -4,20 +4,19 @@ Last updated: 2026-09-02
 
 ## Next executable wave
 
-Run the owner-visible **ChatGPT Desktop W5 smoke** against deployed commit
-`74b880b`: confirm thirteen tools register in the in-app browser, ask an
-intent-only whole-book question, observe genuine `search_book`, and preserve the
-result without prompting tool names or arguments. Deterministic live-browser
-validation is complete; this remaining check is model behavior and must not be
-substituted with Playwright evidence.
+Review and integrate the isolated **document-remaster coding harness** after
+W6 commit `d9f204d`. Its primary contract is deliberately small and powerful:
+an agent reads a section's real XHTML and CSS, rewrites the whole section, and
+the person can compare, Undo, or Reset. A deterministic `data-tex` compiler is
+an optional shortcut, never the architecture or a restriction on the agent's
+edit. Before integration, prove that render and extraction see the same
+rewrite, remove temporary test files, reconcile the branch with W6 rather than
+blindly cherry-picking it, and state honestly whether revisions survive reload.
 
-The W6 amendment proposed in
-`docs/reviews/2026-09-02-w6-contract-amendment-proposal.md` is now reflected in
-the canonical contracts: exact verified `focus_passage` navigation belongs to
-W6, active guidance anchors persisted reading position, learner navigation
-yields with a quiet Back affordance, and there is one predictable session-origin
-target rather than a hidden hop stack. W9 retains transient cue rendering. No
-W6 implementation has started.
+The owner-visible **ChatGPT Desktop smoke** remains required after the next
+deployment. It must confirm the model discovers and uses the shipped tools from
+intent-only prompts; deterministic Playwright evidence proves the application
+contract, not model-authored behavior.
 
 ## Active product direction
 
@@ -27,6 +26,8 @@ The active polish mission now distinguishes:
 - **Study:** durable, coherent learner-owned lessons and annotations.
 - **Tutor guidance:** transient attention that can search, point, explain,
   reveal, Back, and Stop without creating permanent content implicitly.
+- **Document remaster:** agent-authored restoration of the EPUB document
+  itself, with original bytes preserved and recovery controlled by the reader.
 - **Agent diagnostics:** separate observability. Raw tool names, calls, and logs
   have no place in Study; only compact semantic status for an active tutoring
   action belongs near the learning surface.
@@ -69,21 +70,27 @@ This direction is recorded in:
 - Study remains a flat record feed. Equations render as raw-looking `<pre>`
   content, raw Agent Activity occupies the Study viewport, initial Study load
   failure is not rendered, and removal is still permanent one-click behavior.
-- There is no tutor session, exact transient passage cue, item reveal target,
-  temporary explanation, Back stack, or Stop-guiding action yet.
+- There is no production transient passage cue, item reveal target, or
+  temporary anchored explanation yet. The navigation/session core is present.
 - W5 is implemented locally: canonical Foliate chunks feed a schema-v4,
   worker-owned FTS5 index with transactional batches, truthful lifecycle state,
   cancellation, resume, failure recovery, and book/version isolation. Ordinary
   Search exposes a bounded 1–10 result limit; genuine `search_book` returns
   structured availability, outcomes, exact source envelopes, and never moves
   the reader. This makes thirteen open-book tools after deployment.
+- W6 is implemented in `d9f204d`: source-verified `focus_passage`, Back and
+  Stop, one origin-aware transient session, learner takeover, anchored reading
+  persistence, serialized navigation, stalled-view recovery, and a dedicated
+  tutor-overlay identifier space that cannot replace durable annotations.
+  The local open-book runtime therefore exposes fifteen tools. The production
+  passage cue and anchored explanation remain W9 work.
 
 ## Accepted remaining topology
 
 - W4: complete — runtime/tool truth and canonical source lifecycle.
 - W5: complete and deployed — local lexical retrieval and `search_book`.
-- W6: shared origin-aware navigation, navigation-only `focus_passage`, and the
-  non-persistent tutor-session core.
+- W6: complete — shared origin-aware navigation, navigation-only
+  `focus_passage`, and the non-persistent tutor-session core.
 - W7: first-class durable lesson domain, safe math/plot, atomic lifecycle, and
   recoverable removal.
 - W8: lesson-first Study composition, diagnostics separation, responsive
@@ -96,8 +103,11 @@ The contracts under `docs/contracts/polish/` define acceptance. The original
 W4-through-W11 topology received two sequential reviews on 2026-09-02. Later
 runtime evidence exposed additional tutor-navigation races; the amended W6/W9
 contracts then received three sequential passes, with findings incorporated
-after the first two and a clean third verdict. The amendment is frozen. W6 may
-begin after the owner-visible ChatGPT Desktop W5 smoke above.
+after the first two and a clean third verdict. The amendment is frozen and W6
+passed implementation scrutiny plus real-surface validation. The
+document-remaster slice now takes priority before the remaining
+lesson-composition waves because it is the strongest new WebMCP-specific
+demonstration; W7 through W11 remain recorded rather than discarded.
 
 ## Submission state
 
@@ -135,6 +145,13 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
   repeated Retry coalescing, explicit result navigation, non-navigation on
   search alone, and narrow-panel containment with no console/page errors or
   off-origin requests.
+- W6 passed independent source scrutiny, focused unit suites, typecheck, lint,
+  production build and bundle exclusion, the complete 33-test production
+  Playwright suite, and separate desktop/compact/production browser validation.
+  Evidence covers focus supersession, learner links, Back/Stop, reload
+  anchoring, style persistence, stalled-navigation recovery, 44px compact
+  controls, and same-range durable/tutor overlay isolation. The unchanged
+  real-book timing guard passed alone after one resource-contended full run.
 - The bundled *Calculus Made Easy* is judging content, not a permanent product
   dependency.
 - Keep embeddings optional and after lexical retrieval.

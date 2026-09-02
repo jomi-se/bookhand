@@ -85,6 +85,33 @@ Agents are particularly good at CSS. Letting one adapt a dense mathematical
 book for a particular reader is a meaningful WebMCP use, provided changes are
 visible and reversible.
 
+### Remaster the document itself
+
+Some ebooks are not merely ugly. Their document is broken: equations are image
+files, visual paragraphs impersonate headings, captions are detached from
+figures, reading order is accidental, and the accessibility tree contains less
+meaning than the printed page. CSS cannot repair those failures.
+
+Bookhand should let an agent treat one EPUB section like source code. The page
+exposes the section's real XHTML and CSS; the agent may rewrite the whole
+document into semantic HTML, MathML, figures, captions, and accessible reading
+order; Bookhand then renders that result through the ordinary reader. This is
+an open coding harness, not a fixed catalogue of repair operations. The model's
+judgement is the capability being demonstrated.
+
+The freedom belongs beside strong recovery rather than behind a weaker edit
+language. Publisher bytes remain immutable, every accepted revision is visible,
+and the person can compare, Undo, or Reset. Agent-authored markup is still
+untrusted input, so Bookhand strips executable or exfiltrating content and
+reports every refusal. Render, extraction, citation, and search must ultimately
+observe the same accepted document; a remaster that only paints the iframe is
+not complete.
+
+A deterministic repair may exist as an optional accelerator when a publisher
+already supplied machine-readable ground truth—for example compiling thousands
+of `data-tex` images to MathML. It is not the architecture and must not cap what
+the agent may improve.
+
 ### Work with the reader's knowledge
 
 - create and update highlights and notes;
@@ -189,6 +216,9 @@ to its gateway or to Codex.
   locations and the user can return easily.
 - **Persistent effects are visible and reversible.** Notes, styles, and study
   material belong to the user.
+- **Document repair is source editing, not a skin.** Give the model the real
+  section and a whole-document write path; preserve the publisher original and
+  put revision control in the learner's hands.
 - **Attention remains under learner control.** Tutor cues are temporary,
   clearly attributed, easy to stop, and never silently persisted.
 - **Guidance enables creative freedom.** Browser agents receive the semantic
