@@ -130,15 +130,26 @@ does not model is rejected with a structured error, never applied hopefully.
 
 ## Demo arc this slice must serve
 
-1. **The crime.** Open the bundled book. The mathematics is images: it does not
-   select, it does not reflow, it inverts wrongly in the night theme, and a
-   search for a formula finds nothing.
+1. **The crime.** Open the bundled book. The mathematics is images: it cannot
+   be selected, it does not reflow with the text, it inverts wrongly in the
+   night theme, and a screen reader receives `30 Superscript ring`.
 2. **The diagnosis.** The agent calls the inspection tool and reports what is
    actually wrong, with counts, from the real document.
 3. **The transformation.** The section becomes semantic MathML live on screen,
    with a Before/After control the person drives.
-4. **The proof.** Search finds the formula. Selection runs smoothly across it.
-   A study item can quote it as text.
+4. **The proof.** Selection runs across a formula. The accessibility tree
+   carries structure instead of a sentence of speech text. The mathematics
+   reflows and follows the theme.
+
+**Do not claim the index was empty.** Bookhand already extracts `data-tex`
+into passage text (`src/reader/text.ts:50-52`), so search was never returning
+nothing — it was returning TeX source. The honest search claim, measured in
+`tests/unit/remaster-book.test.ts` against chapter III, is that the indexed
+text stops being control syntax and starts being mathematics: `\({\dfrac{d
+y}{d x}}\)` becomes `dy/dx`. In that chapter `dy/dx` appears **twice** before
+restoration — both times inside a human-written figure description, never in an
+equation — and **thirteen** times after. A false baseline would be a worse
+demo than the true one, which is already strong.
 
 ## Slice boundary
 
