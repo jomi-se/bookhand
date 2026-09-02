@@ -168,6 +168,33 @@ export class StorageWorkerRuntime {
       case 'delete-annotation':
         this.requireRepository().deleteAnnotation(request.annotationId)
         return { type: 'annotation-deleted', annotationId: request.annotationId }
+      case 'list-section-rewrites':
+        return {
+          type: 'section-rewrites',
+          rewrites: this.requireRepository().listSectionRewrites(request.bookId),
+        }
+      case 'append-section-rewrite':
+        return {
+          type: 'section-rewrite-written',
+          sectionIndex: request.sectionIndex,
+          versions: this.requireRepository().appendSectionRewrite(
+            request.bookId,
+            request.sectionIndex,
+            request.version,
+          ),
+        }
+      case 'undo-section-rewrite':
+        return {
+          type: 'section-rewrite-written',
+          sectionIndex: request.sectionIndex,
+          versions: this.requireRepository().undoSectionRewrite(
+            request.bookId,
+            request.sectionIndex,
+          ),
+        }
+      case 'clear-section-rewrites':
+        this.requireRepository().clearSectionRewrites(request.bookId, request.sectionIndex)
+        return { type: 'section-rewrite-written', sectionIndex: request.sectionIndex, versions: 0 }
       case 'list-annotations':
         return {
           type: 'annotations',

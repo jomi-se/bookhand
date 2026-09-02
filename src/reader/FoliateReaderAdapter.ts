@@ -9,6 +9,7 @@ import type {
   ReaderAdapter,
   ReaderLocation,
   ReaderSelection,
+  ReaderOpenOptions,
   ReaderStyle,
   TocItem,
 } from '../domain/reader.ts'
@@ -41,6 +42,7 @@ import { remasterDocument } from '../remaster/document.ts'
 import type {
   DocumentRemasterPort,
   RemasterReport,
+  RemasterStore,
   RewriteSummary,
 } from '../domain/remaster.ts'
 import type { SectionStylesheet } from '../remaster/rewrite.ts'
@@ -161,10 +163,11 @@ export class FoliateReaderAdapter implements ReaderAdapter {
    * which knows nothing about any of this.
    */
   #rewrites = new Map<number, SectionRewrite>()
-  /** The publisher's markup for each section seen, captured before any edit. */
-  #originals = new Map<number, string>()
   #showRewritten = true
   #rebuilding: Promise<void> = Promise.resolve()
+  /** Which book is open, and where its rewrites are kept between sessions. */
+  #bookId: string | undefined
+  #rewriteStore: RemasterStore | undefined
 
   constructor(
     host: HTMLElement,
@@ -176,10 +179,12 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#dependencies = dependencies
   }
 
-  async open(blob: Blob): Promise<BookMetadata> {
+  async open(blob: Blob, options: ReaderOpenOptions = {}): Promise<BookMetadata> {
     const revision = ++this.#revision
     this.#destroyActive()
     this.#resetSnapshots()
+    this.#bookId = options.bookId
+    this.#rewriteStore = options.rewrites
 
     const operation = this.#openAtRevision(blob, revision)
     try {
@@ -431,6 +436,11 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     }
 
     blockPackagedScripts(book)
+    // Saved rewrites are loaded before the view opens, so the first thing
+    // Foliate parses is already the version the reader last saw. Hydrating
+    // after the first render would show the publisher's markup and then
+    // replace it, which reads as the app changing its mind.
+    await this.#hydrateRewrites(revision)
     // Rewrites are served here, before Foliate parses or paginates a section.
     const uninstallTransform = installSectionTransform(book, (sectionIndex) =>
       this.#showRewritten ? currentVersion(this.#rewrites.get(sectionIndex) ?? emptyRewrite) : undefined,
@@ -781,7 +791,6 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   async #currentSourceDocument(sectionIndex: number): Promise<Document> {
     const create = this.#sectionSource(sectionIndex)
     const document_ = await create()
-    this.#captureOriginal(sectionIndex, document_)
     const version = this.#currentVersion(sectionIndex)
     if (version) applyVersion(document_, version)
     return document_
@@ -942,7 +951,11 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
   /** Throw an agent's work away and put the publisher's section back. */
   async resetSection(sectionIndex: number): Promise<boolean> {
-    if (!this.#rewrites.delete(sectionIndex)) return false
+    if (!this.#rewrites.has(sectionIndex)) return false
+    // Forget it in the library first: a reset the library did not accept would
+    // come back on the next reload, which is the opposite of what Reset means.
+    await this.#persist((store, bookId) => store.reset(bookId, sectionIndex))
+    this.#rewrites.delete(sectionIndex)
     await this.#rebuildSection(sectionIndex)
     return true
   }
@@ -951,11 +964,38 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   async undoSection(sectionIndex: number): Promise<{ readonly versions: number } | undefined> {
     const existing = this.#rewrites.get(sectionIndex)
     if (!existing || existing.versions.length === 0) return undefined
+    await this.#persist((store, bookId) => store.undo(bookId, sectionIndex))
     const versions = existing.versions.slice(0, -1)
     if (versions.length === 0) this.#rewrites.delete(sectionIndex)
     else this.#rewrites.set(sectionIndex, { ...existing, versions })
     await this.#rebuildSection(sectionIndex)
     return { versions: versions.length }
+  }
+
+  /**
+   * Load this book's saved rewrites.
+   *
+   * A library that cannot be read is not a reason to refuse the book: the
+   * reader opens as published and says nothing, because a person who came to
+   * read should not be stopped by a feature they may never use.
+   */
+  async #hydrateRewrites(revision: number): Promise<void> {
+    const store = this.#rewriteStore
+    const bookId = this.#bookId
+    if (!store || !bookId) return
+    try {
+      const stored = await store.load(bookId)
+      if (revision !== this.#revision) return
+      for (const rewrite of stored) {
+        if (rewrite.versions.length === 0) continue
+        this.#rewrites.set(rewrite.sectionIndex, {
+          sectionIndex: rewrite.sectionIndex,
+          versions: rewrite.versions,
+        })
+      }
+    } catch {
+      // Nothing saved is recoverable here, and the book still reads.
+    }
   }
 
   #currentVersion(sectionIndex: number): SectionVersion | undefined {
@@ -964,26 +1004,44 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   }
 
   /**
-   * Remember the publisher's markup for a section, once, before anything
-   * touches it. Everything about recovery depends on this being the untouched
-   * original rather than whatever the last edit left behind — and on it being
-   * the packaged source, so it stays meaningful past this page load.
+   * Record a version and show it.
+   *
+   * The save comes first. If it fails, the reader is left showing exactly what
+   * it was showing before and the caller is told — which is the truthful
+   * outcome, because a rewrite the library did not accept is a rewrite that
+   * would vanish on reload.
    */
-  #captureOriginal(sectionIndex: number, document_: Document): void {
-    if (this.#rewrites.has(sectionIndex) || this.#originals.has(sectionIndex)) return
-    this.#originals.set(sectionIndex, document_.body?.innerHTML ?? '')
-  }
-
-  /** Record a version and show it. */
   async #commit(sectionIndex: number, version: SectionVersion): Promise<void> {
+    const stored = await this.#persist((store, bookId) =>
+      store.append(bookId, sectionIndex, version),
+    )
     const existing = this.#rewrites.get(sectionIndex)
+    const versions = [...(existing?.versions ?? []), version]
     this.#rewrites.set(sectionIndex, {
       sectionIndex,
-      original: existing?.original ?? this.#originals.get(sectionIndex) ?? '',
-      versions: [...(existing?.versions ?? []), version],
+      // Trimmed history is the saved history: memory must not offer an Undo
+      // the library can no longer honour.
+      versions: stored === undefined ? versions : versions.slice(-stored),
     })
     this.#showRewritten = true
     await this.#rebuildSection(sectionIndex)
+  }
+
+  /**
+   * Run a write against the rewrite store, if there is one.
+   *
+   * Returns the section's saved revision count, or `undefined` when nothing is
+   * persisting — a reader with no library behind it still works, it simply
+   * forgets rewrites when the page reloads.
+   */
+  async #persist(
+    write: (store: RemasterStore, bookId: string) => Promise<number | void>,
+  ): Promise<number | undefined> {
+    const store = this.#rewriteStore
+    const bookId = this.#bookId
+    if (!store || !bookId) return undefined
+    const result = await write(store, bookId)
+    return typeof result === 'number' ? result : undefined
   }
 
   /**
@@ -1234,14 +1292,13 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#selection = null
     this.#marks = []
     this.#rewrites.clear()
-    this.#originals.clear()
   }
 }
 
 function noop(): void {}
 
 /** A stand-in so a missing rewrite reads the same as an empty one. */
-const emptyRewrite: SectionRewrite = { sectionIndex: -1, original: '', versions: [] }
+const emptyRewrite: SectionRewrite = { sectionIndex: -1, versions: [] }
 
 function countElements(html: string): number {
   return new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html').body

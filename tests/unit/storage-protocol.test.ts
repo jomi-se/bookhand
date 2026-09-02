@@ -74,3 +74,117 @@ describe('storage worker response validation', () => {
     ).toThrow(TypeError)
   })
 })
+
+describe('the section rewrite boundary', () => {
+  const version = { html: '<h2>Chapter III</h2>', at: 1_756_800_000_000 }
+
+  it('accepts a save with the parts it models', () => {
+    expect(() =>
+      assertStorageWorkerRequest({
+        requestId: 'request-1',
+        type: 'append-section-rewrite',
+        bookId: 'book-1',
+        sectionIndex: 10,
+        version: { ...version, css: '.a { color: red; }', summary: 'Rewrote it' },
+      }),
+    ).not.toThrow()
+  })
+
+  it('refuses markup larger than a section could plausibly be', () => {
+    expect(() =>
+      assertStorageWorkerRequest({
+        requestId: 'request-1',
+        type: 'append-section-rewrite',
+        bookId: 'book-1',
+        sectionIndex: 10,
+        version: { ...version, html: 'x'.repeat(2_000_000) },
+      }),
+    ).toThrow(TypeError)
+  })
+
+  it('refuses a revision missing the markup it exists to carry', () => {
+    expect(() =>
+      assertStorageWorkerRequest({
+        requestId: 'request-1',
+        type: 'append-section-rewrite',
+        bookId: 'book-1',
+        sectionIndex: 10,
+        version: { at: 1 },
+      }),
+    ).toThrow(TypeError)
+  })
+
+  it('refuses a timestamp the repository could not actually write', () => {
+    // The repository stores this as `new Date(at).toISOString()`, which throws
+    // outside ±8.64e15 ms. Accepting merely-finite numbers would move that
+    // failure into the middle of a write, where it is a broken transaction
+    // rather than a refused message.
+    for (const at of [8.64e15 + 1, -8.64e15 - 1, Number.NaN, Infinity, 1.5, '1756800000000']) {
+      expect(() =>
+        assertStorageWorkerRequest({
+          requestId: 'request-1',
+          type: 'append-section-rewrite',
+          bookId: 'book-1',
+          sectionIndex: 10,
+          version: { html: '<h2>x</h2>', at },
+        }),
+      ).toThrow(TypeError)
+    }
+  })
+
+  it('accepts the boundary timestamps that are storable', () => {
+    for (const at of [0, 8.64e15, -8.64e15, 1_756_800_000_000]) {
+      expect(() =>
+        assertStorageWorkerRequest({
+          requestId: 'request-1',
+          type: 'append-section-rewrite',
+          bookId: 'book-1',
+          sectionIndex: 10,
+          version: { html: '<h2>x</h2>', at },
+        }),
+      ).not.toThrow()
+    }
+  })
+
+  it('refuses a section index that is not one', () => {
+    for (const sectionIndex of [-1, 1.5, '10', undefined]) {
+      expect(() =>
+        assertStorageWorkerRequest({
+          requestId: 'request-1',
+          type: 'undo-section-rewrite',
+          bookId: 'book-1',
+          sectionIndex,
+        }),
+      ).toThrow(TypeError)
+    }
+  })
+
+  it('accepts the results the worker actually sends back', () => {
+    // This is the shape that shipped broken once: a result the worker returns
+    // and the client then refuses is a feature that fails only in a browser.
+    expect(() =>
+      assertStorageWorkerResponse({
+        requestId: 'request-1',
+        ok: true,
+        result: { type: 'section-rewrite-written', sectionIndex: 10, versions: 2 },
+      }),
+    ).not.toThrow()
+    expect(() =>
+      assertStorageWorkerResponse({
+        requestId: 'request-1',
+        ok: true,
+        result: { type: 'section-rewrites', rewrites: [{ sectionIndex: 10, versions: [version] }] },
+      }),
+    ).not.toThrow()
+  })
+
+  it('refuses saved rewrites that are not shaped like rewrites', () => {
+    expect(() =>
+      assertStorageWorkerResponse({
+        requestId: 'request-1',
+        ok: true,
+        result: { type: 'section-rewrites', rewrites: [{ sectionIndex: 10, versions: [{ at: 1 }] }] },
+      }),
+    ).toThrow(TypeError)
+  })
+})

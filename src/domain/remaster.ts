@@ -94,6 +94,50 @@ export interface SectionRewriteResult {
   readonly after: { readonly elements: number; readonly bytes: number }
 }
 
+/**
+ * One saved revision of a section.
+ *
+ * The markup is package-relative and sanitized — the same form the agent wrote
+ * and the same form the section transform serves — so a revision means the
+ * same thing tomorrow as it did when it was written.
+ */
+export interface SectionRewriteVersion {
+  readonly html: string
+  readonly css?: string
+  readonly summary?: string
+  /** When the revision was written, as epoch milliseconds. */
+  readonly at: number
+}
+
+/**
+ * A section's saved history, oldest revision first.
+ *
+ * The publisher's own markup is deliberately **not** stored here. It is the
+ * imported EPUB, which is never rewritten, so it is always recoverable by
+ * reading the section again. A second copy could only drift from it.
+ */
+export interface StoredSectionRewrite {
+  readonly sectionIndex: number
+  readonly versions: readonly SectionRewriteVersion[]
+}
+
+/**
+ * Where section rewrites are kept between sessions.
+ *
+ * The reader depends on this rather than on the storage client, so a reader
+ * with no library behind it still works — it simply forgets rewrites when the
+ * page reloads.
+ */
+export interface RemasterStore {
+  load(bookId: string): Promise<readonly StoredSectionRewrite[]>
+  /** Save a revision. Returns how many the section now has saved. */
+  append(bookId: string, sectionIndex: number, version: SectionRewriteVersion): Promise<number>
+  /** Remove the newest revision. Returns how many remain. */
+  undo(bookId: string, sectionIndex: number): Promise<number>
+  /** Remove every revision of a section, returning it to the book as published. */
+  reset(bookId: string, sectionIndex: number): Promise<void>
+}
+
 /** What a person is told about a rewrite, in the agent's own words. */
 export interface RewriteSummary {
   readonly sectionIndex: number

@@ -73,6 +73,27 @@ async function openChapter(page: Page) {
   await expect(page.locator('#reader-contents-panel')).toBeHidden()
 }
 
+/**
+ * Come back to the same chapter after a reload.
+ *
+ * The readiness check cannot look for `data-tex`: the whole point is that the
+ * chapter may no longer contain any. It waits for the chapter's own title
+ * instead, which survives being rewritten.
+ */
+async function reopenChapter(page: Page) {
+  const row = page.locator('.book-open', { hasText: 'Calculus Made Easy' })
+  await expect(row).toBeVisible({ timeout: 20_000 })
+  await row.click()
+
+  await page.getByRole('button', { name: 'Contents' }).click()
+  await page.locator('.toc-item', { hasText: 'CHAPTER III.' }).first().click()
+  await expect
+    .poll(() => renderedHtml(page).then((html) => /chapter iii/i.test(html)), { timeout: 20_000 })
+    .toBe(true)
+  await page.getByRole('button', { name: 'Close contents' }).click()
+  await expect(page.locator('#reader-contents-panel')).toBeHidden()
+}
+
 test('an agent reads a broken chapter, rewrites it, and the person keeps control', async ({
   page,
 }) => {
@@ -251,4 +272,57 @@ test('the deterministic shortcut is one call the agent may choose', async ({ pag
   const undone = await agentCall(page, 'set_section_view', { view: 'undo' })
   expect(undone.isError).toBe(false)
   await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('data-tex')
+})
+
+test('a rewrite survives a reload, and Reset survives one too', async ({ page }) => {
+  await openChapter(page)
+  await expect
+    .poll(() =>
+      page.evaluate(async () => (await document.modelContext!.getTools()).map((tool) => tool.name)),
+    )
+    .toContain('rewrite_section')
+
+  const rewritten = await agentCall(page, 'rewrite_section', {
+    html:
+      '<h2 id="kept">Chapter III — kept across a reload</h2>' +
+      '<p>The ratio <math display="inline"><mi>d</mi></math> matters.</p>',
+    css: '.kept { color: rebeccapurple; }',
+    summary: 'Rewrote chapter III',
+  })
+  expect(rewritten.isError).toBe(false)
+  await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('id="kept"')
+
+  // The real claim: reload the page, reopen the book, and the chapter is still
+  // the agent's. Nothing here is in memory any more.
+  await page.reload()
+  await reopenChapter(page)
+
+  const after = await renderedHtml(page)
+  expect(after).toContain('id="kept"')
+  expect(after).toContain('Chapter III — kept across a reload')
+  expect(after).not.toContain('data-tex')
+
+  // Its stylesheet and the agent's own words came back with it.
+  const styled = await page.evaluate(() => {
+    const view = document.querySelector('foliate-view') as unknown as {
+      renderer?: { getContents?: () => { doc: Document }[] }
+    }
+    return (
+      view?.renderer?.getContents?.()[0]?.doc?.getElementById('bookhand-remaster-style')
+        ?.textContent ?? ''
+    )
+  })
+  expect(styled).toContain('rebeccapurple')
+  await expect(page.locator('.remaster-bar')).toContainText('Rewrote chapter III')
+
+  // And Reset is just as durable: the book comes back as published and stays
+  // that way, rather than the rewrite reappearing on the next visit.
+  await page.locator('.remaster-bar').getByRole('button', { name: 'Reset' }).click()
+  await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('data-tex')
+
+  await page.reload()
+  await reopenChapter(page)
+
+  expect(await renderedHtml(page)).toContain('data-tex')
+  await expect(page.locator('.remaster-bar')).toBeHidden()
 })

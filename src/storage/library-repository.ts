@@ -20,6 +20,15 @@ import type {
   IndexState,
   SearchHit,
 } from '../domain/index.ts'
+import type { SectionRewriteVersion, StoredSectionRewrite } from '../domain/remaster.ts'
+
+/**
+ * How many revisions of one section are kept.
+ *
+ * Deep enough that Undo is a real affordance in a working session, bounded so
+ * a long session cannot fill a person's disk with copies of a chapter.
+ */
+export const SECTION_REWRITE_HISTORY_LIMIT = 20
 import { canonicalize, OwnershipError } from '../domain/provenance.ts'
 import { fingerprintText } from '../reader/text.ts'
 import {
@@ -872,6 +881,116 @@ export class LibraryRepository {
     }
   }
 
+  // --- Section rewrites -----------------------------------------------------
+  //
+  // What is stored is the agent's package-relative, sanitized markup, and only
+  // that. The publisher's own section is the imported EPUB, which is never
+  // rewritten, so it is recovered by reading the book again rather than by
+  // keeping a second copy that could drift from it.
+
+  listSectionRewrites(bookId: string): readonly StoredSectionRewrite[] {
+    const rows = this.db.selectObjects(
+      `SELECT section_index, revision, html, css, summary, created_at
+       FROM section_rewrites WHERE book_id = ?
+       ORDER BY section_index ASC, revision ASC`,
+      [bookId],
+    )
+    const bySection = new Map<number, SectionRewriteVersion[]>()
+    for (const row of rows) {
+      const sectionIndex = Number(row.section_index)
+      const versions = bySection.get(sectionIndex) ?? []
+      versions.push({
+        html: asString(row.html, 'rewrite markup'),
+        ...(row.css === null ? {} : { css: asString(row.css, 'rewrite stylesheet') }),
+        ...(row.summary === null ? {} : { summary: asString(row.summary, 'rewrite summary') }),
+        at: Date.parse(asString(row.created_at, 'rewrite timestamp')),
+      })
+      bySection.set(sectionIndex, versions)
+    }
+    return [...bySection.entries()]
+      .map(([sectionIndex, versions]) => ({ sectionIndex, versions }))
+      .sort((left, right) => left.sectionIndex - right.sectionIndex)
+  }
+
+  /**
+   * Save a revision and return the section's history depth.
+   *
+   * History is capped, because a chapter's markup is not small and an agent
+   * may revise many times in one session. Undo walks back through what is
+   * kept; Reset never depends on history at all, so returning to the book as
+   * published stays exact however many revisions were trimmed.
+   */
+  appendSectionRewrite(
+    bookId: string,
+    sectionIndex: number,
+    version: SectionRewriteVersion,
+  ): number {
+    return this.db.transaction('IMMEDIATE', () => {
+      const highest = Number(
+        this.db.selectValue(
+          'SELECT coalesce(max(revision), 0) FROM section_rewrites WHERE book_id = ? AND section_index = ?',
+          [bookId, sectionIndex],
+        ) ?? 0,
+      )
+      const revision = highest + 1
+      this.db.exec({
+        sql: `INSERT INTO section_rewrites
+                (book_id, section_index, revision, html, css, summary, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        bind: [
+          bookId,
+          sectionIndex,
+          revision,
+          version.html,
+          version.css ?? null,
+          version.summary ?? null,
+          new Date(version.at).toISOString(),
+        ],
+      })
+      this.db.exec({
+        sql: `DELETE FROM section_rewrites
+              WHERE book_id = ? AND section_index = ? AND revision <= ?`,
+        bind: [bookId, sectionIndex, revision - SECTION_REWRITE_HISTORY_LIMIT],
+      })
+      return this.#countSectionRewrites(bookId, sectionIndex)
+    })
+  }
+
+  /** Drop the newest revision. Returns how many remain. */
+  undoSectionRewrite(bookId: string, sectionIndex: number): number {
+    return this.db.transaction('IMMEDIATE', () => {
+      const highest = Number(
+        this.db.selectValue(
+          'SELECT coalesce(max(revision), 0) FROM section_rewrites WHERE book_id = ? AND section_index = ?',
+          [bookId, sectionIndex],
+        ) ?? 0,
+      )
+      if (highest > 0) {
+        this.db.exec({
+          sql: 'DELETE FROM section_rewrites WHERE book_id = ? AND section_index = ? AND revision = ?',
+          bind: [bookId, sectionIndex, highest],
+        })
+      }
+      return this.#countSectionRewrites(bookId, sectionIndex)
+    })
+  }
+
+  /** Forget every revision of a section. The book itself is untouched. */
+  clearSectionRewrites(bookId: string, sectionIndex: number): void {
+    this.db.exec({
+      sql: 'DELETE FROM section_rewrites WHERE book_id = ? AND section_index = ?',
+      bind: [bookId, sectionIndex],
+    })
+  }
+
+  #countSectionRewrites(bookId: string, sectionIndex: number): number {
+    return Number(
+      this.db.selectValue(
+        'SELECT count(*) FROM section_rewrites WHERE book_id = ? AND section_index = ?',
+        [bookId, sectionIndex],
+      ) ?? 0,
+    )
+  }
 }
 
 function boardFromRow(row: Row): StudyBoard {

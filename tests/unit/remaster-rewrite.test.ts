@@ -1,6 +1,11 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { FoliateReaderAdapter } from '../../src/reader/index.ts'
 import type {
+  RemasterStore,
+  SectionRewriteVersion,
+  StoredSectionRewrite,
+} from '../../src/domain/remaster.ts'
+import type {
   FoliateBook,
   FoliateRenderer,
   FoliateResolvedTarget,
@@ -114,13 +119,73 @@ function makeBook(): FoliateBook {
   }
 }
 
-async function openAdapter() {
+/**
+ * A rewrite store held in memory, standing in for the library.
+ *
+ * It records the calls as well as the contents, because what matters is not
+ * only that a rewrite survives but that the reader saved it before it changed
+ * what the person is looking at.
+ */
+function makeStore(seed: readonly StoredSectionRewrite[] = []) {
+  const sections = new Map<number, SectionRewriteVersion[]>(
+    seed.map((entry) => [entry.sectionIndex, [...entry.versions]]),
+  )
+  const calls: string[] = []
+  let failNext: string | undefined
+  const refuse = (name: string) => {
+    if (failNext !== name) return
+    failNext = undefined
+    throw new Error('The library refused that write')
+  }
+  return {
+    calls,
+    sections,
+    failOn(name: 'append' | 'undo' | 'reset') {
+      failNext = name
+    },
+    store: {
+      async load(): Promise<readonly StoredSectionRewrite[]> {
+        calls.push('load')
+        return [...sections.entries()].map(([sectionIndex, versions]) => ({
+          sectionIndex,
+          versions: [...versions],
+        }))
+      },
+      async append(_bookId: string, sectionIndex: number, version: SectionRewriteVersion) {
+        calls.push('append')
+        refuse('append')
+        const versions = sections.get(sectionIndex) ?? []
+        versions.push(version)
+        sections.set(sectionIndex, versions)
+        return versions.length
+      },
+      async undo(_bookId: string, sectionIndex: number) {
+        calls.push('undo')
+        refuse('undo')
+        const versions = sections.get(sectionIndex) ?? []
+        versions.pop()
+        if (versions.length === 0) sections.delete(sectionIndex)
+        return versions.length
+      },
+      async reset(_bookId: string, sectionIndex: number) {
+        calls.push('reset')
+        refuse('reset')
+        sections.delete(sectionIndex)
+      },
+    },
+  }
+}
+
+async function openAdapter(options: { rewrites?: RemasterStore } = {}) {
   const host = document.createElement('div')
   document.body.append(host)
   const adapter = new FoliateReaderAdapter(host, {}, {
     loadFoliate: async () => ({ makeBook: async () => makeBook() }),
   })
-  await adapter.open(new Blob(['x'], { type: 'application/epub+zip' }))
+  await adapter.open(new Blob(['x'], { type: 'application/epub+zip' }), {
+    bookId: 'book-1',
+    ...(options.rewrites ? { rewrites: options.rewrites } : {}),
+  })
   /** The document a reader is actually looking at, in this adapter's host. */
   const rendered = () =>
     (host.querySelector('foliate-view') as unknown as FoliateView).renderer.getContents()[0]!.doc
@@ -297,5 +362,156 @@ describe('the agent’s read and write seam', () => {
     const snapshot = await adapter.getSectionSnapshot(0)
     expect(snapshot.text).toContain('differential coefficient')
     expect(snapshot.text).not.toContain('is what we hunt')
+  })
+})
+
+describe('rewrites that outlive the page', () => {
+  it('shows a saved rewrite from the very first render', async () => {
+    // Hydrating after the first render would show the publisher's markup and
+    // then replace it, which reads as the app changing its mind.
+    const { store } = makeStore([
+      { sectionIndex: 0, versions: [{ html: '<h2>Saved earlier</h2>', at: 1 }] },
+    ])
+    const { adapter, rendered } = await openAdapter({ rewrites: store })
+
+    expect(rendered().querySelector('h2')?.textContent).toBe('Saved earlier')
+    expect(rendered().querySelector('img[data-tex]')).toBeNull()
+    expect(adapter.hasRewrite(0)).toBe(true)
+  })
+
+  it('restores the whole history, so Undo still walks back', async () => {
+    const { store } = makeStore([
+      {
+        sectionIndex: 0,
+        versions: [
+          { html: '<h2>First</h2>', at: 1 },
+          { html: '<h2>Second</h2>', at: 2 },
+        ],
+      },
+    ])
+    const { adapter, rendered } = await openAdapter({ rewrites: store })
+
+    expect(rendered().querySelector('h2')?.textContent).toBe('Second')
+    expect(await adapter.undoSection(0)).toEqual({ versions: 1 })
+    expect(rendered().querySelector('h2')?.textContent).toBe('First')
+  })
+
+  it('restores the agent’s stylesheet and summary with the markup', async () => {
+    const { store } = makeStore([
+      {
+        sectionIndex: 0,
+        versions: [
+          {
+            html: '<h2>Saved</h2>',
+            css: '.saved { color: rebeccapurple; }',
+            summary: 'Promoted the chapter title',
+            at: 1,
+          },
+        ],
+      },
+    ])
+    const { adapter, rendered } = await openAdapter({ rewrites: store })
+
+    expect(rendered().getElementById('bookhand-remaster-style')?.textContent).toContain(
+      'rebeccapurple',
+    )
+    expect(adapter.describeRewrite(0)?.summary).toBe('Promoted the chapter title')
+  })
+
+  it('saves a rewrite, and saves it before showing it', async () => {
+    const harness = makeStore()
+    const { adapter } = await openAdapter({ rewrites: harness.store })
+
+    await adapter.rewriteSection(0, '<h2>Written now</h2>', { summary: 'Rewrote it' })
+
+    expect(harness.calls).toEqual(['load', 'append'])
+    expect(harness.sections.get(0)).toEqual([
+      { html: '<h2>Written now</h2>', summary: 'Rewrote it', at: expect.any(Number) },
+    ])
+    expect(adapter.hasRewrite(0)).toBe(true)
+  })
+
+  it('saves what the deterministic shortcut produced', async () => {
+    const harness = makeStore()
+    const { adapter } = await openAdapter({ rewrites: harness.store })
+
+    await adapter.compileSectionMath(0)
+
+    const saved = harness.sections.get(0)?.at(-1)
+    expect(saved?.html).toContain('<math')
+    expect(saved?.html).not.toContain('blob:')
+    expect(saved?.summary).toContain('Compiled 1 of 1')
+  })
+
+  it('forgets a section in the library when it is reset', async () => {
+    const harness = makeStore()
+    const { adapter, rendered } = await openAdapter({ rewrites: harness.store })
+    await adapter.rewriteSection(0, '<h2>Written</h2>')
+
+    expect(await adapter.resetSection(0)).toBe(true)
+
+    expect(harness.sections.has(0)).toBe(false)
+    expect(rendered().querySelector('img[data-tex]')).not.toBeNull()
+  })
+
+  it('drops one saved revision on undo, not the section', async () => {
+    const harness = makeStore()
+    const { adapter } = await openAdapter({ rewrites: harness.store })
+    await adapter.rewriteSection(0, '<h2>One</h2>')
+    await adapter.rewriteSection(0, '<h2>Two</h2>')
+
+    await adapter.undoSection(0)
+
+    expect(harness.sections.get(0)?.map((entry) => entry.html)).toEqual(['<h2>One</h2>'])
+  })
+
+  describe('when the library refuses a write', () => {
+    it('does not show a rewrite it could not save', async () => {
+      // A rewrite the library rejected would vanish on the next reload, so
+      // showing it would be a promise the app cannot keep.
+      const harness = makeStore()
+      const { adapter, rendered } = await openAdapter({ rewrites: harness.store })
+      harness.failOn('append')
+
+      await expect(adapter.rewriteSection(0, '<h2>Doomed</h2>')).rejects.toThrow(/refused/)
+
+      expect(adapter.hasRewrite(0)).toBe(false)
+      expect(rendered().querySelector('img[data-tex]')).not.toBeNull()
+    })
+
+    it('keeps showing the rewrite when a reset could not be saved', async () => {
+      const harness = makeStore()
+      const { adapter, rendered } = await openAdapter({ rewrites: harness.store })
+      await adapter.rewriteSection(0, '<h2>Written</h2>')
+      harness.failOn('reset')
+
+      await expect(adapter.resetSection(0)).rejects.toThrow(/refused/)
+
+      expect(adapter.hasRewrite(0)).toBe(true)
+      expect(rendered().querySelector('h2')?.textContent).toBe('Written')
+    })
+  })
+
+  it('reads on without saved rewrites when the library cannot be read', async () => {
+    // A person who came to read should not be stopped by a feature they may
+    // never use.
+    const failing: RemasterStore = {
+      load: async () => {
+        throw new Error('storage is unavailable')
+      },
+      append: async () => 0,
+      undo: async () => 0,
+      reset: async () => {},
+    }
+    const { adapter, rendered } = await openAdapter({ rewrites: failing })
+
+    expect(rendered().querySelector('img[data-tex]')).not.toBeNull()
+    expect(adapter.hasRewrite(0)).toBe(false)
+  })
+
+  it('still works with no library behind it at all', async () => {
+    const { adapter } = await openAdapter()
+    await adapter.rewriteSection(0, '<h2>Session only</h2>')
+    expect(adapter.hasRewrite(0)).toBe(true)
   })
 })

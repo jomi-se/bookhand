@@ -1,4 +1,4 @@
-import type { BookMetadata, BookTarget, ReaderAdapter } from '../domain/reader.ts'
+import type { BookMetadata, BookTarget, ReaderAdapter, ReaderOpenOptions } from '../domain/reader.ts'
 
 /**
  * The reader adapter only exists once a reader surface has mounted, but the
@@ -30,7 +30,8 @@ export class ReaderPortBridge {
     return this.#adapter
   }
 
-  openBook = (blob: Blob): Promise<BookMetadata> => this.require().open(blob)
+  openBook = (blob: Blob, options?: ReaderOpenOptions): Promise<BookMetadata> =>
+    this.require().open(blob, options)
 
   loadSection = async (sectionIndex: number): Promise<void> => {
     const target = { kind: 'section' as const, sectionIndex }

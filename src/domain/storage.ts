@@ -13,6 +13,7 @@ import type {
   StudyMutation,
 } from './study.ts'
 import type { IndexChunk, IndexCursor, IndexState, SearchResult } from './search.ts'
+import type { SectionRewriteVersion, StoredSectionRewrite } from './remaster.ts'
 
 export type StorageMode = 'persistent' | 'session-only' | 'locked'
 
@@ -141,6 +142,26 @@ export type StorageWorkerRequest =
   | { readonly requestId: string; readonly type: 'fail-index'; readonly bookId: string; readonly epoch: number; readonly message: string }
   | { readonly requestId: string; readonly type: 'cancel-index'; readonly bookId: string; readonly epoch: number }
   | { readonly requestId: string; readonly type: 'search-book'; readonly bookId: string; readonly query: string; readonly limit: number }
+  | { readonly requestId: string; readonly type: 'list-section-rewrites'; readonly bookId: string }
+  | {
+      readonly requestId: string
+      readonly type: 'append-section-rewrite'
+      readonly bookId: string
+      readonly sectionIndex: number
+      readonly version: SectionRewriteVersion
+    }
+  | {
+      readonly requestId: string
+      readonly type: 'undo-section-rewrite'
+      readonly bookId: string
+      readonly sectionIndex: number
+    }
+  | {
+      readonly requestId: string
+      readonly type: 'clear-section-rewrites'
+      readonly bookId: string
+      readonly sectionIndex: number
+    }
 
 export type StorageWorkerResult =
   | { readonly type: 'initialized'; readonly diagnostics: StorageDiagnostics }
@@ -163,6 +184,13 @@ export type StorageWorkerResult =
   | { readonly type: 'study-items'; readonly items: readonly StudyItem[] }
   | { readonly type: 'index-state'; readonly state: IndexState | null }
   | { readonly type: 'search-results'; readonly result: SearchResult }
+  | { readonly type: 'section-rewrites'; readonly rewrites: readonly StoredSectionRewrite[] }
+  | {
+      readonly type: 'section-rewrite-written'
+      readonly sectionIndex: number
+      /** How many revisions the section has now. */
+      readonly versions: number
+    }
 
 export type StorageWorkerResponse =
   | {

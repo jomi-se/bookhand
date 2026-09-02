@@ -18,6 +18,7 @@ import type {
   IndexState,
   SearchResult,
 } from '../domain/index.ts'
+import type { SectionRewriteVersion, StoredSectionRewrite } from '../domain/remaster.ts'
 import {
   BOOK_IMPORT_DEADLINE_MS,
   DeadlineExceededError,
@@ -238,6 +239,38 @@ export class StorageClient {
     expectResult(
       await this.request({ type: 'delete-annotation', annotationId }),
       'annotation-deleted',
+    )
+  }
+
+  async listSectionRewrites(bookId: string): Promise<readonly StoredSectionRewrite[]> {
+    return expectResult(
+      await this.request({ type: 'list-section-rewrites', bookId }),
+      'section-rewrites',
+    ).rewrites
+  }
+
+  async appendSectionRewrite(
+    bookId: string,
+    sectionIndex: number,
+    version: SectionRewriteVersion,
+  ): Promise<number> {
+    return expectResult(
+      await this.request({ type: 'append-section-rewrite', bookId, sectionIndex, version }),
+      'section-rewrite-written',
+    ).versions
+  }
+
+  async undoSectionRewrite(bookId: string, sectionIndex: number): Promise<number> {
+    return expectResult(
+      await this.request({ type: 'undo-section-rewrite', bookId, sectionIndex }),
+      'section-rewrite-written',
+    ).versions
+  }
+
+  async clearSectionRewrites(bookId: string, sectionIndex: number): Promise<void> {
+    expectResult(
+      await this.request({ type: 'clear-section-rewrites', bookId, sectionIndex }),
+      'section-rewrite-written',
     )
   }
 

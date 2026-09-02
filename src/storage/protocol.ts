@@ -16,6 +16,9 @@ import {
   SOURCE_SEGMENT_MAX_COUNT,
 } from '../domain/source.ts'
 
+/** The largest section markup or stylesheet that may be saved. */
+export const SECTION_REWRITE_MAX_CHARACTERS = 1_500_000
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -380,8 +383,77 @@ export function assertStorageWorkerRequest(value: unknown): asserts value is Sto
     case 'search-book':
       if (isString(value.bookId, 256) && isString(value.query, 300) && Number.isInteger(value.limit) && Number(value.limit) >= 1 && Number(value.limit) <= 10) return
       break
+    case 'list-section-rewrites':
+      if (isString(value.bookId, 256)) return
+      break
+    case 'append-section-rewrite':
+      if (
+        isString(value.bookId, 256) &&
+        isSectionIndex(value.sectionIndex) &&
+        isRewriteVersion(value.version)
+      ) {
+        return
+      }
+      break
+    case 'undo-section-rewrite':
+    case 'clear-section-rewrites':
+      if (isString(value.bookId, 256) && isSectionIndex(value.sectionIndex)) return
+      break
   }
   throw new TypeError(`Invalid storage worker request: ${String(value.type)}`)
+}
+
+/** A section index is a position in the spine, not an arbitrary number. */
+function isSectionIndex(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) >= 0 && Number(value) < 10_000
+}
+
+/**
+ * A revision crossing the worker boundary.
+ *
+ * The markup was sanitized before it was ever offered for saving, but this
+ * boundary re-checks shape and size anyway: the worker owns the database, and
+ * what reaches it is the last place a malformed record can be refused.
+ */
+function isRewriteVersion(value: unknown): boolean {
+  if (!isRecord(value)) return false
+  if (typeof value.html !== 'string' || value.html.length > SECTION_REWRITE_MAX_CHARACTERS) {
+    return false
+  }
+  if (
+    value.css !== undefined &&
+    (typeof value.css !== 'string' || value.css.length > SECTION_REWRITE_MAX_CHARACTERS)
+  ) {
+    return false
+  }
+  if (value.summary !== undefined && (typeof value.summary !== 'string' || value.summary.length > 240)) {
+    return false
+  }
+  return isStorableTimestamp(value.at)
+}
+
+/**
+ * A timestamp the repository can actually write.
+ *
+ * The repository stores it as `new Date(at).toISOString()`, and that throws a
+ * `RangeError` outside ±8.64e15 milliseconds — so "finite" is not the same
+ * question as "storable". Checking the weaker one here would move the failure
+ * into the middle of a write, where it is a broken transaction rather than a
+ * refused message.
+ */
+function isStorableTimestamp(value: unknown): value is number {
+  if (!isFiniteNumber(value) || !Number.isInteger(value)) return false
+  try {
+    new Date(value).toISOString()
+    return true
+  } catch {
+    return false
+  }
+}
+
+function isStoredSectionRewrite(value: unknown): boolean {
+  if (!isRecord(value) || !isSectionIndex(value.sectionIndex)) return false
+  return Array.isArray(value.versions) && value.versions.every(isRewriteVersion)
 }
 
 export function assertStorageWorkerResponse(
@@ -460,6 +532,12 @@ export function assertStorageWorkerResponse(
       break
     case 'search-results':
       if (isSearchResult(result.result)) return
+      break
+    case 'section-rewrites':
+      if (Array.isArray(result.rewrites) && result.rewrites.every(isStoredSectionRewrite)) return
+      break
+    case 'section-rewrite-written':
+      if (isSectionIndex(result.sectionIndex) && Number.isInteger(result.versions)) return
       break
   }
   throw new TypeError(`Invalid storage worker result: ${String(result.type)}`)

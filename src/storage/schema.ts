@@ -1,6 +1,6 @@
 import type { Database } from '@sqlite.org/sqlite-wasm'
 
-export const STORAGE_SCHEMA_VERSION = 4
+export const STORAGE_SCHEMA_VERSION = 5
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -147,6 +147,17 @@ CREATE TABLE IF NOT EXISTS index_meta (
   updated_at TEXT NOT NULL DEFAULT ''
 ) STRICT;
 
+CREATE TABLE IF NOT EXISTS section_rewrites (
+  book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  section_index INTEGER NOT NULL,
+  revision INTEGER NOT NULL,
+  html TEXT NOT NULL,
+  css TEXT,
+  summary TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (book_id, section_index, revision)
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS vector_batches (
   book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
   model_id TEXT NOT NULL,
@@ -231,8 +242,13 @@ export function initializeSchema(db: Database): void {
       // only derived retrieval data; books and learner-owned records remain.
       db.exec('DELETE FROM vector_batches; DELETE FROM chunks; DELETE FROM index_meta;')
     }
+    // Version 5 adds `section_rewrites`, which `CREATE TABLE IF NOT EXISTS`
+    // above already creates on any database. There is nothing to backfill: a
+    // library from before this feature simply has no saved rewrites, which is
+    // the truthful state, and the books it holds are untouched.
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS chunks_book_order ON chunks(book_id, sort_order);
-             CREATE INDEX IF NOT EXISTS chunks_book_section ON chunks(book_id, section_index, sort_order);`)
+             CREATE INDEX IF NOT EXISTS chunks_book_section ON chunks(book_id, section_index, sort_order);
+             CREATE INDEX IF NOT EXISTS section_rewrites_book ON section_rewrites(book_id, section_index, revision);`)
     db.exec(`PRAGMA user_version = ${STORAGE_SCHEMA_VERSION}`)
   })
 }
