@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-02T06:45:21Z",
+  "generatedAt": "2026-09-02T14:20:00Z",
   "title": "Design System: Bookhand",
   "extensions": {
     "colorMeta": {
@@ -8,147 +8,429 @@
         "role": "canvas",
         "displayName": "Clear Canvas",
         "canonical": "oklch(98.51% 0 89.88)",
-        "tonalRamp": ["oklch(15% 0 89.88)", "oklch(25% 0 89.88)", "oklch(38% 0 89.88)", "oklch(52% 0 89.88)", "oklch(65% 0 89.88)", "oklch(77% 0 89.88)", "oklch(87% 0 89.88)", "oklch(95% 0 89.88)"]
+        "tonalRamp": [
+          "oklch(15% 0 89.88)",
+          "oklch(25% 0 89.88)",
+          "oklch(38% 0 89.88)",
+          "oklch(52% 0 89.88)",
+          "oklch(65% 0 89.88)",
+          "oklch(77% 0 89.88)",
+          "oklch(87% 0 89.88)",
+          "oklch(95% 0 89.88)"
+        ]
       },
       "library-ink": {
         "role": "ink",
         "displayName": "Library Ink",
         "canonical": "oklch(17.73% 0.0089 264.32)",
-        "tonalRamp": ["oklch(15% 0.0089 264.32)", "oklch(25% 0.0089 264.32)", "oklch(38% 0.0089 264.32)", "oklch(52% 0.0089 264.32)", "oklch(65% 0.0089 264.32)", "oklch(77% 0.0089 264.32)", "oklch(87% 0.0089 264.32)", "oklch(95% 0.0089 264.32)"]
+        "tonalRamp": [
+          "oklch(15% 0.0089 264.32)",
+          "oklch(25% 0.0089 264.32)",
+          "oklch(38% 0.0089 264.32)",
+          "oklch(52% 0.0089 264.32)",
+          "oklch(65% 0.0089 264.32)",
+          "oklch(77% 0.0089 264.32)",
+          "oklch(87% 0.0089 264.32)",
+          "oklch(95% 0.0089 264.32)"
+        ]
       },
       "quiet-graphite": {
         "role": "muted-ink",
         "displayName": "Quiet Graphite",
         "canonical": "oklch(50.23% 0.0205 264.37)",
-        "tonalRamp": ["oklch(15% 0.0205 264.37)", "oklch(25% 0.0205 264.37)", "oklch(38% 0.0205 264.37)", "oklch(52% 0.0205 264.37)", "oklch(65% 0.0205 264.37)", "oklch(77% 0.0205 264.37)", "oklch(87% 0.0205 264.37)", "oklch(95% 0.0205 264.37)"]
+        "tonalRamp": [
+          "oklch(15% 0.0205 264.37)",
+          "oklch(25% 0.0205 264.37)",
+          "oklch(38% 0.0205 264.37)",
+          "oklch(52% 0.0205 264.37)",
+          "oklch(65% 0.0205 264.37)",
+          "oklch(77% 0.0205 264.37)",
+          "oklch(87% 0.0205 264.37)",
+          "oklch(95% 0.0205 264.37)"
+        ]
       },
       "fine-rule": {
         "role": "rule",
         "displayName": "Fine Rule",
         "canonical": "oklch(92.76% 0.0058 264.53)",
-        "tonalRamp": ["oklch(15% 0.0058 264.53)", "oklch(25% 0.0058 264.53)", "oklch(38% 0.0058 264.53)", "oklch(52% 0.0058 264.53)", "oklch(65% 0.0058 264.53)", "oklch(77% 0.0058 264.53)", "oklch(87% 0.0058 264.53)", "oklch(95% 0.0058 264.53)"]
+        "tonalRamp": [
+          "oklch(15% 0.0058 264.53)",
+          "oklch(25% 0.0058 264.53)",
+          "oklch(38% 0.0058 264.53)",
+          "oklch(52% 0.0058 264.53)",
+          "oklch(65% 0.0058 264.53)",
+          "oklch(77% 0.0058 264.53)",
+          "oklch(87% 0.0058 264.53)",
+          "oklch(95% 0.0058 264.53)"
+        ]
       },
       "terracotta-spine": {
         "role": "accent",
         "displayName": "Terracotta Spine",
         "canonical": "oklch(56.66% 0.1606 35.42)",
-        "tonalRamp": ["oklch(15% 0.1606 35.42)", "oklch(25% 0.1606 35.42)", "oklch(38% 0.1606 35.42)", "oklch(52% 0.1606 35.42)", "oklch(65% 0.1606 35.42)", "oklch(77% 0.1606 35.42)", "oklch(87% 0.1606 35.42)", "oklch(95% 0.1606 35.42)"]
+        "tonalRamp": [
+          "oklch(15% 0.1606 35.42)",
+          "oklch(25% 0.1606 35.42)",
+          "oklch(38% 0.1606 35.42)",
+          "oklch(52% 0.1606 35.42)",
+          "oklch(65% 0.1606 35.42)",
+          "oklch(77% 0.1606 35.42)",
+          "oklch(87% 0.1606 35.42)",
+          "oklch(95% 0.1606 35.42)"
+        ]
       },
       "raised-leaf": {
         "role": "raised-surface",
         "displayName": "Raised Leaf",
         "canonical": "oklch(100% 0 0)",
-        "tonalRamp": ["oklch(15% 0 0)", "oklch(25% 0 0)", "oklch(38% 0 0)", "oklch(52% 0 0)", "oklch(65% 0 0)", "oklch(77% 0 0)", "oklch(87% 0 0)", "oklch(95% 0 0)"]
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(52% 0 0)",
+          "oklch(65% 0 0)",
+          "oklch(77% 0 0)",
+          "oklch(87% 0 0)",
+          "oklch(95% 0 0)"
+        ]
       },
       "sepia-canvas": {
         "role": "canvas",
         "displayName": "Reading Sepia Canvas",
         "canonical": "#f4efe4",
-        "tonalRamp": ["oklch(15% 0.025 75)", "oklch(25% 0.025 75)", "oklch(38% 0.025 75)", "oklch(52% 0.025 75)", "oklch(65% 0.025 75)", "oklch(77% 0.025 75)", "oklch(87% 0.025 75)", "oklch(95% 0.025 75)"]
+        "tonalRamp": [
+          "oklch(15% 0.025 75)",
+          "oklch(25% 0.025 75)",
+          "oklch(38% 0.025 75)",
+          "oklch(52% 0.025 75)",
+          "oklch(65% 0.025 75)",
+          "oklch(77% 0.025 75)",
+          "oklch(87% 0.025 75)",
+          "oklch(95% 0.025 75)"
+        ]
       },
       "sepia-ink": {
         "role": "ink",
         "displayName": "Reading Sepia Ink",
         "canonical": "#29231b",
-        "tonalRamp": ["oklch(15% 0.025 75)", "oklch(25% 0.025 75)", "oklch(38% 0.025 75)", "oklch(52% 0.025 75)", "oklch(65% 0.025 75)", "oklch(77% 0.025 75)", "oklch(87% 0.025 75)", "oklch(95% 0.025 75)"]
+        "tonalRamp": [
+          "oklch(15% 0.025 75)",
+          "oklch(25% 0.025 75)",
+          "oklch(38% 0.025 75)",
+          "oklch(52% 0.025 75)",
+          "oklch(65% 0.025 75)",
+          "oklch(77% 0.025 75)",
+          "oklch(87% 0.025 75)",
+          "oklch(95% 0.025 75)"
+        ]
       },
       "sepia-muted": {
         "role": "muted-ink",
         "displayName": "Reading Sepia Muted",
         "canonical": "#655c50",
-        "tonalRamp": ["oklch(15% 0.025 75)", "oklch(25% 0.025 75)", "oklch(38% 0.025 75)", "oklch(52% 0.025 75)", "oklch(65% 0.025 75)", "oklch(77% 0.025 75)", "oklch(87% 0.025 75)", "oklch(95% 0.025 75)"]
+        "tonalRamp": [
+          "oklch(15% 0.025 75)",
+          "oklch(25% 0.025 75)",
+          "oklch(38% 0.025 75)",
+          "oklch(52% 0.025 75)",
+          "oklch(65% 0.025 75)",
+          "oklch(77% 0.025 75)",
+          "oklch(87% 0.025 75)",
+          "oklch(95% 0.025 75)"
+        ]
       },
       "sepia-rule": {
         "role": "rule",
         "displayName": "Reading Sepia Rule",
         "canonical": "#d8cdbb",
-        "tonalRamp": ["oklch(15% 0.025 75)", "oklch(25% 0.025 75)", "oklch(38% 0.025 75)", "oklch(52% 0.025 75)", "oklch(65% 0.025 75)", "oklch(77% 0.025 75)", "oklch(87% 0.025 75)", "oklch(95% 0.025 75)"]
+        "tonalRamp": [
+          "oklch(15% 0.025 75)",
+          "oklch(25% 0.025 75)",
+          "oklch(38% 0.025 75)",
+          "oklch(52% 0.025 75)",
+          "oklch(65% 0.025 75)",
+          "oklch(77% 0.025 75)",
+          "oklch(87% 0.025 75)",
+          "oklch(95% 0.025 75)"
+        ]
       },
       "sepia-accent": {
         "role": "accent",
         "displayName": "Reading Sepia Accent",
         "canonical": "#9b3b21",
-        "tonalRamp": ["oklch(15% 0.14 35)", "oklch(25% 0.14 35)", "oklch(38% 0.14 35)", "oklch(52% 0.14 35)", "oklch(65% 0.14 35)", "oklch(77% 0.14 35)", "oklch(87% 0.14 35)", "oklch(95% 0.14 35)"]
+        "tonalRamp": [
+          "oklch(15% 0.14 35)",
+          "oklch(25% 0.14 35)",
+          "oklch(38% 0.14 35)",
+          "oklch(52% 0.14 35)",
+          "oklch(65% 0.14 35)",
+          "oklch(77% 0.14 35)",
+          "oklch(87% 0.14 35)",
+          "oklch(95% 0.14 35)"
+        ]
       },
       "sepia-raised": {
         "role": "raised-surface",
         "displayName": "Reading Sepia Raised",
         "canonical": "#fffaf0",
-        "tonalRamp": ["oklch(15% 0.025 75)", "oklch(25% 0.025 75)", "oklch(38% 0.025 75)", "oklch(52% 0.025 75)", "oklch(65% 0.025 75)", "oklch(77% 0.025 75)", "oklch(87% 0.025 75)", "oklch(95% 0.025 75)"]
+        "tonalRamp": [
+          "oklch(15% 0.025 75)",
+          "oklch(25% 0.025 75)",
+          "oklch(38% 0.025 75)",
+          "oklch(52% 0.025 75)",
+          "oklch(65% 0.025 75)",
+          "oklch(77% 0.025 75)",
+          "oklch(87% 0.025 75)",
+          "oklch(95% 0.025 75)"
+        ]
       },
       "night-canvas": {
         "role": "canvas",
         "displayName": "Night Reading Canvas",
         "canonical": "#171717",
-        "tonalRamp": ["oklch(15% 0.008 60)", "oklch(25% 0.008 60)", "oklch(38% 0.008 60)", "oklch(52% 0.008 60)", "oklch(65% 0.008 60)", "oklch(77% 0.008 60)", "oklch(87% 0.008 60)", "oklch(95% 0.008 60)"]
+        "tonalRamp": [
+          "oklch(15% 0.008 60)",
+          "oklch(25% 0.008 60)",
+          "oklch(38% 0.008 60)",
+          "oklch(52% 0.008 60)",
+          "oklch(65% 0.008 60)",
+          "oklch(77% 0.008 60)",
+          "oklch(87% 0.008 60)",
+          "oklch(95% 0.008 60)"
+        ]
       },
       "night-ink": {
         "role": "ink",
         "displayName": "Night Reading Ink",
         "canonical": "#f4efe9",
-        "tonalRamp": ["oklch(15% 0.008 60)", "oklch(25% 0.008 60)", "oklch(38% 0.008 60)", "oklch(52% 0.008 60)", "oklch(65% 0.008 60)", "oklch(77% 0.008 60)", "oklch(87% 0.008 60)", "oklch(95% 0.008 60)"]
+        "tonalRamp": [
+          "oklch(15% 0.008 60)",
+          "oklch(25% 0.008 60)",
+          "oklch(38% 0.008 60)",
+          "oklch(52% 0.008 60)",
+          "oklch(65% 0.008 60)",
+          "oklch(77% 0.008 60)",
+          "oklch(87% 0.008 60)",
+          "oklch(95% 0.008 60)"
+        ]
       },
       "night-muted": {
         "role": "muted-ink",
         "displayName": "Night Reading Muted",
         "canonical": "#b8b0a7",
-        "tonalRamp": ["oklch(15% 0.008 60)", "oklch(25% 0.008 60)", "oklch(38% 0.008 60)", "oklch(52% 0.008 60)", "oklch(65% 0.008 60)", "oklch(77% 0.008 60)", "oklch(87% 0.008 60)", "oklch(95% 0.008 60)"]
+        "tonalRamp": [
+          "oklch(15% 0.008 60)",
+          "oklch(25% 0.008 60)",
+          "oklch(38% 0.008 60)",
+          "oklch(52% 0.008 60)",
+          "oklch(65% 0.008 60)",
+          "oklch(77% 0.008 60)",
+          "oklch(87% 0.008 60)",
+          "oklch(95% 0.008 60)"
+        ]
       },
       "night-rule": {
         "role": "rule",
         "displayName": "Night Reading Rule",
         "canonical": "#3b3733",
-        "tonalRamp": ["oklch(15% 0.008 60)", "oklch(25% 0.008 60)", "oklch(38% 0.008 60)", "oklch(52% 0.008 60)", "oklch(65% 0.008 60)", "oklch(77% 0.008 60)", "oklch(87% 0.008 60)", "oklch(95% 0.008 60)"]
+        "tonalRamp": [
+          "oklch(15% 0.008 60)",
+          "oklch(25% 0.008 60)",
+          "oklch(38% 0.008 60)",
+          "oklch(52% 0.008 60)",
+          "oklch(65% 0.008 60)",
+          "oklch(77% 0.008 60)",
+          "oklch(87% 0.008 60)",
+          "oklch(95% 0.008 60)"
+        ]
       },
       "night-accent": {
         "role": "accent",
         "displayName": "Night Reading Accent",
         "canonical": "#ff9a76",
-        "tonalRamp": ["oklch(15% 0.12 35)", "oklch(25% 0.12 35)", "oklch(38% 0.12 35)", "oklch(52% 0.12 35)", "oklch(65% 0.12 35)", "oklch(77% 0.12 35)", "oklch(87% 0.12 35)", "oklch(95% 0.12 35)"]
+        "tonalRamp": [
+          "oklch(15% 0.12 35)",
+          "oklch(25% 0.12 35)",
+          "oklch(38% 0.12 35)",
+          "oklch(52% 0.12 35)",
+          "oklch(65% 0.12 35)",
+          "oklch(77% 0.12 35)",
+          "oklch(87% 0.12 35)",
+          "oklch(95% 0.12 35)"
+        ]
       },
       "night-raised": {
         "role": "raised-surface",
         "displayName": "Night Reading Raised",
         "canonical": "#232220",
-        "tonalRamp": ["oklch(15% 0.008 60)", "oklch(25% 0.008 60)", "oklch(38% 0.008 60)", "oklch(52% 0.008 60)", "oklch(65% 0.008 60)", "oklch(77% 0.008 60)", "oklch(87% 0.008 60)", "oklch(95% 0.008 60)"]
+        "tonalRamp": [
+          "oklch(15% 0.008 60)",
+          "oklch(25% 0.008 60)",
+          "oklch(38% 0.008 60)",
+          "oklch(52% 0.008 60)",
+          "oklch(65% 0.008 60)",
+          "oklch(77% 0.008 60)",
+          "oklch(87% 0.008 60)",
+          "oklch(95% 0.008 60)"
+        ]
       },
       "highlight-amber": {
         "role": "user-highlight",
         "displayName": "Highlight Amber",
         "canonical": "#d69e2e",
-        "tonalRamp": ["oklch(15% 0.12 80)", "oklch(25% 0.12 80)", "oklch(38% 0.12 80)", "oklch(52% 0.12 80)", "oklch(65% 0.12 80)", "oklch(77% 0.12 80)", "oklch(87% 0.12 80)", "oklch(95% 0.12 80)"]
+        "tonalRamp": [
+          "oklch(15% 0.12 80)",
+          "oklch(25% 0.12 80)",
+          "oklch(38% 0.12 80)",
+          "oklch(52% 0.12 80)",
+          "oklch(65% 0.12 80)",
+          "oklch(77% 0.12 80)",
+          "oklch(87% 0.12 80)",
+          "oklch(95% 0.12 80)"
+        ]
       },
       "highlight-sky": {
         "role": "user-highlight",
         "displayName": "Highlight Sky",
         "canonical": "#3b82f6",
-        "tonalRamp": ["oklch(15% 0.15 250)", "oklch(25% 0.15 250)", "oklch(38% 0.15 250)", "oklch(52% 0.15 250)", "oklch(65% 0.15 250)", "oklch(77% 0.15 250)", "oklch(87% 0.15 250)", "oklch(95% 0.15 250)"]
+        "tonalRamp": [
+          "oklch(15% 0.15 250)",
+          "oklch(25% 0.15 250)",
+          "oklch(38% 0.15 250)",
+          "oklch(52% 0.15 250)",
+          "oklch(65% 0.15 250)",
+          "oklch(77% 0.15 250)",
+          "oklch(87% 0.15 250)",
+          "oklch(95% 0.15 250)"
+        ]
       },
       "highlight-moss": {
         "role": "user-highlight",
         "displayName": "Highlight Moss",
         "canonical": "#48946a",
-        "tonalRamp": ["oklch(15% 0.1 155)", "oklch(25% 0.1 155)", "oklch(38% 0.1 155)", "oklch(52% 0.1 155)", "oklch(65% 0.1 155)", "oklch(77% 0.1 155)", "oklch(87% 0.1 155)", "oklch(95% 0.1 155)"]
+        "tonalRamp": [
+          "oklch(15% 0.1 155)",
+          "oklch(25% 0.1 155)",
+          "oklch(38% 0.1 155)",
+          "oklch(52% 0.1 155)",
+          "oklch(65% 0.1 155)",
+          "oklch(77% 0.1 155)",
+          "oklch(87% 0.1 155)",
+          "oklch(95% 0.1 155)"
+        ]
+      },
+      "terracotta-quiet": {
+        "role": "quiet accent",
+        "displayName": "Terracotta Wash",
+        "canonical": "color-mix(in oklch, oklch(56.66% 0.1606 35.42) 12%, oklch(98.51% 0 89.88))",
+        "tonalRamp": [
+          "oklch(15% 0.019 35.42)",
+          "oklch(25% 0.019 35.42)",
+          "oklch(38% 0.019 35.42)",
+          "oklch(52% 0.019 35.42)",
+          "oklch(65% 0.019 35.42)",
+          "oklch(77% 0.019 35.42)",
+          "oklch(87% 0.019 35.42)",
+          "oklch(95% 0.019 35.42)"
+        ]
+      },
+      "sepia-accent-quiet": {
+        "role": "quiet accent",
+        "displayName": "Sepia Wash",
+        "canonical": "#ead9ca",
+        "tonalRamp": [
+          "#2a211a",
+          "#43352a",
+          "#5d4a3b",
+          "#79614e",
+          "#977c66",
+          "#b89b83",
+          "#d4bda6",
+          "#ead9ca"
+        ]
+      },
+      "night-accent-quiet": {
+        "role": "quiet accent",
+        "displayName": "Ember Wash",
+        "canonical": "#3b2922",
+        "tonalRamp": [
+          "#1b120e",
+          "#281a15",
+          "#3b2922",
+          "#513830",
+          "#6b4c41",
+          "#8a6555",
+          "#ab826f",
+          "#cba28e"
+        ]
       }
     },
     "typographyMeta": {
-      "literary-display": { "displayName": "Literary Display", "purpose": "Library title and rare high-level literary moments." },
-      "literary-title": { "displayName": "Literary Title", "purpose": "Wordmark, book identity, and compact bookish moments." },
-      "body": { "displayName": "Product Body", "purpose": "Ordinary product text and authored study prose." },
-      "label": { "displayName": "Product Label", "purpose": "Controls, metadata, status, panel headings, and values." },
-      "micro-label": { "displayName": "Micro Label", "purpose": "Format tags, study kinds, and dense tool history." },
-      "code": { "displayName": "Code", "purpose": "Custom CSS, equations before typesetting, tool names, and diagnostics." }
+      "literary-display": {
+        "displayName": "Literary Display",
+        "purpose": "Library title and rare high-level literary moments."
+      },
+      "literary-title": {
+        "displayName": "Literary Title",
+        "purpose": "Wordmark, book identity, and compact bookish moments."
+      },
+      "feature-title": {
+        "displayName": "Feature Title",
+        "purpose": "The Continue section's book title. The largest sans voice in the product, deliberately not serif: it names a resumable state, not the library's identity."
+      },
+      "body": {
+        "displayName": "Product Body",
+        "purpose": "Ordinary product text and authored study prose."
+      },
+      "label": {
+        "displayName": "Product Label",
+        "purpose": "Controls, metadata, status, panel headings, and values."
+      },
+      "micro-label": {
+        "displayName": "Micro Label",
+        "purpose": "Format tags, study kinds, and dense tool history."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Custom CSS, equations before typesetting, tool names, and diagnostics."
+      }
     },
     "shadows": [
-      { "name": "selection-action", "value": "0 2px 8px rgb(15 17 21 / 0.14)", "purpose": "Only for a temporary selection action floating above book content." }
+      {
+        "name": "selection-action",
+        "value": "0 1px 3px rgb(0 0 0 / 12%)",
+        "purpose": "The only shadow in the system. Lifts the temporary selection action off book content; nothing else floats."
+      }
     ],
     "motion": [
-      { "name": "duration-standard", "value": "180ms", "purpose": "Panel, paging, focus, and persistence state transitions." },
-      { "name": "ease-standard", "value": "ease", "purpose": "Direct, quiet state changes without decorative travel." }
+      {
+        "name": "duration-standard",
+        "value": "180ms",
+        "purpose": "Panel, paging, focus, and persistence state transitions."
+      },
+      {
+        "name": "ease-standard",
+        "value": "ease",
+        "purpose": "Direct, quiet state changes without decorative travel."
+      }
     ],
     "breakpoints": [
-      { "name": "mobile", "value": "720px" },
-      { "name": "library-max", "value": "900px" }
+      {
+        "name": "library-compact",
+        "value": "720px"
+      },
+      {
+        "name": "reader-compact",
+        "value": "860px"
+      },
+      {
+        "name": "library-max",
+        "value": "900px"
+      },
+      {
+        "name": "coarse-pointer",
+        "value": "(pointer: coarse)"
+      }
     ]
   },
   "components": [
@@ -204,6 +486,30 @@
       "description": "A native study artifact that leads with the source-grounded learning material.",
       "html": "<figure class=\"ds-study-quote\"><blockquote>Let the distance x increase by a small amount.</blockquote><figcaption>Chapter X · Return to source</figcaption></figure>",
       "css": ".ds-study-quote { margin: 0; padding: 14px 16px; border: 0; border-inline-start: 2px solid var(--accent, #c24a2b); background: transparent; color: var(--ink, #0f1115); } .ds-study-quote blockquote { margin: 0; font: 400 1rem/1.6 'Source Serif 4 Variable', Georgia, serif; } .ds-study-quote figcaption { margin-block-start: 10px; color: var(--muted, #5e6470); font: 500 0.6875rem/1.4 'Inter Variable', system-ui, sans-serif; } .ds-study-quote:hover { background: color-mix(in oklch, var(--rule, #e5e7eb) 30%, transparent); } .ds-study-quote:focus-within { outline: 2px solid var(--accent, #c24a2b); outline-offset: 3px; }"
+    },
+    {
+      "name": "Panel Field",
+      "kind": "input",
+      "refersTo": "panel-field",
+      "description": "Text and number inputs inside a reader panel; used by Search.",
+      "html": "<label class=\"ds-field-label\" for=\"ds-q\">Words or phrase</label><input class=\"ds-field\" id=\"ds-q\" value=\"differential coefficient\">",
+      "css": ".ds-field-label { display: block; margin-bottom: 6px; color: var(--muted, #5e6470); font-size: 0.8125rem; font-weight: 650; font-family: Inter Variable, ui-sans-serif, system-ui, sans-serif; } .ds-field { width: 100%; border: 1px solid var(--rule, #e5e7eb); border-radius: 6px; background: var(--raised, #fff); color: var(--ink, #0f1115); padding: 0.7rem 0.75rem; font: inherit; font-family: Inter Variable, ui-sans-serif, system-ui, sans-serif; } .ds-field:focus-visible { outline: 2px solid var(--accent, #c24a2b); outline-offset: 2px; }"
+    },
+    {
+      "name": "Search Result Row",
+      "kind": "custom",
+      "refersTo": "search-result-row",
+      "description": "One book passage in the Search panel: a micro-label section title over a serif excerpt clamped to four lines. Ruled, never carded.",
+      "html": "<ol class=\"ds-results\"><li><button class=\"ds-result\" type=\"button\"><span>CHAPTER I — TO DELIVER YOU FROM THE PRELIMINARY TERRORS</span><q>The preliminary terror, which chokes off most fifth-form boys from even attempting to learn how to calculate, can be abolished once for all by simply stating what is the meaning—in common-sense terms—of the two principal symbols that are used in calculating.</q></button></li><li><button class=\"ds-result\" type=\"button\"><span>CHAPTER II — ON DIFFERENT DEGREES OF SMALLNESS</span><q>We shall find that in our processes of calculation we have to deal with small quantities of various degrees of smallness.</q></button></li></ol>",
+      "css": ".ds-results { margin: 0; padding: 0; list-style: none; display: grid; gap: 0; } .ds-results li + li { border-top: 1px solid var(--rule, #e5e7eb); } .ds-result { width: 100%; min-height: 44px; border: 0; background: transparent; color: var(--ink, #0f1115); padding: 0.9rem 0; text-align: left; cursor: pointer; font: inherit; } .ds-result span { display: block; margin-bottom: 0.35rem; color: var(--muted, #5e6470); font-size: 0.6875rem; font-weight: 700; font-family: Inter Variable, ui-sans-serif, system-ui, sans-serif; } .ds-result q { display: -webkit-box; overflow: hidden; font-family: Source Serif 4 Variable, Iowan Old Style, Georgia, serif; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 4; } .ds-result:hover { color: var(--accent, #c24a2b); } .ds-result:focus-visible { outline: 2px solid var(--accent, #c24a2b); outline-offset: 2px; border-radius: 3px; }"
+    },
+    {
+      "name": "Advisory Notice",
+      "kind": "custom",
+      "refersTo": "advisory-notice",
+      "description": "The only 8px radius in the system. Says something happened that the person did not do, and puts it back in one press.",
+      "html": "<p class=\"ds-notice\">An agent changed this board’s layout.<button class=\"ds-notice-undo\" type=\"button\">Undo</button></p>",
+      "css": ".ds-notice { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 0 0 14px; padding: 8px 10px; border: 1px solid var(--rule, #e5e7eb); border-radius: 8px; background: var(--accent-quiet, color-mix(in oklch, #c24a2b 12%, #fafafa)); color: var(--ink, #0f1115); font-family: Inter Variable, ui-sans-serif, system-ui, sans-serif; font-size: 0.9375rem; } .ds-notice-undo { border: 0; background: none; padding: 0; color: var(--muted, #5e6470); font: inherit; font-size: 0.8125rem; font-weight: 500; text-decoration: underline; cursor: pointer; } .ds-notice-undo:hover { color: var(--accent, #c24a2b); }"
     }
   ],
   "narrative": {
@@ -218,27 +524,64 @@
       "Native study artifacts that remain visibly grounded in their sources."
     ],
     "rules": [
-      { "name": "The Whole-World Theme Rule", "body": "A reading theme changes every visible reader surface: EPUB, chrome, panels, controls, overlays, focus, Study artifacts, and status UI. Never leave a bright application frame around a dark book or apply a new accent without checking it against every surface it touches.", "section": "colors" },
-      { "name": "The One Accent Voice Rule", "body": "A customized world may replace Terracotta Spine with any deliberate accent, but ordinary chrome should still speak with one primary accent occupying roughly ten percent or less of the surface. Additional highlight colors label user meaning; they do not become competing brand colors.", "section": "colors" },
-      { "name": "The Two Voices Rule", "body": "Keep one literary voice and one operational voice. Custom typography may replace either family, but must preserve the role contrast and cannot leak application type rules into publisher content.", "section": "typography" },
-      { "name": "The Book Gets the Space Rule", "body": "Reader chrome and agent activity must justify every permanent pixel. Navigation can overlay or recede on mobile; it must not reserve broad rails that make the book feel like a preview.", "section": "layout" },
-      { "name": "The Structural Depth Rule", "body": "Prefer a rule, tonal change, or spatial move to a shadow. Shadows appear only when an element temporarily floats above reading content; never combine broad soft shadows with ornamental borders.", "section": "elevation" }
+      {
+        "name": "The Whole-World Theme Rule",
+        "body": "A reading theme changes every visible reader surface: EPUB, chrome, panels, controls, overlays, focus, Study artifacts, and status UI. Never leave a bright application frame around a dark book or apply a new accent without checking it against every surface it touches.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Accent Voice Rule",
+        "body": "A customized world may replace Terracotta Spine with any deliberate accent, but ordinary chrome should still speak with one primary accent occupying roughly ten percent or less of the surface. Additional highlight colors label user meaning; they do not become competing brand colors.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Voices Rule",
+        "body": "Keep one literary voice and one operational voice. Custom typography may replace either family, but must preserve the role contrast and cannot leak application type rules into publisher content.",
+        "section": "typography"
+      },
+      {
+        "name": "The Borrowed Voice Rule",
+        "body": "Book words keep the literary voice even when they appear inside product chrome. A search result's excerpt, a quoted highlight, and a study quotation are set in the serif because they are the book speaking; the label above them stays operational. Never set the book's own words in the product font merely because they are inside a panel.",
+        "section": "typography"
+      },
+      {
+        "name": "The Book Gets the Space Rule",
+        "body": "Reader chrome and diagnostics must justify every permanent pixel. Navigation can overlay or recede on mobile; it must not reserve broad rails that make the book feel like a preview.",
+        "section": "layout"
+      },
+      {
+        "name": "The Structural Depth Rule",
+        "body": "Prefer a rule, tonal change, or spatial move to a shadow. Shadows appear only when an element temporarily floats above reading content; never combine broad soft shadows with ornamental borders.",
+        "section": "elevation-depth"
+      },
+      {
+        "name": "The Rounder Means Louder Rule",
+        "body": "The eight-pixel radius is reserved for blocks that interrupt: something happened that the person did not do, or a change did not land. Ordinary content never earns it. If a new surface wants the softer corner, ask whether it is actually interrupting, and if not, give it the control radius.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Diagnostics Are Not Study Rule",
+        "body": "Raw agent telemetry — tool names, call lists, counts, success and failure history — never appears in Study. Study is the learner's material; a scrolling log of what a model did is a different surface with a different audience, and putting it in the study viewport tells the learner the machinery matters as much as the lesson. The only agent-facing element Study may carry is a compact semantic status for guidance happening right now, saying what is being explained and exposing Back and Stop. This is an invariant, and the shipped board does not yet satisfy it: `StudyBoardPanel` still accepts and renders an `agentActivity` node above the learner's content. Treat that as a defect against this rule, not as precedent.",
+        "section": "components"
+      }
     ],
     "dos": [
-      "Do treat the shipped themes as excellent examples of a semantic system, not as the only palettes Bookhand may support.",
-      "Do define a complete token world before applying an agent-authored theme.",
-      "Do preserve hierarchy, contrast, source grounding, user control, and a visible reset path when experimenting boldly.",
-      "Do inspect customization on library, reader, panels, Study, mobile, desktop, error, focus, and reduced-motion states.",
-      "Do let the artifact dominate Study and keep tool history secondary.",
-      "Do use real book content and real product state in demonstrations."
+      "**Do** treat the shipped themes as excellent examples of a semantic system, not as the only palettes Bookhand may support.",
+      "**Do** define a complete token world before applying an agent-authored theme.",
+      "**Do** preserve hierarchy, contrast, source grounding, user control, and a visible reset path when experimenting boldly.",
+      "**Do** inspect customization on library, reader, panels, Study, mobile, desktop, error, focus, and reduced-motion states.",
+      "**Do** let the artifact dominate Study and keep tool history in separate diagnostics.",
+      "**Do** state background work honestly where it happens: name the readiness of a slow index in one calm live-region line, and keep the person's Pause and Resume visible the whole time it runs.",
+      "**Do** use real book content and real product state in demonstrations."
     ],
     "donts": [
-      "Don't turn Bookhand into a generic dashboard, chat transcript, card grid, fake bookshelf, or collection of equally weighted controls.",
-      "Don't equate “bookish” with beige application chrome, parchment texture, paper grain, ornamental shadows, or nostalgic decoration.",
-      "Don't apply dark or sepia only inside the EPUB while leaving the shell in another world.",
-      "Don't let custom CSS, model text, diagrams, or labs escape their bounded rendering surfaces or silently rewrite publisher content.",
-      "Don't hard-code the current terracotta palette into new study primitives; consume semantic tokens so user-created worlds remain coherent.",
-      "Don't preserve a weak customization merely because an agent created it; preview, validate, revise, and keep Reset or Undo visible."
+      "**Don't** turn Bookhand into a generic dashboard, chat transcript, card grid, fake bookshelf, or collection of equally weighted controls.",
+      "**Don't** equate “bookish” with beige application chrome, parchment texture, paper grain, ornamental shadows, or nostalgic decoration.",
+      "**Don't** apply dark or sepia only inside the EPUB while leaving the shell in another world.",
+      "**Don't** let custom CSS, model text, diagrams, or labs escape their bounded rendering surfaces or silently rewrite publisher content.",
+      "**Don't** hard-code the current terracotta palette into new study primitives; consume semantic tokens so user-created worlds remain coherent.",
+      "**Don't** preserve a weak customization merely because an agent created it; preview, validate, revise, and keep Reset or Undo visible.",
+      "**Don't** mark identity with a logo badge floating in a corner. Bookhand is named by the wordmark in the masthead and by the book artwork itself; a badge is product chrome asserting itself in an interface whose whole intent is to recede."
     ]
   }
 }

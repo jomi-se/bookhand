@@ -7,18 +7,21 @@ colors:
   quiet-graphite: "oklch(50.23% 0.0205 264.37)"
   fine-rule: "oklch(92.76% 0.0058 264.53)"
   terracotta-spine: "oklch(56.66% 0.1606 35.42)"
+  terracotta-quiet: "color-mix(in oklch, oklch(56.66% 0.1606 35.42) 12%, oklch(98.51% 0 89.88))"
   raised-leaf: "oklch(100% 0 0)"
   sepia-canvas: "#f4efe4"
   sepia-ink: "#29231b"
   sepia-muted: "#655c50"
   sepia-rule: "#d8cdbb"
   sepia-accent: "#9b3b21"
+  sepia-accent-quiet: "#ead9ca"
   sepia-raised: "#fffaf0"
   night-canvas: "#171717"
   night-ink: "#f4efe9"
   night-muted: "#b8b0a7"
   night-rule: "#3b3733"
   night-accent: "#ff9a76"
+  night-accent-quiet: "#3b2922"
   night-raised: "#232220"
   highlight-amber: "#d69e2e"
   highlight-sky: "#3b82f6"
@@ -36,6 +39,12 @@ typography:
     fontWeight: 600
     lineHeight: 1.3
     letterSpacing: "-0.01em"
+  feature-title:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "1.5rem"
+    fontWeight: 600
+    lineHeight: 1.2
+    letterSpacing: "-0.015em"
   body:
     fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
     fontSize: "0.9375rem"
@@ -63,6 +72,7 @@ rounded:
   focus: "3px"
   compact: "4px"
   control: "6px"
+  notice: "8px"
 spacing:
   tight: "6px"
   compact: "10px"
@@ -95,6 +105,24 @@ components:
     textColor: "{colors.library-ink}"
     typography: "{typography.body}"
     rounded: "{rounded.focus}"
+  panel-field:
+    backgroundColor: "{colors.raised-leaf}"
+    textColor: "{colors.library-ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.control}"
+    padding: "11px 12px"
+  search-result-row:
+    backgroundColor: "transparent"
+    textColor: "{colors.library-ink}"
+    typography: "{typography.body}"
+    padding: "14px 0"
+    height: "44px"
+  advisory-notice:
+    backgroundColor: "{colors.terracotta-quiet}"
+    textColor: "{colors.library-ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.notice}"
+    padding: "8px 10px"
 ---
 
 # Design System: Bookhand
@@ -139,7 +167,7 @@ or assets to rasterize into the application.
 The default library uses Clear Canvas, Library Ink, Quiet Graphite, Fine Rule,
 Raised Leaf, and the rare Terracotta Spine accent. Reader themes are complete
 semantic sets: Reading Sepia and Night Reading replace canvas, ink, muted,
-rule, accent, and raised-surface roles together. Publisher mode preserves the
+rule, accent, quiet accent, and raised-surface roles together. Publisher mode preserves the
 EPUB's own presentation while the application shell remains a neutral,
 accessible frame.
 
@@ -208,6 +236,9 @@ user-adjustable.
 
 - **Literary display:** library title and rare high-level literary moments.
 - **Literary title:** wordmark and compact bookish identity.
+- **Feature title:** the one book the library is inviting you back into. The
+  largest sans voice in the product, and deliberately not serif: it names a
+  resumable state, not the library's identity.
 - **Body:** ordinary product text and authored study prose.
 - **Label:** controls, metadata, status, panel headings, and values.
 - **Micro label:** format tags, study kinds, and compact diagnostic metadata;
@@ -220,6 +251,12 @@ user-adjustable.
 Custom typography may replace either family, but must preserve the role
 contrast and cannot leak application type rules into publisher content.
 
+**The Borrowed Voice Rule.** Book words keep the literary voice even when they
+appear inside product chrome. A search result's excerpt, a quoted highlight, and
+a study quotation are set in the serif because they are the book speaking; the
+label above them stays operational. Never set the book's own words in the
+product font merely because they are inside a panel.
+
 ## Layout
 
 The library is a centered working catalog capped near 900px. It uses a compact
@@ -227,10 +264,13 @@ masthead, a conditional Continue section, and full-width ruled book rows rather
 than shelves or cards. Covers, titles, progress, and last-read context align to
 a clear scanning grid and collapse intentionally on small screens.
 
-The desktop reader gives the book the largest and calmest region. Contents and
-Text occupy an adjacent panel; Study may dock or expand while preserving the
-reading location. Mobile uses one primary surface at a time. Contents, Text,
-and Study become complete surfaces rather than squeezing beside the book.
+The desktop reader gives the book the largest and calmest region. Contents,
+Search, and Text occupy an adjacent panel; Study may dock or expand while
+preserving the reading location. Mobile uses one primary surface at a time.
+Contents, Search, Text, and Study become complete surfaces rather than
+squeezing beside the book. Panels are `min-inline-size: 0` and clip horizontal
+overflow, because a long unbroken string in book content must wrap rather than
+widen the column the book is reading in.
 
 Spacing follows a compact six-to-eighteen-pixel control rhythm and opens to
 larger section gaps only when the information hierarchy changes. Coarse-pointer
@@ -255,11 +295,19 @@ content; never combine broad soft shadows with ornamental borders.
 
 ## Shapes
 
-Shapes are compact and quiet. Controls use gently squared six-pixel corners;
-fields and compact states use four pixels; focus treatment may use three. Book
-covers retain their physical rectangular silhouette. Full pills, oversized
-rounding, floating glass panels, and decorative blobs do not belong to the
-default world.
+Shapes are compact and quiet. Controls and panel fields use gently squared
+six-pixel corners; compact states use four pixels; focus treatment may use
+three. Advisory notices — the block that says an agent changed something, or
+that a study mutation failed — use eight, the only step above the control
+radius. Book covers retain their physical rectangular silhouette. Full pills,
+oversized rounding, floating glass panels, and decorative blobs do not belong
+to the default world.
+
+**The Rounder Means Louder Rule.** The eight-pixel radius is reserved for
+blocks that interrupt: something happened that the person did not do, or a
+change did not land. Ordinary content never earns it. If a new surface wants
+the softer corner, ask whether it is actually interrupting, and if not, give
+it the control radius.
 
 Custom worlds may change the corner language, but must do so systemically. Pick
 a small scale, apply it by component role, and keep touch targets and focus
@@ -290,20 +338,58 @@ cards as the library grows.
 
 ### Reader chrome and panels
 
-Reader chrome carries back/library, book identity, Contents, Study, and Text.
-Pressed state uses the active theme accent. Panels have one header, one scroll
-body, and a clear close path; mobile panels replace the reading surface and
-restore focus when closed.
+Reader chrome carries back/library, book identity, Contents, Search, Study,
+and Text. Pressed state uses the active theme accent. Panels have one header,
+one scroll body, and a clear close path; mobile panels replace the reading
+surface and restore focus when closed.
+
+### Search
+
+Search is a panel, not an overlay, so a result can be read against the book
+beside it on desktop. Its distinctive part is that the index is slower than the
+question: the panel therefore carries its own readiness in the header, as one
+polite live-region line under the heading rather than a spinner or a modal
+block. Every readiness state is a sentence a person can act on — preparing with
+a section count, ready, ready with no text in this book, or paused with the
+reason — and the form stays usable throughout, because a partial index still
+answers.
+
+Index lifecycle controls are text buttons, never primary ones. Resume indexing
+and Pause indexing are the person's control over background work they did not
+ask for; they must be visible whenever that work is running or stopped, and
+must never compete with Search for emphasis.
+
+Results are a ruled list, matching the library's ruled book row rather than
+becoming cards. Each row is a full-width button of at least 44px: a micro-label
+section title above, then the excerpt in the literary serif, clamped to four
+lines so a long paragraph cannot push the next result off the panel. Hover
+moves the row's text to the accent — the row itself does not gain a background,
+because a list of book passages should read as book, not as menu.
 
 ### Study artifacts
 
 Study content leads with the learning artifact and its source relationship.
-Authoring controls are secondary disclosure. Raw agent telemetry and tool
-history never appear in Study; a compact semantic active-tutor status may
-appear only to explain the current guidance and expose Back and Stop. Quotations,
-equations, steps, questions, diagrams, and interactive plots use native,
-theme-aware rendering. Agent-created work identifies its origin and exposes
-the appropriate Return to source, Reset, Undo, or Delete action.
+Authoring controls are secondary disclosure. Agent-created work identifies its
+origin and exposes the appropriate Return to source, Reset, Undo, or Delete
+action.
+
+Every study block renders natively and consumes semantic roles, so a
+user-authored world restyles Study without touching its markup. The shipped
+block vocabulary is quotation, prose, equation, steps, and question; a block
+kind that cannot yet render meaningfully — an equation still shown as its raw
+source — is a gap in the rendering, not permission to hand the surface a
+foreign renderer or raw markup.
+
+**The Diagnostics Are Not Study Rule.** Raw agent telemetry — tool names, call
+lists, counts, success and failure history — never appears in Study. Study is
+the learner's material; a scrolling log of what a model did is a different
+surface with a different audience, and putting it in the study viewport tells
+the learner the machinery matters as much as the lesson. The only agent-facing
+element Study may carry is a compact semantic status for guidance happening
+right now, saying what is being explained and exposing Back and Stop. This is
+an invariant, and the shipped board does not yet satisfy it: `StudyBoardPanel`
+still accepts and renders an `agentActivity` node above the learner's content.
+Treat that as a defect against this rule, not as precedent.
 
 ### Motion
 
@@ -325,6 +411,9 @@ immediate, understandable state change.
   desktop, error, focus, and reduced-motion states.
 - **Do** let the artifact dominate Study and keep tool history in separate
   diagnostics.
+- **Do** state background work honestly where it happens: name the readiness of
+  a slow index in one calm live-region line, and keep the person's Pause and
+  Resume visible the whole time it runs.
 - **Do** use real book content and real product state in demonstrations.
 
 ### Don't:
