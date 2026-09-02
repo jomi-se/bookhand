@@ -4,14 +4,13 @@ Last updated: 2026-09-02
 
 ## Next executable wave
 
-Review and integrate the isolated **document-remaster coding harness** after
-W6 commit `d9f204d`. Its primary contract is deliberately small and powerful:
-an agent reads a section's real XHTML and CSS, rewrites the whole section, and
-the person can compare, Undo, or Reset. A deterministic `data-tex` compiler is
-an optional shortcut, never the architecture or a restriction on the agent's
-edit. Before integration, prove that render and extraction see the same
-rewrite, remove temporary test files, reconcile the branch with W6 rather than
-blindly cherry-picking it, and state honestly whether revisions survive reload.
+Deploy and exercise the combined **tutor + document remaster + composed Study**
+surface through ChatGPT Desktop. The local runtime now has twenty tools. The
+highest-value engineering continuation is W9's bounded temporary explanation
+and direct Study reveal; the highest-value owner action is an intent-only model
+run that proves the agent discovers the five remaster tools, reads actual XHTML,
+rewrites one chapter, and leaves the person able to compare, Undo, Reset, and
+reload the result.
 
 The owner-visible **ChatGPT Desktop smoke** remains required after the next
 deployment. It must confirm the model discovers and uses the shipped tools from
@@ -44,8 +43,10 @@ This direction is recorded in:
 - Slices 1 through 3 are implemented: local library/import, Foliate EPUB
   reading, SQLite WASM persistence, highlights/notes, the native Study board,
   and genuine `document.modelContext` registration.
-- The deployed open-book runtime exposes thirteen tools: three library/global
-  tools plus ten reading/study/search tools. `search_book` is the W5 addition.
+- The deployed open-book runtime exposes thirteen tools. The current local
+  runtime exposes twenty: the deployed set plus W6's two guidance tools and the
+  five document-remaster tools. Deployment truth must remain separate until
+  the current head is pushed and verified.
 - W0 through W3 are implemented: runtime design-context discovery, source and
   persistence trust, shared observable style/board state, and the mobile/desktop
   reader reset.
@@ -65,13 +66,23 @@ This direction is recorded in:
 - Source-linked mutations verify current book, range, fingerprint, and quote.
   Agent-created item updates use ownership tokens, retry idempotency, revisions,
   provenance, and per-item Undo.
-- `actionGroupId` is provenance only in the current product. It does not group
-  rendering or Undo; tool and domain copy now state per-item Undo truthfully.
-- Study remains a flat record feed. Equations render as raw-looking `<pre>`
-  content, raw Agent Activity occupies the Study viewport, initial Study load
-  failure is not rendered, and removal is still permanent one-click behavior.
-- There is no production transient passage cue, item reveal target, or
-  temporary anchored explanation yet. The navigation/session core is present.
+- Consecutive blocks from one `actionGroupId` now compose into one calm visual
+  group while keeping per-item Undo truthfully independent. Shared source and
+  authorship context collapse only while they remain identical.
+- Study equations compile through the bounded native MathML renderer, with
+  unsupported notation kept visibly as code rather than disappearing. Storage
+  type labels no longer outrank the lesson, existing content comes before one
+  progressively disclosed manual-authoring path, and raw Agent Activity is no
+  longer part of Study.
+- An initial Study-load failure is visible and retryable without unregistering
+  the reading/search/style/tutor tool surface. Recoverable removal, a
+  first-class titled lesson entity, safe plots, and the fully distinct
+  docked/expanded/mobile workspace remain open W7/W8 work.
+- `focus_passage` now draws a production transient cue over the exact verified
+  words using Foliate's native highlight, underline, or outline painter. It
+  briefly settles into place, respects reduced motion, coexists with durable
+  marks, and clears through the W6 session lifecycle. Direct Study reveal and a
+  temporary anchored explanation remain open.
 - W5 is implemented locally: canonical Foliate chunks feed a schema-v4,
   worker-owned FTS5 index with transactional batches, truthful lifecycle state,
   cancellation, resume, failure recovery, and book/version isolation. Ordinary
@@ -82,8 +93,16 @@ This direction is recorded in:
   Stop, one origin-aware transient session, learner takeover, anchored reading
   persistence, serialized navigation, stalled-view recovery, and a dedicated
   tutor-overlay identifier space that cannot replace durable annotations.
-  The local open-book runtime therefore exposes fifteen tools. The production
-  passage cue and anchored explanation remain W9 work.
+  W9 now supplies the production cue; anchored explanation remains open.
+- Document remaster is implemented through five genuine WebMCP tools. An agent
+  reads current package-relative XHTML/CSS, diagnoses it without heuristic
+  classification, rewrites the complete section through Foliate's own loader,
+  or optionally compiles publisher-supplied `data-tex` to MathML. Publisher
+  bytes remain immutable; Original/Rewritten, Undo, and Reset are visible.
+- Schema v5 persists bounded sanitized rewrite history before it is shown and
+  hydrates it before Foliate's first render. Markup, CSS, summary, Undo, and
+  Reset survive reload. Reindexing, EPUB export, and annotation re-anchoring do
+  not exist and must not be claimed.
 
 ## Accepted remaining topology
 
@@ -91,11 +110,14 @@ This direction is recorded in:
 - W5: complete and deployed — local lexical retrieval and `search_book`.
 - W6: complete — shared origin-aware navigation, navigation-only
   `focus_passage`, and the non-persistent tutor-session core.
-- W7: first-class durable lesson domain, safe math/plot, atomic lifecycle, and
-  recoverable removal.
-- W8: lesson-first Study composition, diagnostics separation, responsive
-  workspace, manual no-agent authoring, and visible recovery.
-- W9: source cue presentation, Study reveal, and bounded temporary explanation.
+- W7: partial — native safe math and action-group composition have landed;
+  first-class titled experiences, safe plots, atomic lifecycle, and recoverable
+  removal remain.
+- W8: partial — diagnostics separation, content-first manual authoring, grouped
+  composition, and visible load recovery have landed; the fully differentiated
+  responsive workspace remains.
+- W9: partial — production source cue presentation is complete; Study reveal
+  and a bounded temporary explanation remain.
 - W10: combined real-model hero and evidence closure.
 - W11: repeated composition-quality evaluation showing worst and best outputs.
 
@@ -152,6 +174,19 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
   anchoring, style persistence, stalled-navigation recovery, 44px compact
   controls, and same-range durable/tutor overlay isolation. The unchanged
   real-book timing guard passed alone after one resource-contended full run.
+- Document remaster passes its sanitizer/compiler/source-path units and four
+  production-browser scenarios: free-form rewrite, deterministic MathML
+  shortcut, compact 44px controls, and persistent rewrite + persistent Reset
+  across full reload. Schema-v5 migration, bounded history, cross-book
+  isolation, worker request/result validation, refused-write truth, and
+  first-render hydration are covered. The combined post-merge typecheck, lint,
+  targeted units, production build, remaster browser, and Study/WebMCP browser
+  suites pass.
+- The production tutor cue passes typed/schema validation, native Foliate
+  painter selection, exact verified-range rendering, durable-highlight
+  coexistence, transient cleanup, reduced-motion behavior, and the real
+  Chromium guidance flow. The existing reload/style timing guard passed alone
+  after one resource-contended combined run.
 - The bundled *Calculus Made Easy* is judging content, not a permanent product
   dependency.
 - Keep embeddings optional and after lexical retrieval.

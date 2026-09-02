@@ -3,32 +3,37 @@
 Date: 2026-09-02
 
 **Status: draft for José to rewrite.** This is scaffolding with the facts
-checked, not authored prose. Every current-capability claim below was verified
-against deployed commit `74b880b` and
-`docs/reviews/2026-09-02-judge-demo-readiness.md`.
+checked, not authored prose. Deployed claims below refer to commit `74b880b`;
+local claims refer to the combined main branch after the tutor, Study, and
+document-remaster work. Promote `[LOCAL]` to `[DEPLOYED]` only after pushing and
+verifying the live origin through ChatGPT Desktop.
 
-Two tiers are marked throughout and must stay separated when this is edited:
+Three tiers are marked throughout and must stay separated when this is edited:
 
 - **[DEPLOYED]** — live at the submission URL right now (W0–W5).
+- **[LOCAL]** — implemented and production-browser tested, but not yet verified
+  on the deployed origin.
 - **[FUTURE]** — not built. Appears only under "What's next," never as a claim.
 
 ---
 
 ## Tagline
 
-*Pick one; all are truthful today.*
+*Pick one after promoting the corresponding local capability to deployed.*
 
 1. An ebook reader that gives your agent real capabilities — and checks its
    work against the book.
 2. A local-first EPUB reader that publishes itself to agents through WebMCP.
 3. Your agent can read, navigate, restyle, and annotate this book. It cannot
    make up a quotation.
+4. An ebook reader where your agent can repair the book itself — not merely
+   restyle it.
 
 ## Short summary (Devpost "elevator pitch", ~180 characters)
 
-Bookhand is a local-first EPUB reader that publishes its real capabilities to a
-browser agent through WebMCP. Every source claim is verified against the open
-book, and every change is yours to undo.
+Bookhand is a local-first EPUB reader whose WebMCP tools let an agent teach from
+the book—and repair the book itself. Claims are source-verified; rewrites are
+semantic, local, and reversible.
 
 ---
 
@@ -70,6 +75,12 @@ Registered through genuine `document.modelContext`:
 `search_book`, `set_reading_style`, `upsert_study_item`, `list_study_items`,
 `set_study_board_view`.
 
+**Twenty capabilities on current main. [LOCAL]**
+
+The shipped set above plus `focus_passage`, `control_guidance`,
+`get_section_source`, `diagnose_section`, `rewrite_section`,
+`compile_section_math`, and `set_section_view`.
+
 **The page tells the agent how to compose. [DEPLOYED]**
 
 `get_design_context` hands the agent a compact, versioned design contract:
@@ -104,6 +115,48 @@ unavailable, partial, or ready rather than pretending an empty result means the
 words are not in the book. It never scans live EPUB content, moves the reader,
 or changes the selection.
 
+**The agent can point, then give control back. [LOCAL]**
+
+`focus_passage` verifies an exact source range, moves the visible reader, and
+points at the exact words with a transient highlight, underline, or outline.
+It also shows an attributed guidance state with Back and Stop. The learner's
+original position stays anchored rather than being silently replaced by agent
+movement; manual navigation yields guidance; reload returns to the learner's
+place. The cue is transient and never becomes an annotation or Study record.
+
+**The agent can repair the document itself. [LOCAL]**
+
+Many public-domain technical EPUBs encode every variable and equation as an
+image. That is not a theme problem: it breaks selection, reflow, accessibility,
+and semantic text. Bookhand gives the agent the current section's real,
+package-relative XHTML and stylesheets, then accepts a complete semantic HTML5,
+MathML, figure, caption, accessibility, and CSS rewrite. Foliate renders that
+rewrite through its ordinary loader; Bookhand's extraction path reads the same
+accepted document.
+
+This is deliberately a coding harness, not a menu of repair operations. The
+model decides what the document should become. Bookhand keeps the non-negotiable
+parts: scripts and exfiltrating resources are removed and reported, publisher
+bytes stay immutable, every accepted version is local, and the person has
+Original/Rewritten, Undo, and Reset. Schema v5 saves the sanitized,
+package-relative history before showing it and hydrates it before Foliate's
+first render, so the repaired chapter and its CSS survive reload without a
+flash of the broken version.
+
+`compile_section_math` is an optional accelerator when a publisher already
+left trustworthy LaTeX in `data-tex`; it converts the bundled calculus book's
+equation images to native MathML locally. It is not the architecture and does
+not limit the agent's free-form rewrite.
+
+**Study now reads like material, not telemetry. [LOCAL]**
+
+Blocks created together compose into one restrained lesson group, shared source
+context is not repeated, and equations render as bounded native MathML with a
+visible fallback. Existing learning content precedes a single progressively
+disclosed manual authoring path. Raw tool calls and agent logs do not appear in
+Study; storage failure stays visible and does not unregister unrelated reader
+tools.
+
 ## How I built it
 
 React 19 and Vite, TypeScript, no backend of any kind.
@@ -113,7 +166,8 @@ React 19 and Vite, TypeScript, no backend of any kind.
 - **Storage** is the official SQLite WASM build, owned by one dedicated worker
   and persisted with `opfs-sahpool`. One worker owns the database; everything
   else talks to it through a typed protocol with validation at the boundary.
-  FTS5 provides lexical retrieval; there is no vector store.
+  FTS5 provides lexical retrieval; schema v5 also stores bounded section
+  rewrite history. There is no vector store.
 - **The agent surface** is genuine `document.modelContext`. Because the current
   Chromium runtime treats input schemas as hints rather than enforcing them,
   every handler independently validates its input and returns structured
@@ -157,6 +211,9 @@ React 19 and Vite, TypeScript, no backend of any kind.
   reader stays complete when no agent is present.
 - Agent authority that is narrow by construction — create with a token, revise
   only your own, no delete — rather than by good behavior.
+- A broken EPUB chapter can become semantic HTML and MathML through the model's
+  judgement, then survive reload while the untouched publisher version remains
+  one click away.
 
 ## What I learned
 
@@ -176,15 +233,16 @@ React 19 and Vite, TypeScript, no backend of any kind.
 
 ## What's next
 
-All [FUTURE]; none of this is built.
+Each item below names the remaining [FUTURE] layer without erasing the local
+foundation already built beneath it.
 
-- **Transient tutor guidance.** An agent that can move you to a passage, point
-  at it, explain briefly, and hand control back — with an always-visible Back
-  and Stop, no permanent marks, and nothing surviving a reload. The reader
-  should always show who moved it.
-- **Lessons instead of records.** One titled, ordered, atomic study experience
-  with typeset math and a declarative interactive plot, rather than the flat
-  feed of blocks the board shows today.
+- **Embodied tutor presentation.** Exact transient source cues exist; the next
+  layer is a small anchored plain-text explanation plus direct reveal of a
+  Study item.
+- **First-class lessons.** One titled, ordered, atomic study experience with a
+  declarative interactive plot and recoverable removal. Grouped native blocks
+  and typeset math exist today, but `actionGroupId` is not yet a durable lesson
+  entity.
 - **A lesson-first workspace** with different compositions docked, expanded, and
   on mobile — and agent call logs moved out of the study surface entirely, where
   they belong.
@@ -238,9 +296,9 @@ window is fine for the rest.
 2. **The reader, mid-chapter, chrome visible.** *Caption:* "A real reader
    first: exact locations, themes, typography, and custom book CSS. It works
    with no agent present."
-3. **Agent tool calls beside the moved reader.** *Caption:* "Thirteen capabilities
-   published through WebMCP. The agent navigates by exact location, not by
-   clicking."
+3. **The reader moved by verified tutor guidance, Back and Stop visible.**
+   *Caption:* "The agent points through exact book semantics; the reader always
+   shows who moved it and how to take control back."
 4. **Before/after of an agent style change, with Reset visible.** *Caption:*
    "The page hands the agent a versioned design contract — and refuses custom
    CSS unless the agent quotes the version it read. Reset is always yours."
@@ -248,7 +306,11 @@ window is fine for the rest.
    source claim is verified against the open book. When the quote doesn't hold,
    nothing is written." — *This is the strongest image in the set. Make it the
    Devpost thumbnail.*
-6. **A saved highlight and study block with agent attribution and Undo, after a
+6. **A before/after remaster split: equation images versus native MathML, with
+   Original, Rewritten, Undo, and Reset visible.** *Caption:* "The agent did not
+   repaint the EPUB. It rewrote the chapter into semantic document markup, and
+   the repaired version survives reload."
+7. **A saved highlight and grouped Study lesson with native math, after a
    reload.** *Caption:* "Agent work is labeled, reversible, and still here after
    a reload — on your device."
 
@@ -257,14 +319,15 @@ FTS5 index. Every result carries a citation that resolves back to exact text."*
 
 ## Do not claim
 
-A checklist for the rewrite. None of these are true on 2026-09-02:
+A checklist for the rewrite. None of these are true on current main:
 
 - continuous or ambient tutoring, or any implication the agent watches you read;
-- composed lessons, `upsert_study_experience`, typeset math, or interactive
-  plots — study blocks are a flat feed and equations render as plain text;
-- pointing at a passage, Back, Stop, or returning you to where you were;
+- `upsert_study_experience`, atomic titled lessons, or interactive plots;
+- an anchored tutor explanation, direct Study reveal, or continuous presence;
 - embeddings, semantic or hybrid search;
 - recoverable deletion — delete is currently permanent and one click;
-- a diagnostics surface separate from Study;
-- any tool beyond the thirteen listed;
+- a user-facing diagnostics surface (diagnostics have been removed from Study,
+  not relocated into a finished Activity UI);
+- remaster-aware FTS reindexing, annotation re-anchoring, or EPUB export;
+- any tool beyond the twenty listed after the current branch is deployed;
 - physical Android validation.
