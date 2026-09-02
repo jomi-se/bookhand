@@ -88,6 +88,46 @@
   text-transform: uppercase;
 }
 
+/*
+ * Agent-authored blocks carry a mark, and the mark is quiet. It has to be
+ * legible enough that nobody mistakes this block for their own, and calm enough
+ * that a board full of them still reads as a study board rather than a feed of
+ * notifications. The left rule does the work; the label only confirms it.
+ */
+.study-item[data-origin='agent'] {
+  border-inline-start: 2px solid color-mix(in oklab, var(--accent) 45%, transparent);
+  padding-inline-start: 12px;
+}
+
+.study-item-origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-inline-end: auto;
+  color: var(--muted);
+  font-size: var(--step--2);
+  white-space: nowrap;
+}
+
+.study-mutation-error {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-block-end: 12px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, var(--rule));
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--accent) 6%, var(--canvas));
+  color: var(--ink);
+  font-size: var(--step--1);
+}
+
+.study-mutation-error-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .study-item-tools {
   display: flex;
   align-items: center;

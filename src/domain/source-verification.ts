@@ -50,16 +50,25 @@ export interface SourceClaim {
   readonly quote: string
 }
 
+/**
+ * The message says what was wrong and never repeats what was claimed, so it is
+ * safe to show a person and safe to hand back to the caller that got it wrong.
+ * It is the Error's own message because these travel across a worker boundary
+ * that keeps only the message; see `OwnershipError` for why that matters.
+ */
 export class SourceVerificationError extends Error {
   readonly code: SourceRejectionCode
-  /** Safe to show a person: it says what was wrong, never what was claimed. */
-  readonly userMessage: string
+  readonly detail: string
 
   constructor(code: SourceRejectionCode, userMessage: string, detail: string) {
-    super(detail)
+    super(userMessage)
     this.name = 'SourceVerificationError'
     this.code = code
-    this.userMessage = userMessage
+    this.detail = detail
+  }
+
+  get userMessage(): string {
+    return this.message
   }
 }
 

@@ -25,6 +25,20 @@ export const ANNOTATION_CSS: Record<AnnotationColor, string> = {
   moss: '#48946a',
 }
 
+/**
+ * A refused mutation the person can see and act on.
+ *
+ * A rejection that only reaches the console is, from where the person sits,
+ * indistinguishable from the action having worked — and worse, from the action
+ * having worked wrongly. Every refusal that reaches a person carries the
+ * message written for them and the exact thing that failed, so it can be tried
+ * again once whatever caused it has changed. `VAL-MUTATION-ERRORS`.
+ */
+export interface MutationFailure {
+  readonly message: string
+  readonly retry: () => void
+}
+
 export interface UseStudyOptions {
   readonly entry: BookCatalogEntry
   readonly client: StorageClient
@@ -37,6 +51,7 @@ export function useStudy({ entry, client, bridge }: UseStudyOptions) {
   const [annotations, setAnnotations] = useState<readonly Annotation[]>([])
   const [items, setItems] = useState<readonly StudyItem[]>([])
   const [error, setError] = useState<string>()
+  const [mutationError, setMutationError] = useState<MutationFailure>()
 
   useEffect(() => {
     let alive = true
@@ -91,5 +106,37 @@ export function useStudy({ entry, client, bridge }: UseStudyOptions) {
     [annotations],
   )
 
-  return { board, commands, annotations, items, marks, error, reload, setBoard }
+  /**
+   * Run one mutation, surfacing any refusal instead of dropping it.
+   *
+   * Every refusal this product raises already carries the wording meant for a
+   * person, so it is shown as it arrives rather than smoothed into a generic
+   * apology; a vague failure is one nobody can act on.
+   */
+  const run = useCallback((describe: string, action: () => Promise<unknown>) => {
+    const attempt = () => {
+      setMutationError(undefined)
+      void action().catch((cause: unknown) => {
+        const message = cause instanceof Error ? cause.message : `Could not ${describe}.`
+        setMutationError({ message, retry: attempt })
+      })
+    }
+    attempt()
+  }, [])
+
+  const dismissMutationError = useCallback(() => setMutationError(undefined), [])
+
+  return {
+    board,
+    commands,
+    annotations,
+    items,
+    marks,
+    error,
+    mutationError,
+    dismissMutationError,
+    run,
+    reload,
+    setBoard,
+  }
 }

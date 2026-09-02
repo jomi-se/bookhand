@@ -82,32 +82,38 @@ export function ReaderScreen({
   const highlightSelection = useCallback(() => {
     const selection = reader.selection
     if (!selection || !study.commands) return
-    void study.commands.saveAnnotation({
-      bookId: study.commands.bookId,
-      range: selection.range,
-      quote: selection.quote,
-    })
-  }, [reader.selection, study.commands])
+    const commands = study.commands
+    study.run('highlight that passage', () =>
+      commands.saveAnnotation({
+        bookId: commands.bookId,
+        range: selection.range,
+        quote: selection.quote,
+      }),
+    )
+  }, [reader.selection, study])
 
   const addStudyItem = useCallback(
     (payload: StudyItemPayload, withSource: boolean) => {
       if (!study.commands) return
+      const commands = study.commands
       const selection = withSource ? reader.selection : null
-      void study.commands.upsertStudyItem({
-        payload,
-        ...(selection
-          ? {
-              bookId: study.commands.bookId,
-              sourceRange: selection.range,
-              sourceQuote: selection.quote,
-            }
-          : {}),
-        ...(selection && reader.location?.chapterLabel
-          ? { sourceLabel: reader.location.chapterLabel }
-          : {}),
-      })
+      study.run('add that block', () =>
+        commands.upsertStudyItem({
+          payload,
+          ...(selection
+            ? {
+                bookId: commands.bookId,
+                sourceRange: selection.range,
+                sourceQuote: selection.quote,
+              }
+            : {}),
+          ...(selection && reader.location?.chapterLabel
+            ? { sourceLabel: reader.location.chapterLabel }
+            : {}),
+        }),
+      )
     },
-    [reader.location, reader.selection, study.commands],
+    [reader.location, reader.selection, study],
   )
 
   const closePanel = useCallback(() => {
@@ -246,7 +252,18 @@ export function ReaderScreen({
             annotations={study.annotations}
             selectionQuote={reader.selection?.quote}
             onAddItem={addStudyItem}
-            onDeleteItem={(item) => void study.commands?.deleteStudyItem(item.id)}
+            onDeleteItem={(item) =>
+              study.commands &&
+              study.run('delete that block', () => study.commands!.deleteStudyItem(item.id))
+            }
+            onUndoItem={(item) =>
+              study.commands &&
+              study.run('undo that change', () =>
+                study.commands!.undoStudyItem(item.id, item.revision),
+              )
+            }
+            mutationError={study.mutationError}
+            onDismissMutationError={study.dismissMutationError}
             onGoToSource={goToSource}
             onDeleteAnnotation={(annotation) =>
               void study.commands?.deleteAnnotation(annotation.id)

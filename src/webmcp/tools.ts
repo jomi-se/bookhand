@@ -110,6 +110,11 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
       onCall({ name, summary: summary(result) })
       return result
     } catch (error) {
+      // Every refusal this product raises already carries the wording meant for
+      // a person, including the ones that came back from the storage worker,
+      // where the error class does not survive. The agent gets that same
+      // wording, because it will repeat what it is told and what it repeats
+      // should be something the person can act on.
       const message = error instanceof Error ? error.message : 'That did not work'
       onCall({ name, summary: message, failed: true })
       return errorResult(message)

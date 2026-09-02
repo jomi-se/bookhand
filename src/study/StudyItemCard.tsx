@@ -1,10 +1,11 @@
-import { CornerUpLeft, Trash2 } from 'lucide-react'
+import { CornerUpLeft, Sparkles, Trash2, Undo2 } from 'lucide-react'
 import type { StudyItem } from '../domain/index.ts'
 
 export interface StudyItemCardProps {
   readonly item: StudyItem
   readonly onGoToSource: (item: StudyItem) => void
   readonly onDelete: (item: StudyItem) => void
+  readonly onUndo: (item: StudyItem) => void
 }
 
 function Body({ item }: { readonly item: StudyItem }) {
@@ -52,12 +53,39 @@ function Body({ item }: { readonly item: StudyItem }) {
   }
 }
 
-export function StudyItemCard({ item, onGoToSource, onDelete }: StudyItemCardProps) {
+export function StudyItemCard({ item, onGoToSource, onDelete, onUndo }: StudyItemCardProps) {
+  const byAgent = item.origin === 'agent'
   return (
-    <li className="study-item" data-kind={item.payload.kind}>
+    <li className="study-item" data-kind={item.payload.kind} data-origin={item.origin}>
       <div className="study-item-head">
         <span className="study-item-kind">{item.payload.kind}</span>
+        {byAgent ? (
+          // Agent work is marked, always. A block a person did not write should
+          // never be able to pass for one they did.
+          <span className="study-item-origin">
+            <Sparkles size={12} aria-hidden="true" />
+            Added by an agent
+            {item.revision > 1 ? ` · revised ${item.revision - 1}×` : ''}
+          </span>
+        ) : null}
         <span className="study-item-tools">
+          <button
+            type="button"
+            className="button button-icon"
+            aria-label={
+              item.revision > 1
+                ? 'Undo the last change to this item'
+                : 'Undo adding this item'
+            }
+            title={
+              item.revision > 1
+                ? 'Put this block back the way it was before the last change.'
+                : 'Remove this block, undoing the action that added it.'
+            }
+            onClick={() => onUndo(item)}
+          >
+            <Undo2 size={14} aria-hidden="true" />
+          </button>
           {item.sourceRange ? (
             <button
               type="button"
@@ -74,6 +102,7 @@ export function StudyItemCard({ item, onGoToSource, onDelete }: StudyItemCardPro
             type="button"
             className="button button-icon"
             aria-label="Delete this item"
+            title="Remove this block from the board for good."
             onClick={() => onDelete(item)}
           >
             <Trash2 size={14} aria-hidden="true" />

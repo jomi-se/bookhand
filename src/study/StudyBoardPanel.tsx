@@ -19,6 +19,9 @@ export interface StudyBoardPanelProps {
   readonly selectionQuote?: string
   readonly onAddItem: (payload: StudyItemPayload, withSource: boolean) => void
   readonly onDeleteItem: (item: StudyItem) => void
+  readonly onUndoItem: (item: StudyItem) => void
+  readonly mutationError?: { readonly message: string; readonly retry: () => void }
+  readonly onDismissMutationError?: () => void
   readonly onGoToSource: (range: BookRange) => void
   readonly onDeleteAnnotation: (annotation: Annotation) => void
   readonly onEditNote: (annotation: Annotation, note: string) => void
@@ -164,6 +167,26 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
           </div>
         ) : null}
 
+        {props.mutationError ? (
+          // Bounded: it says what happened, offers the one useful next move,
+          // and does not pretend the board changed.
+          <div className="study-mutation-error" role="alert">
+            <p>{props.mutationError.message}</p>
+            <span className="study-mutation-error-tools">
+              <button type="button" className="button" onClick={props.mutationError.retry}>
+                Try again
+              </button>
+              <button
+                type="button"
+                className="button button-text"
+                onClick={props.onDismissMutationError}
+              >
+                Dismiss
+              </button>
+            </span>
+          </div>
+        ) : null}
+
         {items.length === 0 ? (
           <p className="panel-empty">
             Nothing on this board yet. Select a passage in the book and keep it here, or add a
@@ -177,6 +200,7 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
                 item={item}
                 onGoToSource={(target) => target.sourceRange && props.onGoToSource(target.sourceRange)}
                 onDelete={props.onDeleteItem}
+                onUndo={props.onUndoItem}
               />
             ))}
           </ul>

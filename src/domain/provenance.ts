@@ -89,12 +89,28 @@ function sortKeys(value: unknown): unknown {
   return Object.fromEntries(entries.map(([k, v]) => [k, sortKeys(v)]))
 }
 
+/**
+ * The message is the one written for a person, not the diagnostic.
+ *
+ * These errors cross a worker boundary, where only `code`, `message`, and
+ * `retryable` survive — the class does not. Anything that decides what a person
+ * sees by testing `instanceof` therefore works in a unit test and silently
+ * fails in the running product, showing an internal string instead. Putting the
+ * person's wording in `message` removes that whole failure mode: whatever
+ * arrives is already the right thing to show.
+ */
 export class OwnershipError extends Error {
-  readonly userMessage: string
+  readonly code = 'ownership'
+  readonly detail: string
 
   constructor(userMessage: string, detail: string) {
-    super(detail)
+    super(userMessage)
     this.name = 'OwnershipError'
-    this.userMessage = userMessage
+    this.detail = detail
+  }
+
+  /** Kept for call sites that want to be explicit about which text they mean. */
+  get userMessage(): string {
+    return this.message
   }
 }

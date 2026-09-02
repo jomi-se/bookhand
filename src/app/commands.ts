@@ -275,7 +275,11 @@ export class BookhandCommands {
     const operation = existing ? 'update' : 'create'
 
     const item: StudyItem = {
-      id: input.id ?? this.#id('item'),
+      // A create with no id must land on the SAME id when it is retried,
+      // otherwise every attempt is a different action and the retry protection
+      // protects nothing. Deriving it from the caller's own action token gives
+      // a stable name without asking the caller to invent ids.
+      id: input.id ?? (input.actionToken ? `item-${input.actionToken}` : this.#id('item')),
       boardId: this.#context.board.id,
       origin: existing?.origin ?? origin,
       revision: existing?.revision ?? 1,

@@ -309,13 +309,16 @@ export class LibraryRepository {
    */
   commitStudyItem(item: StudyItem, mutation: StudyMutation, now: string): StudyItemCommit {
     return this.db.transaction('IMMEDIATE', () => {
+      // What the caller asked for, and nothing the product worked out for
+      // itself. `sortOrder` is derived from what is already on the board, so a
+      // retry computes a different one and an identical request would look like
+      // a different action — the retry protection would protect nothing.
       const digest = canonicalize({
         id: item.id,
         boardId: item.boardId,
         payload: item.payload,
         sourceRange: item.sourceRange ?? null,
         sourceLabel: item.sourceLabel ?? null,
-        sortOrder: item.sortOrder,
       })
 
       const replay = this.#findReceipt(mutation)
