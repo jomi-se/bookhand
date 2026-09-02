@@ -141,9 +141,14 @@ describe('the WebMCP tool surface', () => {
 
   it('saves a highlight through the same command the interface uses', async () => {
     const { tool, commands } = setup()
-    await tool('save_annotation').execute({ range, quote: 'the slope', color: 'amber' })
+    await tool('save_annotation').execute({
+      bookId: 'book-1',
+      range,
+      quote: 'the slope',
+      color: 'amber',
+    })
     expect(commands.saveAnnotation).toHaveBeenCalledWith(
-      expect.objectContaining({ range, quote: 'the slope', color: 'amber' }),
+      expect.objectContaining({ bookId: 'book-1', range, quote: 'the slope', color: 'amber' }),
     )
   })
 
@@ -166,7 +171,9 @@ describe('the WebMCP tool surface', () => {
       kind: 'steps',
       title: 'Finding a slope',
       steps: ['Pick two points', 'Divide the rise by the run'],
+      bookId: 'book-1',
       sourceRange: range,
+      sourceQuote: 'Alpha exact',
       sourceLabel: 'Chapter X',
     })
     expect(commands.upsertStudyItem).toHaveBeenCalledWith({
@@ -175,7 +182,9 @@ describe('the WebMCP tool surface', () => {
         title: 'Finding a slope',
         steps: ['Pick two points', 'Divide the rise by the run'],
       },
+      bookId: 'book-1',
       sourceRange: range,
+      sourceQuote: 'Alpha exact',
       sourceLabel: 'Chapter X',
     })
   })

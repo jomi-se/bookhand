@@ -23,6 +23,12 @@ export interface ToolHostOptions {
   readonly onCall: (record: Omit<ToolCallRecord, 'id' | 'at'>) => void
 }
 
+const BOOK_ID_SCHEMA = {
+  type: 'string',
+  description:
+    'The id of the book you are reading, from get_reading_context. Checked against the open book: a mutation naming a different book is rejected.',
+} as const
+
 const RANGE_SCHEMA = {
   type: 'object',
   description: 'An exact source range previously returned by another Bookhand tool.',
@@ -199,18 +205,25 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
       inputSchema: {
         type: 'object',
         properties: {
+          bookId: BOOK_ID_SCHEMA,
           range: RANGE_SCHEMA,
-          quote: { type: 'string', maxLength: 20_000, description: 'The exact text being highlighted.' },
+          quote: {
+            type: 'string',
+            maxLength: 20_000,
+            description:
+              'The exact text being highlighted, as returned by a Bookhand tool. It is compared against the text the range resolves to; only whitespace differences are forgiven.',
+          },
           color: { type: 'string', enum: [...ANNOTATION_COLORS] },
           note: { type: 'string', maxLength: 20_000 },
         },
-        required: ['range', 'quote'],
+        required: ['bookId', 'range', 'quote'],
         additionalProperties: false,
       },
       execute: (input) =>
         run('save_annotation', () => 'highlighted a passage', async () => {
           const range = asRange(input.range)
           const saved = await commands.saveAnnotation({
+            bookId: String(input.bookId ?? ''),
             range,
             quote: String(input.quote ?? ''),
             ...(typeof input.color === 'string'
@@ -286,10 +299,18 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           steps: { type: 'array', maxItems: 100, items: { type: 'string', maxLength: 5_000 } },
           prompt: { type: 'string', maxLength: 20_000, description: 'Question body.' },
           answer: { type: 'string', maxLength: 20_000 },
+          bookId: BOOK_ID_SCHEMA,
           sourceRange: RANGE_SCHEMA,
+          sourceQuote: {
+            type: 'string',
+            maxLength: 20_000,
+            description:
+              'The exact text sourceRange covers. Required with sourceRange, and checked against the book, so a block can never cite words the book does not contain.',
+          },
           sourceLabel: { type: 'string', maxLength: 500 },
         },
         required: ['kind'],
+        dependentRequired: { sourceRange: ['bookId', 'sourceQuote'] },
         additionalProperties: false,
       },
       execute: (input) =>
@@ -298,7 +319,13 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           const saved = await commands.upsertStudyItem({
             payload,
             ...(typeof input.id === 'string' ? { id: input.id } : {}),
-            ...(input.sourceRange ? { sourceRange: asRange(input.sourceRange) } : {}),
+            ...(input.sourceRange
+              ? {
+                  bookId: String(input.bookId ?? ''),
+                  sourceRange: asRange(input.sourceRange),
+                  sourceQuote: String(input.sourceQuote ?? ''),
+                }
+              : {}),
             ...(typeof input.sourceLabel === 'string' ? { sourceLabel: input.sourceLabel } : {}),
           })
           return textResult(`Saved ${payload.kind} block ${saved.id} to the study board.`)

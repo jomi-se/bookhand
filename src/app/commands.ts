@@ -11,6 +11,12 @@ import type {
   StudyItemPayload,
   TocItem,
 } from '../domain/index.ts'
+import {
+  compareQuote,
+  rejectSource,
+  verifyBookOwnership,
+  verifyFingerprint,
+} from '../domain/source-verification.ts'
 import type { ReaderPortBridge } from './reader-bridge.ts'
 import type { StorageClient } from '../storage/client.ts'
 
@@ -25,6 +31,12 @@ export interface ReadingContext {
 }
 
 export interface SaveAnnotationInput {
+  /**
+   * The book the caller believes is open. Required, and checked: a mutation
+   * that names the wrong book is a mutation aimed at text the caller has not
+   * actually read.
+   */
+  readonly bookId: string
   readonly range: BookRange
   readonly quote: string
   readonly color?: AnnotationColor
@@ -35,7 +47,14 @@ export interface SaveAnnotationInput {
 
 export interface UpsertStudyItemInput {
   readonly payload: StudyItemPayload
+  /** Required whenever `sourceRange` is present; see `SaveAnnotationInput`. */
+  readonly bookId?: string
   readonly sourceRange?: BookRange
+  /**
+   * The exact text `sourceRange` covers. Required whenever `sourceRange` is
+   * present, so a block that claims a source can be checked against it.
+   */
+  readonly sourceQuote?: string
   readonly sourceLabel?: string
   readonly id?: string
   readonly sortOrder?: number
@@ -146,7 +165,28 @@ export class BookhandCommands {
     this.#changed()
   }
 
+  /**
+   * Resolve a claimed range against the open book and prove the claimed quote
+   * is exactly the text it covers.
+   *
+   * This runs before any write. A rejection must leave storage, the overlays,
+   * and the mounted interface untouched, which is why verification happens here
+   * rather than inside the storage worker: nothing has been attempted yet.
+   */
+  async #verifySource(bookId: string, range: BookRange, quote: string): Promise<void> {
+    verifyBookOwnership(bookId, this.#context.bookId)
+    let resolved
+    try {
+      resolved = await this.#adapter().getPassage(range)
+    } catch (cause) {
+      rejectSource('stale-range', `The range did not resolve: ${String(cause)}`)
+    }
+    verifyFingerprint(range.textFingerprint, resolved.range.textFingerprint)
+    compareQuote(quote, resolved.text)
+  }
+
   async saveAnnotation(input: SaveAnnotationInput): Promise<Annotation> {
+    await this.#verifySource(input.bookId, input.range, input.quote)
     const now = this.#timestamp()
     const existing = input.id
       ? (await this.listAnnotations()).find((item) => item.id === input.id)
@@ -180,6 +220,15 @@ export class BookhandCommands {
   }
 
   async upsertStudyItem(input: UpsertStudyItemInput): Promise<StudyItem> {
+    if (input.sourceRange) {
+      if (input.bookId === undefined || input.sourceQuote === undefined) {
+        rejectSource(
+          'invented-quote',
+          'A study item carrying a source range must also carry its bookId and the exact quote',
+        )
+      }
+      await this.#verifySource(input.bookId, input.sourceRange, input.sourceQuote)
+    }
     const now = this.#timestamp()
     const existing = input.id
       ? (await this.listStudyItems()).find((item) => item.id === input.id)

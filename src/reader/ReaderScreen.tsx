@@ -82,7 +82,11 @@ export function ReaderScreen({
   const highlightSelection = useCallback(() => {
     const selection = reader.selection
     if (!selection || !study.commands) return
-    void study.commands.saveAnnotation({ range: selection.range, quote: selection.quote })
+    void study.commands.saveAnnotation({
+      bookId: study.commands.bookId,
+      range: selection.range,
+      quote: selection.quote,
+    })
   }, [reader.selection, study.commands])
 
   const addStudyItem = useCallback(
@@ -91,7 +95,13 @@ export function ReaderScreen({
       const selection = withSource ? reader.selection : null
       void study.commands.upsertStudyItem({
         payload,
-        ...(selection ? { sourceRange: selection.range } : {}),
+        ...(selection
+          ? {
+              bookId: study.commands.bookId,
+              sourceRange: selection.range,
+              sourceQuote: selection.quote,
+            }
+          : {}),
         ...(selection && reader.location?.chapterLabel
           ? { sourceLabel: reader.location.chapterLabel }
           : {}),
@@ -243,6 +253,7 @@ export function ReaderScreen({
             }
             onEditNote={(annotation, note) =>
               void study.commands?.saveAnnotation({
+                bookId: study.commands.bookId,
                 id: annotation.id,
                 range: annotation.range,
                 quote: annotation.quote,
