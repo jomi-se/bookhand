@@ -3,15 +3,13 @@
 Date: 2026-09-02
 
 **Status: draft for José to rewrite.** This is scaffolding with the facts
-checked, not authored prose. Every claim below was verified against the tree at
-`16233d0` and against `docs/reviews/2026-09-02-judge-demo-readiness.md`. Nothing
-unshipped is presented as a current capability.
+checked, not authored prose. Every current-capability claim below was verified
+against deployed commit `74b880b` and
+`docs/reviews/2026-09-02-judge-demo-readiness.md`.
 
-Three tiers are marked throughout and must stay separated when this is edited:
+Two tiers are marked throughout and must stay separated when this is edited:
 
-- **[DEPLOYED]** — live at the submission URL right now (W0–W4).
-- **[PENDING]** — implemented locally, not yet committed or deployed (W5).
-  Delete every [PENDING] line if W5 is not deployed before submitting.
+- **[DEPLOYED]** — live at the submission URL right now (W0–W5).
 - **[FUTURE]** — not built. Appears only under "What's next," never as a claim.
 
 ---
@@ -64,12 +62,12 @@ it says. That turned out to be the most interesting thing I built.
 - Works completely without an agent. WebMCP is what makes the tutor behavior
   possible; it is not what makes the reader work.
 
-**Twelve capabilities published to the page's agent. [DEPLOYED]**
+**Thirteen capabilities published to the page's agent. [DEPLOYED]**
 
 Registered through genuine `document.modelContext`:
 `get_design_context`, `list_books`, `open_book`, `get_reading_context`,
 `get_table_of_contents`, `get_passage`, `navigate_book`, `save_annotation`,
-`set_reading_style`, `upsert_study_item`, `list_study_items`,
+`search_book`, `set_reading_style`, `upsert_study_item`, `list_study_items`,
 `set_study_board_view`.
 
 **The page tells the agent how to compose. [DEPLOYED]**
@@ -97,7 +95,7 @@ changes offer Reset. A board layout an agent changed offers Undo. An agent may
 revise the blocks it created, using an unguessable token it was handed at
 creation; it cannot edit what you wrote, and it has no delete.
 
-**Whole-book search, grounded. [PENDING — delete if not deployed]**
+**Whole-book search, grounded. [DEPLOYED]**
 
 `search_book` searches a local FTS5 index built from CFI-anchored chunks of the
 book, so a result carries a citation that resolves back to exact text. Indexing
@@ -115,7 +113,7 @@ React 19 and Vite, TypeScript, no backend of any kind.
 - **Storage** is the official SQLite WASM build, owned by one dedicated worker
   and persisted with `opfs-sahpool`. One worker owns the database; everything
   else talks to it through a typed protocol with validation at the boundary.
-  [PENDING] FTS5 provides lexical retrieval; there is no vector store.
+  FTS5 provides lexical retrieval; there is no vector store.
 - **The agent surface** is genuine `document.modelContext`. Because the current
   Chromium runtime treats input schemas as hints rather than enforcing them,
   every handler independently validates its input and returns structured
@@ -214,14 +212,15 @@ All [FUTURE]; none of this is built.
   production builds and that exclusion is asserted by its own test.
 - The deterministic WebMCP specs prove plumbing, not model behavior. They are
   never presented as evidence that a model composed anything.
-- [PENDING] Search is validated against a manually frozen two-book oracle bound
+- Search is validated against a manually frozen two-book oracle bound
   to the SHA-256s of both EPUBs, including a check that the expected results are
   not embedded anywhere in the shipped bundle.
 
 ## Links
 
-- **Live demo:** `<https://bookhand.jomi-se.workers.dev/>` — confirm this is the
-  URL being submitted, and confirm the deployed commit before recording.
+- **Live demo:** <https://bookhand.jomi-se.workers.dev/> — deployed commit
+  `74b880b` was verified through genuine WebMCP and ordinary Search before
+  recording.
 - **Repository:** `<GITHUB URL — repository must be made public before
   submitting>`
 - **Demo video:** `<YOUTUBE URL — public, under three minutes, with audio>`
@@ -239,7 +238,7 @@ window is fine for the rest.
 2. **The reader, mid-chapter, chrome visible.** *Caption:* "A real reader
    first: exact locations, themes, typography, and custom book CSS. It works
    with no agent present."
-3. **Agent tool calls beside the moved reader.** *Caption:* "Twelve capabilities
+3. **Agent tool calls beside the moved reader.** *Caption:* "Thirteen capabilities
    published through WebMCP. The agent navigates by exact location, not by
    clicking."
 4. **Before/after of an agent style change, with Reset visible.** *Caption:*
@@ -253,9 +252,8 @@ window is fine for the rest.
    reload.** *Caption:* "Agent work is labeled, reversible, and still here after
    a reload — on your device."
 
-[PENDING] If W5 ships, insert a search screenshot between 3 and 4: *"Whole-book
-search over a local FTS5 index. Every result carries a citation that resolves
-back to exact text."*
+Insert a search screenshot between 3 and 4: *"Whole-book search over a local
+FTS5 index. Every result carries a citation that resolves back to exact text."*
 
 ## Do not claim
 
@@ -268,5 +266,5 @@ A checklist for the rewrite. None of these are true on 2026-09-02:
 - embeddings, semantic or hybrid search;
 - recoverable deletion — delete is currently permanent and one click;
 - a diagnostics surface separate from Study;
-- any tool beyond the twelve listed (plus `search_book` only if W5 is deployed);
+- any tool beyond the thirteen listed;
 - physical Android validation.

@@ -4,11 +4,12 @@ Last updated: 2026-09-02
 
 ## Next executable wave
 
-Ship and verify **W5: local lexical retrieval**. Commit and push the accepted
-implementation, wait for Cloudflare Workers Builds to deploy that exact commit,
-then repeat the ChatGPT Desktop registration and intent-only search smoke on the
-deployed origin. Until that check passes, submission copy must continue to mark
-`search_book` as pending and the live surface as a twelve-tool build.
+Run the owner-visible **ChatGPT Desktop W5 smoke** against deployed commit
+`74b880b`: confirm thirteen tools register in the in-app browser, ask an
+intent-only whole-book question, observe genuine `search_book`, and preserve the
+result without prompting tool names or arguments. Deterministic live-browser
+validation is complete; this remaining check is model behavior and must not be
+substituted with Playwright evidence.
 
 Before implementing W6, resolve the proposed amendments in
 `docs/reviews/2026-09-02-w6-contract-amendment-proposal.md` into the canonical
@@ -41,8 +42,8 @@ This direction is recorded in:
 - Slices 1 through 3 are implemented: local library/import, Foliate EPUB
   reading, SQLite WASM persistence, highlights/notes, the native Study board,
   and genuine `document.modelContext` registration.
-- The current open-book runtime exposes twelve tools: three library/global
-  tools plus nine reading/study tools in the deployed W4 build.
+- The deployed open-book runtime exposes thirteen tools: three library/global
+  tools plus ten reading/study/search tools. `search_book` is the W5 addition.
 - W0 through W3 are implemented: runtime design-context discovery, source and
   persistence trust, shared observable style/board state, and the mobile/desktop
   reader reset.
@@ -79,8 +80,7 @@ This direction is recorded in:
 ## Accepted remaining topology
 
 - W4: complete — runtime/tool truth and canonical source lifecycle.
-- W5: complete locally — local lexical retrieval and `search_book`; deployment
-  confirmation remains.
+- W5: complete and deployed — local lexical retrieval and `search_book`.
 - W6: shared origin-aware navigation and non-persistent tutor-session core.
 - W7: first-class durable lesson domain, safe math/plot, atomic lifecycle, and
   recoverable removal.
@@ -99,6 +99,10 @@ independent contract-review passes were completed and incorporated on
 The WebMCP Challenge closes 2026-09-03T20:00Z.
 
 - Live surface: https://bookhand.jomi-se.workers.dev/
+- Deployed commit `74b880b` was verified with persistent browser storage,
+  thirteen genuine WebMCP tools, `search_book` reaching `ready / results` with
+  corpus-derived hits, ordinary human Search, reload survival, and no observed
+  page, console, request, or off-origin errors.
 - Cloudflare Workers Builds deploys pushes to `main`.
 - `LICENSE` is committed. Making the GitHub repository public and attaching the
   final domain are owner actions.

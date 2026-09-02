@@ -71,7 +71,26 @@ try {
     await page.waitForTimeout(500)
   }
   if (!reading.includes('get_reading_context')) throw new Error('reading tools never appeared')
+  if (!reading.includes('search_book')) throw new Error('deployed build does not expose search_book')
   console.log('reading tools:', reading.join(', '))
+
+  let search
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    search = await call('search_book', { query: 'infinitesimal increment', limit: 3 })
+    const result = search.structured.search
+    if (result?.availability === 'ready') break
+    await page.waitForTimeout(500)
+  }
+  const searchResult = search?.structured.search
+  if (search?.isError || searchResult?.availability !== 'ready') {
+    throw new Error(`search_book did not become ready (got ${searchResult?.availability ?? 'no result'})`)
+  }
+  if (searchResult.outcome !== 'results' || !Array.isArray(searchResult.hits) || searchResult.hits.length === 0) {
+    throw new Error('search_book returned no corpus-derived result for the live smoke query')
+  }
+  console.log(
+    `live search: ${searchResult.availability} / ${searchResult.outcome} · ${searchResult.hits.length} hit(s)`,
+  )
 
   // Persistence is the question an in-app browser can answer differently.
   await page.reload({ waitUntil: 'domcontentloaded' })
