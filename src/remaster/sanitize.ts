@@ -161,6 +161,19 @@ export function sanitizeSectionHtml(html: string): SanitizeResult {
         node.removeAttribute(attribute.name)
         continue
       }
+      if (name === 'srcset') {
+        // A srcset is a list, and one bad candidate must not be waved through
+        // because its neighbours are fine — nor take the good ones with it.
+        const kept = sanitizeSrcset(attribute.value)
+        if (kept === null) {
+          count(removedAttributes, 'srcset')
+          node.removeAttribute(attribute.name)
+        } else {
+          if (kept !== attribute.value) count(removedAttributes, 'srcset-candidate')
+          node.setAttribute(attribute.name, kept)
+        }
+        continue
+      }
       if (isUrlAttribute(name) && !isAllowedUrl(attribute.value)) {
         count(removedAttributes, name)
         node.removeAttribute(attribute.name)
@@ -181,7 +194,7 @@ export function sanitizeSectionHtml(html: string): SanitizeResult {
       // An in-book link may stay; anything else opens somewhere Bookhand
       // cannot vouch for, so it loses its destination but keeps its text.
       const href = node.getAttribute('href')
-      if (href && !href.startsWith('#') && !href.startsWith('blob:')) {
+      if (href && !isAllowedUrl(href)) {
         count(removedAttributes, 'href')
         node.removeAttribute('href')
       }
@@ -220,13 +233,43 @@ function isAllowedAttribute(tag: string, name: string): boolean {
 }
 
 function isUrlAttribute(name: string): boolean {
-  return name === 'src' || name === 'href' || name === 'srcset' || name === 'poster'
+  return name === 'src' || name === 'href' || name === 'poster'
 }
 
 /**
- * Local resources only. `blob:` is what Foliate rewrites the book's own images
- * to, so it is how a repaired section keeps its figures; an `http(s)` URL
- * would both leak the reading position and break the offline promise.
+ * Split a `srcset`, check every candidate, and keep the ones that are local.
+ *
+ * Returns the surviving list, or `null` when nothing survives and the whole
+ * attribute should go. Validating the raw string as if it were one URL — which
+ * is what a naive check does — passes `images/a.png 1x, https://t.example/b 2x`
+ * as safe or rejects it whole; neither is right.
+ */
+export function sanitizeSrcset(value: string): string | null {
+  const kept = splitSrcset(value).filter((candidate) => isAllowedUrl(candidateUrl(candidate)))
+  return kept.length > 0 ? kept.join(', ') : null
+}
+
+/** Candidates are comma-separated, but a URL may itself contain a comma. */
+export function splitSrcset(value: string): readonly string[] {
+  return value
+    .split(/\s*,\s*(?=[^\s,]+(?:\s+[\d.]+[wxh])?\s*(?:,|$))/)
+    .map((candidate) => candidate.trim())
+    .filter((candidate) => candidate.length > 0)
+}
+
+export function candidateUrl(candidate: string): string {
+  return candidate.split(/\s+/)[0] ?? ''
+}
+
+/**
+ * Local resources only.
+ *
+ * A package-relative path is the normal case and the important one: agents are
+ * given the book's own raw source, so `src="images/fig4.svg"` is what they
+ * write back, and Foliate's loader resolves it exactly as it resolves the
+ * publisher's. What is refused is anything that leaves the book: an `http(s)`
+ * URL would both leak what a person is reading and break the offline promise,
+ * and a `javascript:` URL is not a resource at all.
  */
 function isAllowedUrl(value: string): boolean {
   const url = value.trim()
@@ -234,13 +277,35 @@ function isAllowedUrl(value: string): boolean {
   if (url.startsWith('#')) return true
   if (url.startsWith('blob:')) return true
   if (/^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml);/i.test(url)) return true
-  return false
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return false
+  // Protocol-relative is off-origin by another name.
+  return !url.startsWith('//')
 }
 
 function hasUnsafeCss(value: string): boolean {
-  return /expression\s*\(|javascript:|@import|behavior\s*:|url\s*\(\s*['"]?\s*(?!blob:|data:image\/)/i.test(
-    value,
-  )
+  if (/expression\s*\(|javascript:|@import|behavior\s*:/i.test(value)) return true
+  for (const match of value.matchAll(/url\s*\(\s*['"]?([^'")]*)/gi)) {
+    if (!isAllowedUrl(match[1] ?? '')) return true
+  }
+  return false
+}
+
+export interface SanitizeCssResult {
+  readonly css: string
+  readonly modified: boolean
+}
+
+/**
+ * Stylesheet text an agent wrote.
+ *
+ * Typography is part of repairing a document, so CSS is a first-class thing an
+ * agent may write. What it may not do is reach off-origin: `@import`, remote
+ * `url()`, and the legacy IE escape hatches are removed.
+ */
+export function sanitizeCss(css: string): SanitizeCssResult {
+  if (css.length > MAX_HTML) throw new SanitizeError('Proposed stylesheet is too large')
+  const filtered = filterCss(css)
+  return { css: filtered, modified: filtered !== css }
 }
 
 function filterCss(css: string): string {
@@ -248,5 +313,7 @@ function filterCss(css: string): string {
     .replace(/@import[^;]*;?/gi, '')
     .replace(/expression\s*\([^)]*\)/gi, '')
     .replace(/behavior\s*:[^;]*;?/gi, '')
-    .replace(/url\s*\(\s*['"]?(?!blob:|data:image\/|#)[^)]*\)/gi, 'none')
+    .replace(/url\s*\(\s*['"]?([^'")]*)['"]?\s*\)/gi, (whole, url: string) =>
+      isAllowedUrl(url) ? whole : 'none',
+    )
 }

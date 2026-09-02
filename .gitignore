@@ -39,3 +39,6 @@ test-results/
 .impeccable/build/
 .impeccable/live/sessions/
 .impeccable/hook.cache.json
+
+# Validation evidence: screenshots and traces kept as evidence for a decision.
+artifacts/

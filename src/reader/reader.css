@@ -145,6 +145,7 @@
   gap: 16px;
   padding: 10px max(14px, env(safe-area-inset-right)) 10px max(14px, env(safe-area-inset-left));
   border-block-end: 1px solid var(--rule);
+  flex-wrap: wrap;
 }
 
 .reader-identity {
@@ -640,14 +641,15 @@
  * book carries no trace of the capability.
  */
 .remaster-bar {
+  /* A full-width strip on its own line inside the chrome. */
+  flex: 1 0 100%;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 1rem;
-  border-block-end: 1px solid var(--rule);
-  background: var(--surface-quiet, var(--surface));
+  padding-block-start: 0.5rem;
+  border-block-start: 1px solid var(--rule);
   font-size: 0.85rem;
   min-inline-size: 0;
 }
@@ -683,4 +685,8 @@
   background: var(--accent-quiet);
   color: var(--accent);
   font-weight: 600;
+}
+
+.remaster-bar-versions {
+  color: var(--muted);
 }

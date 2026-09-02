@@ -65,11 +65,17 @@ export interface SectionDiagnosis {
   readonly truncated: boolean
 }
 
+export interface SectionStylesheet {
+  readonly name: string
+  readonly css: string
+}
+
 export interface SectionSource {
   readonly sectionIndex: number
   readonly label?: string
+  /** Packaged source: `src` and `href` are still package-relative. */
   readonly html: string
-  readonly css: string
+  readonly stylesheets: readonly SectionStylesheet[]
   readonly rewritten: boolean
   readonly bytes: number
 }
@@ -82,8 +88,17 @@ export interface SectionRewriteResult {
     readonly removedAttributes: Readonly<Record<string, number>>
     readonly modified: boolean
   }
+  /** True when the agent's stylesheet had rules removed. */
+  readonly cssModified: boolean
   readonly before: { readonly elements: number; readonly bytes: number }
   readonly after: { readonly elements: number; readonly bytes: number }
+}
+
+/** What a person is told about a rewrite, in the agent's own words. */
+export interface RewriteSummary {
+  readonly sectionIndex: number
+  readonly summary?: string
+  readonly versions: number
 }
 
 /**
@@ -96,13 +111,19 @@ export interface SectionRewriteResult {
 export interface DocumentRemasterPort {
   diagnoseSection(sectionIndex: number): Promise<SectionDiagnosis>
   getSectionSource(sectionIndex: number): Promise<SectionSource>
-  rewriteSection(sectionIndex: number, html: string, summary?: string): SectionRewriteResult
-  compileSectionMath(sectionIndex: number): RemasterReport
+  rewriteSection(
+    sectionIndex: number,
+    html: string,
+    options?: { readonly css?: string; readonly summary?: string },
+  ): Promise<SectionRewriteResult>
+  compileSectionMath(sectionIndex: number): Promise<RemasterReport>
   isShowingRewritten(): boolean
   hasRewrite(sectionIndex: number): boolean
-  showRewritten(showRewritten: boolean): number
+  /** What the agent said it did, and how many revisions deep the section is. */
+  describeRewrite(sectionIndex: number): RewriteSummary | undefined
+  showRewritten(showRewritten: boolean): Promise<number>
   /** Step back one revision. */
-  undoSection(sectionIndex: number): { readonly versions: number } | undefined
+  undoSection(sectionIndex: number): Promise<{ readonly versions: number } | undefined>
   /** Throw every revision away and return to the publisher's markup. */
-  resetSection(sectionIndex: number): boolean
+  resetSection(sectionIndex: number): Promise<boolean>
 }

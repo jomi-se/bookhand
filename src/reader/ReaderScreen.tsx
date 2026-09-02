@@ -298,8 +298,11 @@ export function ReaderScreen({
             <span className="tool-label">Text</span>
           </button>
         </div>
+        {/* Inside the chrome, not beside it: `.reader` declares exactly three
+            grid rows, and a fourth child would push the book's own surface out
+            of the `1fr` track and collapse it to nothing. */}
+        <RemasterBar commands={study.commands} sectionIndex={reader.location?.sectionIndex} />
       </header>
-      <RemasterBar commands={study.commands} sectionIndex={reader.location?.sectionIndex} />
 
       <div className="reader-stage">
         {panel === 'contents' ? (

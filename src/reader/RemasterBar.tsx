@@ -18,7 +18,12 @@ export interface RemasterBarProps {
  */
 export function RemasterBar(props: RemasterBarProps) {
   const { commands, sectionIndex } = props
-  const [state, setState] = useState<{ rewritten: boolean; showing: boolean }>()
+  const [state, setState] = useState<{
+    rewritten: boolean
+    showing: boolean
+    summary?: string
+    versions: number
+  }>()
 
   useEffect(() => {
     if (!commands || sectionIndex === undefined) {
@@ -27,9 +32,12 @@ export function RemasterBar(props: RemasterBarProps) {
     }
     const read = () => {
       try {
+        const described = commands.describeRewrite(sectionIndex)
         setState({
           rewritten: commands.hasRewrite(sectionIndex),
           showing: commands.isShowingRewritten(),
+          ...(described?.summary === undefined ? {} : { summary: described.summary }),
+          versions: described?.versions ?? 0,
         })
       } catch {
         // The reader is between books; there is nothing to offer yet.
@@ -44,8 +52,14 @@ export function RemasterBar(props: RemasterBarProps) {
 
   return (
     <div className="remaster-bar" role="status">
+      {/* The agent's own sentence, when it gave one. A person deciding whether
+          to keep a rewrite is better served by what was attempted than by a
+          generic notice — and the tool promises this is where it appears. */}
       <p className="remaster-bar-note">
-        An agent rewrote this chapter’s markup.
+        {state.summary ?? 'An agent rewrote this chapter’s markup.'}
+        {state.versions > 1 ? (
+          <span className="remaster-bar-versions"> · {state.versions} revisions</span>
+        ) : null}
       </p>
       <div className="remaster-bar-tools">
         <div className="remaster-switch" role="group" aria-label="Which version of this chapter to show">
@@ -53,7 +67,7 @@ export function RemasterBar(props: RemasterBarProps) {
             type="button"
             className="button button-quiet"
             aria-pressed={!state.showing}
-            onClick={() => commands.showRewritten(false)}
+            onClick={() => void commands.showRewritten(false)}
           >
             Original
           </button>
@@ -61,7 +75,7 @@ export function RemasterBar(props: RemasterBarProps) {
             type="button"
             className="button button-quiet"
             aria-pressed={state.showing}
-            onClick={() => commands.showRewritten(true)}
+            onClick={() => void commands.showRewritten(true)}
           >
             Rewritten
           </button>

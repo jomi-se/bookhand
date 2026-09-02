@@ -654,7 +654,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     {
       name: 'get_section_source',
       description:
-        "Read the book's own markup for one section: the rendered XHTML and its CSS, exactly as it is. This is a source file, not a summary — treat it the way you would treat a file you are about to edit. Image URLs are blob: URLs Foliate rewrote the book's files to; keep them exactly as they are or the figures stop loading. Use this together with diagnose_section when you want counts first, and rewrite_section when you are ready to write.",
+        "Read the book's own source for one section: the packaged XHTML and its stylesheets, exactly as the publisher wrote them. This is a source file, not a summary — treat it the way you would treat a file you are about to edit. Paths in it (src, href, url()) are package-relative; keep them relative when you write it back and Bookhand resolves them the same way the book does. Use diagnose_section alongside this when you want counts first, and rewrite_section when you are ready to write.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -671,7 +671,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             typeof input.sectionIndex === 'number' ? input.sectionIndex : undefined,
           )
           return textResult(
-            `Section ${source.sectionIndex}${source.label ? ` (${source.label})` : ''}: ${source.bytes} bytes of HTML${source.rewritten ? ', currently showing your rewrite' : ''}.`,
+            `Section ${source.sectionIndex}${source.label ? ` (${source.label})` : ''}: ${source.bytes} bytes of packaged XHTML and ${source.stylesheets.length} stylesheet${source.stylesheets.length === 1 ? '' : 's'}${source.rewritten ? ', currently showing your rewrite' : ''}.`,
             { ...source },
           )
         }),
@@ -705,7 +705,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     {
       name: 'rewrite_section',
       description:
-        "Replace a section's markup with markup you wrote. This is the whole document body: rewrite the structure, the headings, the equations, the figures and captions, the accessibility, and the CSS together, however you judge best. Nothing is off limits to you except what could run code or reach the network — Bookhand strips scripts, event handlers, and off-origin URLs, and tells you exactly what it removed. Every edit is a new version: the person can Undo one step, Reset to the publisher's original, or flip between the two at any time, so write the chapter you think it should be.",
+        "Replace a section's markup, and optionally its stylesheet, with what you wrote. This is the whole document body: rewrite the structure, the headings, the equations, the figures and captions, the accessibility, and the CSS together, however you judge best. Nothing is off limits to you except what could run code or reach the network — Bookhand strips scripts, event handlers, and off-origin URLs, and tells you exactly what it removed. Every edit is a new version: the person can Undo one step, Reset to the publisher's original, or flip between the two at any time, so write the chapter you think it should be.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -713,6 +713,11 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             type: 'string',
             description:
               "The section body's complete new markup. Semantic HTML5 and MathML both render natively.",
+          },
+          css: {
+            type: 'string',
+            description:
+              "A stylesheet for this section, applied inside the book's own frame alongside the publisher's own. Typography is part of repairing a document, so write it together with the markup. Package-relative url() works; @import and off-origin url() are removed.",
           },
           summary: {
             type: 'string',
@@ -732,16 +737,19 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           if (typeof input.html !== 'string' || input.html.trim().length === 0) {
             return errorResult('Send the section markup you want to apply as `html`.')
           }
-          const result = await commands.rewriteSection(
-            input.html,
-            typeof input.summary === 'string' ? input.summary : undefined,
-            typeof input.sectionIndex === 'number' ? input.sectionIndex : undefined,
-          )
+          const result = await commands.rewriteSection(input.html, {
+            ...(typeof input.css === 'string' ? { css: input.css } : {}),
+            ...(typeof input.summary === 'string' ? { summary: input.summary } : {}),
+            ...(typeof input.sectionIndex === 'number' ? { sectionIndex: input.sectionIndex } : {}),
+          })
           const refused = result.sanitized.modified
             ? ` Removed: ${describeRefusals(result.sanitized)}.`
             : ''
+          const styleRefused = result.cssModified
+            ? ' Some stylesheet rules were removed for reaching off-origin.'
+            : ''
           return textResult(
-            `Rewrote section ${result.sectionIndex}: ${result.before.elements} elements became ${result.after.elements}.${refused}`,
+            `Rewrote section ${result.sectionIndex}: ${result.before.elements} elements became ${result.after.elements}.${refused}${styleRefused}`,
             { ...result },
           )
         }),
@@ -818,7 +826,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           if (input.view !== 'original' && input.view !== 'rewritten') {
             return errorResult('Choose one of: original, rewritten, undo, reset.')
           }
-          const changed = commands.showRewritten(input.view === 'rewritten')
+          const changed = await commands.showRewritten(input.view === 'rewritten')
           return textResult(
             `Now showing the ${input.view === 'rewritten' ? 'rewritten' : 'published'} text${changed > 0 ? ` in ${changed} section${changed === 1 ? '' : 's'}` : ''}.`,
             { view: input.view, changed },

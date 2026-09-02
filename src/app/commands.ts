@@ -255,38 +255,40 @@ export class BookhandCommands {
 
   async rewriteSection(
     html: string,
-    summary?: string,
-    sectionIndex?: number,
+    options: { readonly css?: string; readonly summary?: string; readonly sectionIndex?: number } = {},
   ): Promise<SectionRewriteResult> {
-    const index = await this.#resolveSection(sectionIndex)
-    const result = this.#remaster().rewriteSection(index, html, summary)
+    const index = await this.#resolveSection(options.sectionIndex)
+    const result = await this.#remaster().rewriteSection(index, html, {
+      ...(options.css === undefined ? {} : { css: options.css }),
+      ...(options.summary === undefined ? {} : { summary: options.summary }),
+    })
     this.#changed()
     return result
   }
 
   async compileSectionMath(sectionIndex?: number) {
     const index = await this.#resolveSection(sectionIndex)
-    const report = this.#remaster().compileSectionMath(index)
+    const report = await this.#remaster().compileSectionMath(index)
     this.#changed()
     return { sectionIndex: index, ...report }
   }
 
   async undoSectionRewrite(sectionIndex?: number) {
     const index = await this.#resolveSection(sectionIndex)
-    const result = this.#remaster().undoSection(index)
+    const result = await this.#remaster().undoSection(index)
     this.#changed()
     return result ? { sectionIndex: index, ...result } : undefined
   }
 
   async resetSection(sectionIndex?: number): Promise<boolean> {
     const index = await this.#resolveSection(sectionIndex)
-    const reset = this.#remaster().resetSection(index)
+    const reset = await this.#remaster().resetSection(index)
     this.#changed()
     return reset
   }
 
-  showRewritten(showRewritten: boolean): number {
-    const changed = this.#remaster().showRewritten(showRewritten)
+  async showRewritten(showRewritten: boolean): Promise<number> {
+    const changed = await this.#remaster().showRewritten(showRewritten)
     this.#changed()
     return changed
   }
@@ -297,6 +299,10 @@ export class BookhandCommands {
 
   hasRewrite(sectionIndex: number): boolean {
     return this.#remaster().hasRewrite(sectionIndex)
+  }
+
+  describeRewrite(sectionIndex: number) {
+    return this.#remaster().describeRewrite(sectionIndex)
   }
 
   /** Default to the section the person is actually reading. */

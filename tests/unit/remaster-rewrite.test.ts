@@ -7,7 +7,16 @@ import type {
   FoliateView,
 } from '../../src/reader/foliate-types.ts'
 
-const SECTION = `<h1 class="ctitle">CHAPTER III</h1><p class="para">The ratio <img alt="d y by d x" data-tex="\\({\\dfrac{dy}{dx}}\\)" src="blob:eq-1"> is what we hunt.</p>`
+/**
+ * The publisher's own section, with package-relative references — an equation
+ * image carrying its LaTeX, and an ordinary figure that is not mathematics.
+ */
+const SECTION = `<h1 class="ctitle">CHAPTER III</h1><p class="para">The ratio <img alt="d y by d x" data-tex="\\({\\dfrac{dy}{dx}}\\)" src="images/eq-1.svg" /> is what we hunt.</p><figure><img src="images/fig4.svg" alt="Fig. 4" /><figcaption>Fig. 4</figcaption></figure>`
+
+/** What Foliate's loader does before the transform sees a section. */
+function asLoaded(source: string): string {
+  return source.replace(/src="(images\/[^"]+)"/g, (_, path: string) => `src="blob:loaded/${path}"`)
+}
 
 function makeDocument(markup: string): Document {
   return new DOMParser().parseFromString(
@@ -16,6 +25,11 @@ function makeDocument(markup: string): Document {
   )
 }
 
+/**
+ * A stand-in that loads sections the way Foliate does: through the loader's
+ * `data` event, so the section transform is exercised rather than bypassed.
+ * A fake that skipped it would prove the opposite of what these tests claim.
+ */
 class FakeView extends HTMLElement implements FoliateView {
   book!: FoliateBook
   renderer: FoliateRenderer
@@ -29,12 +43,27 @@ class FakeView extends HTMLElement implements FoliateView {
     renderer.getContents = () => [{ index: 0, doc }]
     renderer.setStyles = vi.fn()
     renderer.goTo = vi.fn(async (_target: FoliateResolvedTarget) => {
-      doc = makeDocument(SECTION)
+      doc = await this.loadSection()
       this.dispatchEvent(new CustomEvent('load', { detail: { doc, index: 0 } }))
     })
     renderer.prev = vi.fn(async () => {})
     renderer.next = vi.fn(async () => {})
     this.renderer = renderer
+  }
+
+  /**
+   * What `Loader.createURL` does: dispatch `data`, then await `detail.data`.
+   * The payload has already been through resource replacement, exactly as it
+   * has in the real loader — which is why the transform needs a raw-to-loaded
+   * map to make sense of an agent's relative paths.
+   */
+  async loadSection(): Promise<Document> {
+    const source = asLoaded(rawSectionXhtml())
+    const detail = { data: source as unknown, type: 'application/xhtml+xml' as unknown }
+    Object.defineProperty(detail, 'name', { value: 'ch3.xhtml' })
+    this.book?.transformTarget?.dispatchEvent(new CustomEvent('data', { detail }))
+    const served = await detail.data
+    return new DOMParser().parseFromString(String(served), 'application/xhtml+xml')
   }
 
   async open(book: FoliateBook) {
@@ -61,11 +90,24 @@ class FakeView extends HTMLElement implements FoliateView {
   close = vi.fn()
 }
 
+function rawSectionXhtml(): string {
+  return `<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><style>.para { text-indent: 1em; }</style></head><body>${SECTION}</body></html>`
+}
+
 function makeBook(): FoliateBook {
   return {
     metadata: { title: 'Calculus Made Easy', author: 'Silvanus P. Thompson' },
     toc: [{ id: 'c3', label: 'Chapter III', href: 'ch3.xhtml' }],
-    sections: [{ id: 'ch3.xhtml', createDocument: async () => makeDocument(SECTION) }],
+    loadText: async () => rawSectionXhtml(),
+    sections: [
+      {
+        id: 'ch3.xhtml',
+        createDocument: async () =>
+          new DOMParser().parseFromString(rawSectionXhtml(), 'application/xhtml+xml'),
+        unload: vi.fn(),
+        resolveHref: (href: string) => href,
+      },
+    ],
     transformTarget: new EventTarget(),
     resolveCFI: () => ({ index: 0 }),
     destroy: vi.fn(),
@@ -95,7 +137,8 @@ describe('the agent’s read and write seam', () => {
     const source = await adapter.getSectionSource(0)
 
     expect(source.html).toContain('data-tex')
-    expect(source.html).toContain('<h1 class="ctitle">CHAPTER III</h1>')
+    expect(source.html).toContain('class="ctitle"')
+    expect(source.html).toContain('CHAPTER III')
     expect(source.rewritten).toBe(false)
     expect(source.bytes).toBeGreaterThan(0)
   })
@@ -104,18 +147,55 @@ describe('the agent’s read and write seam', () => {
     const { adapter } = await openAdapter()
     const diagnosis = await adapter.diagnoseSection(0)
 
-    expect(diagnosis.counts.images).toBe(1)
+    // Two images, one carrying LaTeX. Bookhand reports both and calls neither
+    // an equation: which is which is the agent's call to make.
+    expect(diagnosis.counts.images).toBe(2)
     expect(diagnosis.counts.imagesWithTex).toBe(1)
     expect(diagnosis.images[0]?.tex).toBe('\\({\\dfrac{dy}{dx}}\\)')
     expect(diagnosis.blocks.map((block) => block.tag)).toContain('h1')
   })
 
+  it('reads and diagnoses the agent’s current version, not the publisher’s', async () => {
+    // A second pass has to see what the first one wrote. Handing back the
+    // publisher's document would make an agent edit a chapter that is no
+    // longer on screen.
+    const { adapter } = await openAdapter()
+    await adapter.rewriteSection(0, '<h2>Rewritten</h2><p>Only prose now.</p>', {
+      css: '.para { color: rebeccapurple; }',
+    })
+
+    const source = await adapter.getSectionSource(0)
+    expect(source.html).toContain('Rewritten')
+    expect(source.html).toMatch(/<h2[ >]/)
+    expect(source.html).not.toContain('data-tex')
+    expect(source.rewritten).toBe(true)
+    expect(source.stylesheets.map((sheet) => sheet.name)).toContain('bookhand-remaster')
+    expect(
+      source.stylesheets.find((sheet) => sheet.name === 'bookhand-remaster')?.css,
+    ).toContain('rebeccapurple')
+
+    const diagnosis = await adapter.diagnoseSection(0)
+    expect(diagnosis.counts.images).toBe(0)
+    expect(diagnosis.blocks.map((block) => block.tag)).toContain('h2')
+  })
+
+  it('hands back package-relative source, never the rendered blob URLs', async () => {
+    const { adapter, rendered } = await openAdapter()
+    // The rendered document does carry blob URLs — that is what makes reading
+    // from it the wrong thing to do.
+    expect(rendered().querySelector('img')?.getAttribute('src')).toContain('blob:')
+
+    const source = await adapter.getSectionSource(0)
+    expect(source.html).toContain('images/eq-1.svg')
+    expect(source.html).not.toContain('blob:')
+  })
+
   it('applies whatever markup the agent decides on', async () => {
     const { adapter, rendered } = await openAdapter()
-    const result = adapter.rewriteSection(
+    const result = await adapter.rewriteSection(
       0,
       '<h2>Chapter III</h2><p>The ratio <math><mfrac><mi>d</mi><mi>x</mi></mfrac></math> is what we hunt.</p>',
-      'Promoted the chapter title and set the derivative as MathML',
+      { summary: 'Promoted the chapter title and set the derivative as MathML' },
     )
 
     expect(result.applied).toBe(true)
@@ -126,7 +206,7 @@ describe('the agent’s read and write seam', () => {
 
   it('refuses what could run or reach the network, and says what it removed', async () => {
     const { adapter, rendered } = await openAdapter()
-    const result = adapter.rewriteSection(
+    const result = await adapter.rewriteSection(
       0,
       '<p onclick="steal()">text</p><script>fetch("//evil")</script>',
     )
@@ -141,36 +221,36 @@ describe('the agent’s read and write seam', () => {
   describe('recovery', () => {
     it('flips between the publisher’s version and the agent’s', async () => {
       const { adapter, rendered } = await openAdapter()
-      adapter.rewriteSection(0, '<h2>Rewritten</h2>')
+      await adapter.rewriteSection(0, '<h2>Rewritten</h2>')
 
-      adapter.showRewritten(false)
+      await adapter.showRewritten(false)
       expect(rendered().querySelector('img[data-tex]')).not.toBeNull()
       expect(adapter.isShowingRewritten()).toBe(false)
 
-      adapter.showRewritten(true)
+      await adapter.showRewritten(true)
       expect(rendered().querySelector('h2')?.textContent).toBe('Rewritten')
     })
 
     it('steps back one revision at a time', async () => {
       const { adapter, rendered } = await openAdapter()
-      adapter.rewriteSection(0, '<h2>First</h2>')
-      adapter.rewriteSection(0, '<h2>Second</h2>')
+      await adapter.rewriteSection(0, '<h2>First</h2>')
+      await adapter.rewriteSection(0, '<h2>Second</h2>')
 
-      expect(adapter.undoSection(0)).toEqual({ versions: 1 })
+      expect(await adapter.undoSection(0)).toEqual({ versions: 1 })
       expect(rendered().querySelector('h2')?.textContent).toBe('First')
 
-      expect(adapter.undoSection(0)).toEqual({ versions: 0 })
+      expect(await adapter.undoSection(0)).toEqual({ versions: 0 })
       expect(rendered().querySelector('img[data-tex]')).not.toBeNull()
       expect(adapter.hasRewrite(0)).toBe(false)
     })
 
     it('resets to the book as published, however many revisions there were', async () => {
       const { adapter, rendered } = await openAdapter()
-      adapter.rewriteSection(0, '<h2>One</h2>')
-      adapter.rewriteSection(0, '<h2>Two</h2>')
-      adapter.rewriteSection(0, '<h2>Three</h2>')
+      await adapter.rewriteSection(0, '<h2>One</h2>')
+      await adapter.rewriteSection(0, '<h2>Two</h2>')
+      await adapter.rewriteSection(0, '<h2>Three</h2>')
 
-      expect(adapter.resetSection(0)).toBe(true)
+      expect(await adapter.resetSection(0)).toBe(true)
       expect(rendered().querySelector('h1.ctitle')).not.toBeNull()
       expect(rendered().querySelector('img[data-tex]')).not.toBeNull()
       expect(adapter.hasRewrite(0)).toBe(false)
@@ -178,25 +258,41 @@ describe('the agent’s read and write seam', () => {
 
     it('has nothing to undo or reset in an untouched section', async () => {
       const { adapter } = await openAdapter()
-      expect(adapter.undoSection(0)).toBeUndefined()
-      expect(adapter.resetSection(0)).toBe(false)
+      expect(await adapter.undoSection(0)).toBeUndefined()
+      expect(await adapter.resetSection(0)).toBe(false)
     })
   })
 
   it('offers the deterministic compile as a shortcut the agent chooses', async () => {
     const { adapter, rendered } = await openAdapter()
-    const report = adapter.compileSectionMath(0)
+    const report = await adapter.compileSectionMath(0)
 
     expect(report).toMatchObject({ found: 1, restored: 1 })
     expect(rendered().querySelector('math')).not.toBeNull()
     // And it is still just a rewrite: the same undo puts the images back.
-    adapter.undoSection(0)
+    await adapter.undoSection(0)
     expect(rendered().querySelector('img[data-tex]')).not.toBeNull()
+  })
+
+  it('compiles from the section’s source, so the saved version stays portable', async () => {
+    // Compiling from the rendered DOM would bake `blob:` URLs — dead after a
+    // reload, impossible to export — into the stored version, and would take
+    // every ordinary figure in the chapter down with the equations.
+    const { adapter, rendered } = await openAdapter()
+    await adapter.compileSectionMath(0)
+
+    const source = await adapter.getSectionSource(0)
+    expect(source.html).not.toContain('blob:')
+    expect(source.html).toContain('images/fig4.svg')
+    expect(source.html).toContain('<math')
+
+    // And the figure still resolves once the loader has been through it.
+    expect(rendered().querySelector('figure img')?.getAttribute('src')).toContain('blob:')
   })
 
   it('lets extraction read the rewritten document, so the index is the same book', async () => {
     const { adapter } = await openAdapter()
-    adapter.rewriteSection(0, '<h2>Chapter III</h2><p>differential coefficient</p>')
+    await adapter.rewriteSection(0, '<h2>Chapter III</h2><p>differential coefficient</p>')
 
     const snapshot = await adapter.getSectionSnapshot(0)
     expect(snapshot.text).toContain('differential coefficient')

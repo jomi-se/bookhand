@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizeSectionHtml, SanitizeError } from '../../src/remaster/sanitize.ts'
+import {
+  sanitizeSectionHtml,
+  sanitizeSrcset,
+  SanitizeError,
+} from '../../src/remaster/sanitize.ts'
 
 const clean = (html: string) => sanitizeSectionHtml(html).html
 
@@ -103,5 +107,61 @@ describe('sanitizing agent-authored markup', () => {
     expect(result.removedElements).toMatchObject({ script: 1, iframe: 1 })
     expect(result.removedAttributes).toMatchObject({ onclick: 1 })
     expect(result.modified).toBe(true)
+  })
+})
+
+describe('package-relative resources', () => {
+  it('keeps the relative paths an agent reads out of the book’s own source', () => {
+    // Agents are handed the packaged XHTML, so this is the normal case: the
+    // reference has to survive for Foliate's loader to resolve it.
+    const html = '<figure><img src="images/fig4.svg" alt="Fig. 4"></figure>'
+    expect(sanitizeSectionHtml(html).html).toBe(html)
+    expect(sanitizeSectionHtml('<a href="chapter-4.xhtml#top">next</a>').html).toBe(
+      '<a href="chapter-4.xhtml#top">next</a>',
+    )
+  })
+
+  it('still refuses anything that leaves the book', () => {
+    expect(sanitizeSectionHtml('<img src="https://t.example/p.gif">').html).toBe('<img>')
+    expect(sanitizeSectionHtml('<img src="//t.example/p.gif">').html).toBe('<img>')
+    expect(sanitizeSectionHtml('<a href="javascript:x()">t</a>').html).toBe('<a>t</a>')
+  })
+
+  it('keeps a relative url() in a stylesheet and drops a remote one', () => {
+    const result = sanitizeSectionHtml(
+      '<style>.a { background: url(images/rule.png); } .b { background: url(https://t.example/x.png); }</style>',
+    )
+    expect(result.html).toContain('url(images/rule.png)')
+    expect(result.html).not.toContain('t.example')
+  })
+})
+
+describe('srcset, which is a list and not a URL', () => {
+  it('keeps the local candidates and drops only the ones that leave the book', () => {
+    // Checking the raw attribute as if it were one URL is the bug this guards:
+    // it either waves the whole list through or throws all of it away.
+    expect(sanitizeSrcset('images/a.png 1x, https://t.example/b.png 2x')).toBe('images/a.png 1x')
+    expect(sanitizeSrcset('images/a.png 1x, images/b.png 2x')).toBe(
+      'images/a.png 1x, images/b.png 2x',
+    )
+  })
+
+  it('removes the attribute when no candidate survives', () => {
+    expect(sanitizeSrcset('https://t.example/a.png 1x, //t.example/b.png 2x')).toBeNull()
+  })
+
+  it('strips a hostile candidate out of a section’s markup', () => {
+    const result = sanitizeSectionHtml(
+      '<img srcset="images/fig.png 1x, https://t.example/pixel.gif 2x" alt="Fig">',
+    )
+    expect(result.html).toContain('images/fig.png 1x')
+    expect(result.html).not.toContain('t.example')
+    expect(result.removedAttributes['srcset-candidate']).toBe(1)
+  })
+
+  it('drops a srcset whose every candidate is off-origin', () => {
+    const result = sanitizeSectionHtml('<img srcset="https://t.example/a.png 1x" alt="Fig">')
+    expect(result.html).toBe('<img alt="Fig">')
+    expect(result.removedAttributes.srcset).toBe(1)
   })
 })
