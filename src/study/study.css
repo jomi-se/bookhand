@@ -19,6 +19,16 @@
   border-inline-start: 1px solid var(--rule);
 }
 
+.study-authoring {
+  margin-block-start: 20px;
+  padding-block-start: 16px;
+  border-block-start: 1px solid var(--rule);
+}
+
+.study-authoring-open {
+  min-block-size: var(--tap);
+}
+
 .add-row {
   display: flex;
   flex-wrap: wrap;
@@ -34,7 +44,6 @@
 }
 
 .composer {
-  margin-block-end: 20px;
   padding: 12px;
   border: 1px solid var(--rule);
   border-radius: 6px;

@@ -12,6 +12,14 @@ import type {
 import { STUDY_ITEM_KINDS } from '../domain/study.ts'
 import { StudyItemCard } from './StudyItemCard.tsx'
 
+const STUDY_ITEM_LABEL: Readonly<Record<StudyItemKind, string>> = {
+  prose: 'Note',
+  quotation: 'Quotation',
+  equation: 'Equation',
+  steps: 'Steps',
+  question: 'Question',
+}
+
 export interface StudyBoardPanelProps {
   readonly board?: StudyBoard
   readonly items: readonly StudyItem[]
@@ -69,6 +77,7 @@ function NoteEditor({
 export function StudyBoardPanel(props: StudyBoardPanelProps) {
   const { board, items, annotations, selectionQuote } = props
   const [composing, setComposing] = useState<StudyItemKind>()
+  const [authoringOpen, setAuthoringOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const expanded = board?.view === 'expanded'
   const heading = useRef<HTMLHeadingElement>(null)
@@ -131,85 +140,6 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
           </div>
         ) : null}
 
-        <div className="add-row">
-          {STUDY_ITEM_KINDS.map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              className="button button-quiet"
-              aria-pressed={composing === kind}
-              onClick={() => {
-                setComposing((current) => (current === kind ? undefined : kind))
-                setDraft(kind === 'quotation' ? (selectionQuote ?? '') : '')
-              }}
-            >
-              <Plus size={14} aria-hidden="true" />
-              {kind}
-            </button>
-          ))}
-        </div>
-
-        {composing ? (
-          <div className="composer">
-            <label htmlFor="study-draft">
-              New {composing}
-              {selectionQuote ? ' — will link to the selected passage' : ''}
-            </label>
-            <textarea
-              id="study-draft"
-              rows={composing === 'steps' ? 4 : 3}
-              value={draft}
-              placeholder={
-                composing === 'steps'
-                  ? 'One step per line'
-                  : composing === 'equation'
-                    ? 'dy/dx = y / (x - a)'
-                    : composing === 'question'
-                      ? 'What does the slope at a point mean?'
-                      : 'Write something worth keeping'
-              }
-              onChange={(event) => setDraft(event.target.value)}
-            />
-            <div className="control-actions">
-              <button
-                type="button"
-                className="button button-primary"
-                disabled={draft.trim().length === 0}
-                onClick={() => {
-                  const payload =
-                    composing === 'steps'
-                      ? {
-                          kind: 'steps' as const,
-                          steps: draft.split('\n').map((line) => line.trim()).filter(Boolean),
-                        }
-                      : composing === 'quotation'
-                        ? { kind: 'quotation' as const, text: draft.trim() }
-                        : composing === 'equation'
-                          ? { kind: 'equation' as const, expression: draft.trim() }
-                          : composing === 'question'
-                            ? { kind: 'question' as const, prompt: draft.trim() }
-                            : { kind: 'prose' as const, text: draft.trim() }
-                  props.onAddItem(payload, Boolean(selectionQuote))
-                  setDraft('')
-                  setComposing(undefined)
-                }}
-              >
-                Add to board
-              </button>
-              <button
-                type="button"
-                className="button button-text"
-                onClick={() => {
-                  setComposing(undefined)
-                  setDraft('')
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : null}
-
         {props.mutationError ? (
           // Bounded: it says what happened, offers the one useful next move,
           // and does not pretend the board changed.
@@ -232,8 +162,8 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
 
         {items.length === 0 ? (
           <p className="panel-empty">
-            Nothing on this board yet. Select a passage in the book and keep it here, or add a
-            block above. Everything stays on this device.
+            Nothing on this board yet. Select a passage in the book and keep it here, or begin
+            with a note below. Everything stays on this device.
           </p>
         ) : (
           <ul className="study-items">
@@ -265,6 +195,106 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
             ))}
           </ul>
         )}
+
+        <section className="study-authoring" aria-label="Add to Study">
+          {!authoringOpen ? (
+            <button
+              type="button"
+              className="button button-quiet study-authoring-open"
+              onClick={() => {
+                const kind = selectionQuote ? 'quotation' : 'prose'
+                setAuthoringOpen(true)
+                setComposing(kind)
+                setDraft(selectionQuote ?? '')
+              }}
+            >
+              <Plus size={14} aria-hidden="true" />
+              {selectionQuote ? 'Add selected passage' : 'Add study block'}
+            </button>
+          ) : (
+            <>
+              <div className="add-row" role="group" aria-label="Study block type">
+                {STUDY_ITEM_KINDS.map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className="button button-quiet"
+                    aria-pressed={composing === kind}
+                    onClick={() => {
+                      setComposing(kind)
+                      setDraft(kind === 'quotation' ? (selectionQuote ?? '') : '')
+                    }}
+                  >
+                    {STUDY_ITEM_LABEL[kind]}
+                  </button>
+                ))}
+              </div>
+
+              {composing ? (
+                <div className="composer">
+                  <label htmlFor="study-draft">
+                    New {STUDY_ITEM_LABEL[composing].toLowerCase()}
+                    {selectionQuote ? ' — linked to the selected passage' : ''}
+                  </label>
+                  <textarea
+                    id="study-draft"
+                    rows={composing === 'steps' ? 4 : 3}
+                    value={draft}
+                    placeholder={
+                      composing === 'steps'
+                        ? 'One step per line'
+                        : composing === 'equation'
+                          ? 'dy/dx = y / (x - a)'
+                          : composing === 'question'
+                            ? 'What does the slope at a point mean?'
+                            : 'Write something worth keeping'
+                    }
+                    onChange={(event) => setDraft(event.target.value)}
+                  />
+                  <div className="control-actions">
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      disabled={draft.trim().length === 0}
+                      onClick={() => {
+                        const payload =
+                          composing === 'steps'
+                            ? {
+                                kind: 'steps' as const,
+                                steps: draft.split('\n').map((line) => line.trim()).filter(Boolean),
+                              }
+                            : composing === 'quotation'
+                              ? { kind: 'quotation' as const, text: draft.trim() }
+                              : composing === 'equation'
+                                ? { kind: 'equation' as const, expression: draft.trim() }
+                                : composing === 'question'
+                                  ? { kind: 'question' as const, prompt: draft.trim() }
+                                  : { kind: 'prose' as const, text: draft.trim() }
+                        props.onAddItem(payload, Boolean(selectionQuote))
+                        setDraft('')
+                        setComposing(undefined)
+                        setAuthoringOpen(false)
+                      }}
+                    >
+                      Add to board
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-text"
+                      onClick={() => {
+                        setComposing(undefined)
+                        setDraft('')
+                        setAuthoringOpen(false)
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
 
         {annotations.length > 0 ? (
           <section className="highlights">

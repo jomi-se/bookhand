@@ -20,6 +20,9 @@ test('the reader is unchanged when no agent runtime exists', async ({ page }) =>
   expect(await page.evaluate(() => 'modelContext' in document)).toBe(false)
 
   await page.getByRole('button', { name: 'Study' }).click()
-  await expect(page.getByText('No agent connected')).toBeVisible()
+  await page.getByRole('button', { name: 'Add study block' }).click()
   await expect(page.getByRole('button', { name: /quotation/i })).toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Study' })).not.toContainText(
+    'Agent activity',
+  )
 })
