@@ -1,6 +1,6 @@
 import type { Database } from '@sqlite.org/sqlite-wasm'
 
-export const STORAGE_SCHEMA_VERSION = 1
+export const STORAGE_SCHEMA_VERSION = 2
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -33,7 +33,9 @@ CREATE TABLE IF NOT EXISTS annotations (
   color TEXT,
   note TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  origin TEXT NOT NULL DEFAULT 'user' CHECK (origin IN ('user', 'agent')),
+  action_group_id TEXT
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS boards (
@@ -53,7 +55,41 @@ CREATE TABLE IF NOT EXISTS study_items (
   payload_json TEXT NOT NULL,
   sort_order INTEGER NOT NULL,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  origin TEXT NOT NULL DEFAULT 'user' CHECK (origin IN ('user', 'agent')),
+  -- Held only by whoever created the item. An agent proves authorship by
+  -- presenting it; it is never listed back out.
+  update_token TEXT,
+  action_group_id TEXT,
+  revision INTEGER NOT NULL DEFAULT 1
+) STRICT;
+
+-- Every superseded version of an item, so Undo of an update can restore the
+-- immediately prior one rather than merely reverting to a remembered guess.
+CREATE TABLE IF NOT EXISTS study_item_versions (
+  item_id TEXT NOT NULL REFERENCES study_items(id) ON DELETE CASCADE,
+  revision INTEGER NOT NULL,
+  source_range_json TEXT,
+  kind TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  sort_order INTEGER NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (item_id, revision)
+) STRICT;
+
+-- What a caller already did, so an identical retry returns the first result
+-- instead of writing twice. Scoped to the book, the caller's origin, and the
+-- caller's own action token; the digest catches a token reused for a different
+-- intent.
+CREATE TABLE IF NOT EXISTS action_receipts (
+  book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  origin TEXT NOT NULL CHECK (origin IN ('user', 'agent')),
+  action_token TEXT NOT NULL,
+  operation TEXT NOT NULL,
+  payload_digest TEXT NOT NULL,
+  result_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (book_id, origin, action_token)
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS chunks (
@@ -110,10 +146,46 @@ CREATE TABLE IF NOT EXISTS vector_batches (
 ) STRICT;
 `
 
+/**
+ * Columns added after version 1 shipped. `CREATE TABLE IF NOT EXISTS` will not
+ * touch a table that already exists, so a database created before provenance
+ * needs these applied by hand. Each is written to be safe to skip if it is
+ * already there, because the same database may be opened by a build that has
+ * already migrated it.
+ */
+const VERSION_2_COLUMNS: readonly (readonly [string, string])[] = [
+  ['annotations', "origin TEXT NOT NULL DEFAULT 'user'"],
+  ['annotations', 'action_group_id TEXT'],
+  ['study_items', "origin TEXT NOT NULL DEFAULT 'user'"],
+  ['study_items', 'update_token TEXT'],
+  ['study_items', 'action_group_id TEXT'],
+  ['study_items', 'revision INTEGER NOT NULL DEFAULT 1'],
+]
+
+/**
+ * Existing rows predate provenance. They were all written through the
+ * interface by the person sitting there, so `'user'` is the truthful default
+ * rather than a convenient one — no agent could have written them, because no
+ * agent path existed.
+ */
+function migrateToVersion2(db: Database): void {
+  for (const [table, definition] of VERSION_2_COLUMNS) {
+    const column = definition.split(' ')[0]
+    const present = db.selectValue(
+      `SELECT count(*) FROM pragma_table_info(?) WHERE name = ?`,
+      [table, column],
+    )
+    if (Number(present ?? 0) > 0) continue
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`)
+  }
+}
+
 export function initializeSchema(db: Database): void {
   db.exec('PRAGMA foreign_keys = ON; PRAGMA trusted_schema = OFF;')
   db.transaction('IMMEDIATE', () => {
+    const from = Number(db.selectValue('PRAGMA user_version') ?? 0)
     db.exec(SCHEMA_SQL)
+    if (from > 0 && from < 2) migrateToVersion2(db)
     db.exec(`PRAGMA user_version = ${STORAGE_SCHEMA_VERSION}`)
   })
 }

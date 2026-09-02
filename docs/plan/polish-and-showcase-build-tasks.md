@@ -156,6 +156,26 @@ agent surface.
 - Own the final production scan proving that W1, W4, and W5 fault seams are
   unreachable from shipped UI, WebMCP, messages, and bundles.
 
+## W7: does the agent actually compose anything good?
+
+Target: `VAL-COMPOSITION-QUALITY`.
+Depends on: W5, and on W6's real-model access.
+
+Added 2026-09-02, after the owner observed that no wave in this mission measures
+whether a frontier model, given these affordances, produces study surfaces worth
+having. W6 proves a real model originated the calls and did not replay a
+fixture. It does not ask whether the result was any good, and it would pass on a
+lesson nobody would want to read.
+
+- Freeze at least twelve intent-only prompts across at least three chapters.
+- Run them against the deployed build through a named model and version.
+- Score grounding by the product's own source rejections, plus design-context
+  discovery, first-attempt schema validity, and completion.
+- Report the worst outputs beside the best; a table of successes is marketing.
+
+This is the measure that answers the project's actual question. It cannot run
+before W5, because an eval of a surface that does not exist measures nothing.
+
 ## Review and integration rules
 
 - Keep each target independently reviewable; do not use a broad test pass to

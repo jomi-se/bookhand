@@ -29,7 +29,7 @@ describe('storage worker runtime over the official SQLite artifact', () => {
         mode: 'session-only',
         vfsName: 'memory',
         sqliteVersion: '3.53.0',
-        schemaVersion: 1,
+        schemaVersion: 2,
         connectionOwner: 'dedicated-worker',
         bookCount: 0,
       },
