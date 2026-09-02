@@ -223,6 +223,23 @@ describe('the WebMCP tool surface', () => {
     })
   })
 
+  it('accepts only non-negative integer section selectors for remaster tools', () => {
+    const { tool } = setup()
+    for (const name of [
+      'get_section_source',
+      'diagnose_section',
+      'rewrite_section',
+      'compile_section_math',
+      'set_section_view',
+    ]) {
+      expect(tool(name).inputSchema).toMatchObject({
+        properties: {
+          sectionIndex: { type: 'integer', minimum: 0 },
+        },
+      })
+    }
+  })
+
   it('rejects malformed tutor cues before they reach reader commands', async () => {
     const { tool, commands } = setup()
     const result = await tool('focus_passage').execute({

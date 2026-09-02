@@ -44,6 +44,12 @@ const ACTION_GROUP_SCHEMA = {
     'Correlate writes from one intent for provenance. Existing blocks are undone one item at a time.',
 } as const
 
+const SECTION_INDEX_SCHEMA = {
+  type: 'integer',
+  minimum: 0,
+  description: 'Defaults to the section the person is reading.',
+} as const
+
 function describeRefusals(sanitized: {
   readonly removedElements: Readonly<Record<string, number>>
   readonly removedAttributes: Readonly<Record<string, number>>
@@ -773,10 +779,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
       inputSchema: {
         type: 'object',
         properties: {
-          sectionIndex: {
-            type: 'number',
-            description: 'Defaults to the section the person is reading.',
-          },
+          sectionIndex: SECTION_INDEX_SCHEMA,
         },
         additionalProperties: false,
       },
@@ -798,10 +801,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
       inputSchema: {
         type: 'object',
         properties: {
-          sectionIndex: {
-            type: 'number',
-            description: 'Defaults to the section the person is reading.',
-          },
+          sectionIndex: SECTION_INDEX_SCHEMA,
         },
         additionalProperties: false,
       },
@@ -840,10 +840,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             description:
               'What you changed, in a sentence the person will see beside the Undo control.',
           },
-          sectionIndex: {
-            type: 'number',
-            description: 'Defaults to the section the person is reading.',
-          },
+          sectionIndex: SECTION_INDEX_SCHEMA,
         },
         required: ['html'],
         additionalProperties: false,
@@ -877,10 +874,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
       inputSchema: {
         type: 'object',
         properties: {
-          sectionIndex: {
-            type: 'number',
-            description: 'Defaults to the section the person is reading.',
-          },
+          sectionIndex: SECTION_INDEX_SCHEMA,
         },
         additionalProperties: false,
       },
@@ -906,10 +900,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             type: 'string',
             enum: ['original', 'rewritten', 'undo', 'reset'],
           },
-          sectionIndex: {
-            type: 'number',
-            description: 'Defaults to the section the person is reading.',
-          },
+          sectionIndex: SECTION_INDEX_SCHEMA,
         },
         required: ['view'],
         additionalProperties: false,

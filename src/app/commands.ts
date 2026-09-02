@@ -375,8 +375,11 @@ export class BookhandCommands {
 
   /** Default to the section the person is actually reading. */
   async #resolveSection(sectionIndex?: number): Promise<number> {
-    if (typeof sectionIndex === 'number') return sectionIndex
-    return this.#adapter().getLocation().sectionIndex
+    const resolved = sectionIndex ?? this.#adapter().getLocation().sectionIndex
+    if (!Number.isInteger(resolved) || resolved < 0) {
+      throw new Error('sectionIndex must be a non-negative integer.')
+    }
+    return resolved
   }
 
   async searchBook(query: string, limit = 5): Promise<SearchResult> {
