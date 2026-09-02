@@ -2,11 +2,19 @@
 
 ## Present now
 
-- React, TypeScript, and Vite application scaffold.
-- Shared Codex and Claude repository instructions.
-- Project-scoped Playwright and Devpost MCP declarations.
-- Reusable engineering, browser, review, validation, and Impeccable skills.
-- Persistent documentation and handoff structure.
+- A working local-first library and Foliate.js EPUB reader with official SQLite
+  WASM persistence, bundled-book bootstrap, import, navigation, selection,
+  presentation controls, and restore.
+- Persistent highlights, notes, one board per book, docked/expanded Study, and
+  native prose, quotation, equation, steps, and question items.
+- Eleven dynamically registered tools through Chromium's genuine
+  `document.modelContext`: library/open, reading context/TOC/passage/navigation,
+  annotation/style, and study item/view operations.
+- A deployed Cloudflare Worker surface and a production browser/live-check
+  harness. The WebMCP agent test is deterministic orchestration, not yet a
+  genuine model-authored lesson run.
+- Shared Codex and Claude guidance, validation contracts, reusable engineering
+  and design skills, and persistent handoff documentation.
 
 ## Slice 1: the book is usable
 
@@ -28,7 +36,8 @@ Each identifier maps to the named validation contract under
   `VAL-READER-SECTION-ERROR`: bounded open, relative/TOC/CFI navigation, and
   recoverable section failure.
 - `S1-READER-SELECTION` -> `VAL-READER-SELECTION`: exact quote, CFI range,
-  fingerprint, and desktop plus physical-phone selection.
+  fingerprint, and desktop selection. Physical-phone long-press remains
+  best-effort and non-gating under ADR 0003.
 - `S1-STORAGE` -> `VAL-STORAGE-BACKEND`, `VAL-STORAGE-ROUNDTRIP`,
   `VAL-STORAGE-FALLBACK`, `VAL-STORAGE-LOCK`, and
   `VAL-STORAGE-PERSISTENCE-REQUEST`: official SQLite WASM, dedicated-worker
@@ -47,24 +56,67 @@ Each identifier maps to the named validation contract under
   `VAL-READER-RESPONSIVE`, and `VAL-READER-ACCESSIBILITY`: approved
   quiet-catalog identity, visible reader chrome, responsive structure,
   keyboard/accessibility, and resilient content.
-- `S1-PIXEL7` -> `VAL-DEVICE-PIXEL7`: real Android Chrome reader flow and
-  background/resume evidence.
+- `S1-PIXEL7` -> `VAL-DEVICE-PIXEL7`: accepted non-gating real Android Chrome
+  flow and background/resume evidence under ADR 0003.
 - `S1-READER-LIFECYCLE` -> `VAL-READER-LIFECYCLE`: StrictMode, repeated open,
   racing open, and listener/viewer cleanup.
 - `S1-TEST-INTEGRITY` -> `VAL-TEST-CONTROL-INTEGRITY`: production builds cannot
   enable validation-only failures or raw diagnostics.
-- `S1-STUDY-SHELL` -> `VAL-STUDY-SHELL`: honest, non-persistent preview of the
-  later study surface while preserving source location.
+- `S1-STUDY-SHELL` -> superseded historical `VAL-STUDY-SHELL`; Slice 2's
+  persistent board replaces it.
 
-Slice 1 compatibility targets are desktop Chromium and physical Pixel 7
-Chrome. Cross-browser parity is deferred for the hackathon proof of concept.
+Desktop Chromium is the gating compatibility target. Physical Pixel 7 Chrome
+is best-effort and non-gating under ADR 0003. Cross-browser parity is deferred
+for the hackathon proof of concept.
 
-## Later slices
+## Implemented later slices
 
-- Slice 2: highlights, notes, persistent boards, native study blocks, docked and
-  expanded board modes, and return-to-source navigation.
-- Slice 3: WebMCP tools for context, navigation, annotation, presentation, and
-  study-board construction; first credible submission checkpoint.
+- Slice 2: highlights, notes, persistent boards, native study blocks, docked
+  and expanded board modes, and return-to-source navigation.
+- Slice 3: real WebMCP tools for library access, context, navigation,
+  annotation, presentation, and study-board construction; first credible
+  submission checkpoint.
+
+## Active polish and showcase mission
+
+Atomic inventory IDs map to contracts as follows:
+
+- `P-TRUST-RANGE` -> `VAL-RANGE-OWNERSHIP`
+- `P-TRUST-MATH` -> `VAL-MATH-PASSAGE`
+- `P-TRUST-STYLE` -> `VAL-STYLE-PARITY`
+- `P-TRUST-BOARD` -> `VAL-BOARD-VIEW-PARITY`
+- `P-TRUST-DURABLE` -> `VAL-DURABLE-STORAGE-REQUEST`
+- `P-TRUST-ITEM-ID` -> `VAL-STUDY-ID-OWNERSHIP`
+- `P-TRUST-UNDO` -> `VAL-ACTION-PROVENANCE-UNDO`
+- `P-TRUST-ERRORS` -> `VAL-MUTATION-ERRORS`
+- `P-DEPLOY-HEADERS` -> `VAL-DEPLOYMENT-HEADERS`
+- `P-MOBILE-THEME` -> `VAL-MOBILE-THEME`
+- `P-MOBILE-CHROME` -> `VAL-MOBILE-CHROME`
+- `P-MOBILE-GESTURES` -> `VAL-MOBILE-GESTURES`
+- `P-MOBILE-PANELS` -> `VAL-MOBILE-PANELS`
+- `P-MOBILE-A11Y` -> `VAL-MOBILE-ACCESSIBILITY`
+- `P-DESKTOP-READER` -> `VAL-DESKTOP-READER`
+- `P-LEGACY-STYLE` -> reactivated `VAL-READER-STYLE`
+- `P-LEGACY-RESPONSIVE` -> reactivated `VAL-READER-RESPONSIVE`
+- `P-LEGACY-A11Y` -> reactivated `VAL-READER-ACCESSIBILITY`
+- `P-LEGACY-SELECTION` -> amended and reactivated `VAL-READER-SELECTION`
+- `P-INDEX-LIFECYCLE` -> `VAL-INDEX-LIFECYCLE`
+- `P-SEARCH` -> `VAL-SEARCH-BOOK`
+- `P-STUDY-SECURITY` -> `VAL-STUDY-SCHEMA-SECURITY`
+- `P-STUDY-PLOT` -> `VAL-INTERACTIVE-PLOT`
+- `P-STUDY-LIFECYCLE` -> `VAL-STUDY-EXPERIENCE-LIFECYCLE`
+- `P-HERO-MODEL` -> `VAL-HERO-MODEL-RUN`
+- `P-EVIDENCE-GATE` -> `VAL-GATE-STABILITY`
+- `P-EVIDENCE-LIVE` -> `VAL-DEPLOYED-RUNTIME-TRUTH`
+- `P-EVIDENCE-DOCS` -> `VAL-DOCUMENTATION-TRUTH`
+- `P-EVIDENCE-CONTROLS` -> reactivated `VAL-TEST-CONTROL-INTEGRITY` for all
+  new fault seams.
+
+The mission boundary, legacy assertion manifest, device exception, and cut line
+are in `docs/plan/polish-and-showcase-mission.md`.
+
+## Unbuilt slices
+
 - Slice 4: FTS5 lexical search, optional local embeddings, packed vector BLOBs,
   exact semantic scan, hybrid retrieval, and retrieval WebMCP tools.
 - Slice 5: bounded generated labs and the polished end-to-end tutor scenario.

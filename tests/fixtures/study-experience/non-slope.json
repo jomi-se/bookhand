@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "experience": {
+    "title": "Linear comparison fixture",
+    "blocks": [
+      { "kind": "quotation", "quote": "A deterministic non-hero quotation.", "citation": { "bookId": "fixture-book", "startCfi": "fixture-start", "endCfi": "fixture-end", "textFingerprint": "fixture-fingerprint" } },
+      { "kind": "callout", "tone": "tip", "title": "Compare", "body": "Both series use the same domain." },
+      { "kind": "steps", "steps": [{ "title": "First", "text": "Read the intercept." }, { "title": "Second", "text": "Compare the rate." }] },
+      { "kind": "mermaid", "source": "flowchart LR\n  A[Input] --> B[Output]" },
+      {
+        "kind": "interactive_plot",
+        "title": "Linear function",
+        "curve": { "kind": "ast", "ast": { "op": "add", "left": { "op": "mul", "left": { "parameter": "m" }, "right": { "var": "x" } }, "right": { "parameter": "b" } }, "parameters": { "m": 2, "b": 1 } },
+        "domain": [-2, 2],
+        "fixedX": 0,
+        "movableX": 1,
+        "keyboardStep": 0.5,
+        "show": ["curve", "points", "readouts"]
+      }
+    ]
+  },
+  "oracle": {
+    "initial": { "fixedX": 0, "movableX": 1, "fixedY": 1, "movableY": 3, "secantSlope": 2 },
+    "afterKeyboardRight": { "movableX": 1.5, "movableY": 4, "secantSlope": 2 },
+    "reset": { "movableX": 1, "secantSlope": 2 },
+    "absoluteTolerance": 0.000001,
+    "relativeTolerance": 0.000001
+  }
+}

@@ -1,0 +1,6 @@
+# VAL-STUDY-ID-OWNERSHIP: Book-scoped and author-scoped study updates
+
+Surface: command API and storage worker.
+Needs: Slice 2 persistent study boards and two deterministic books.
+Behavior: The local human principal may create, update, or delete any item on the open book's board. An agent may create an item with an unused caller ID and action token, and may update only an agent-origin item on the open board when it supplies that item's unguessable update token returned at creation; this mission exposes no agent delete operation. An agent cannot update a user-origin item. `create` with an existing ID, `update` with an unknown ID, a wrong/missing update token, and any cross-book ID/token are rejected without row changes. Idempotency is scoped to open `bookId`, caller origin, action token, operation, and canonical payload: an identical retry returns the first result, while reuse with a different operation or payload is rejected. Unrelated items remain unchanged.
+Evidence: Worker/command matrix for human authority, agent create/update, identical retry, changed-payload token reuse, cross-book collision, agent-to-user update, unknown ID, missing/wrong token, and unrelated rows; reload from both books.

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "experience": {
+    "title": "Derivative explorer fixture",
+    "blocks": [
+      { "kind": "markdown", "text": "Move Q toward P and compare **rise** with **run**." },
+      { "kind": "equation", "tex": "m = (f(q) - f(p)) / (q - p)" },
+      {
+        "kind": "interactive_plot",
+        "title": "Quadratic secant",
+        "curve": { "kind": "ast", "ast": { "op": "pow", "left": { "var": "x" }, "right": { "literal": 2 } } },
+        "domain": [-3, 3],
+        "fixedX": 1,
+        "movableX": 2,
+        "keyboardStep": 0.25,
+        "show": ["curve", "points", "secant", "tangent", "riseRun", "readouts"]
+      },
+      { "kind": "question", "prompt": "What happens as Q approaches P?", "answer": "The secant slope approaches the tangent slope." }
+    ]
+  },
+  "oracle": {
+    "initial": { "fixedX": 1, "movableX": 2, "fixedY": 1, "movableY": 4, "secantSlope": 3, "tangentSlope": 2 },
+    "afterKeyboardLeft": { "movableX": 1.75, "movableY": 3.0625, "secantSlope": 2.75, "tangentSlope": 2 },
+    "reset": { "movableX": 2, "secantSlope": 3 },
+    "absoluteTolerance": 0.000001,
+    "relativeTolerance": 0.000001
+  }
+}

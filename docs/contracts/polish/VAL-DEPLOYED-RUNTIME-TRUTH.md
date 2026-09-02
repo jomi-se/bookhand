@@ -1,0 +1,6 @@
+# VAL-DEPLOYED-RUNTIME-TRUTH: Exact deployed WebMCP and persistence evidence
+
+Surface: deployed HTTPS browser runtime.
+Needs: deployed commit hash, secure origin, `WebMCPTesting`, and resettable origin storage.
+Behavior: Before book open, the exact set is `list_books`, `open_book`. After open, the exact set is those two plus `get_reading_context`, `get_table_of_contents`, `get_passage`, `navigate_book`, `save_annotation`, `set_reading_style`, `upsert_study_item`, `list_study_items`, `set_study_board_view`, `search_book`, and `upsert_study_experience`; no other tool is registered. Calls use genuine `document.modelContext`; a uniquely mutated or imported sentinel survives reload and cannot be recreated by bundled bootstrap; there are no unexpected console errors, failed app requests, or book-content/byte egress; the reported storage mode is truthful. This contract covers deployed Chromium. ChatGPT desktop presentation/storage evidence is an owner-only required prerequisite for `VAL-HERO-MODEL-RUN` and judged-surface claims, not part of this Chromium verdict.
+Evidence: Deployed URL and commit/assets hash; exact tool-name sets; genuine runtime identity; unique sentinel create/reload trace; diagnostics plus classified console/network logs. Preserve the separately dated owner-witnessed ChatGPT desktop observation with the hero evidence.

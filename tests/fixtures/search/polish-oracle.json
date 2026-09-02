@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "fixtures": {
+    "calculus": {
+      "path": "public/books/calculus-made-easy.epub",
+      "sha256": "256371b889e29ab74fafd2efc1b75f0344438809d873ea76dd3231cf7d364dd0"
+    },
+    "isolation": {
+      "path": "tests/fixtures/epub/tiny-book.epub",
+      "sha256": "9ad96f2624c1171ad697f77cfc5ab824c967e7b9d9a4b8d52fdc081c59575132"
+    }
+  },
+  "queries": [
+    {
+      "book": "calculus",
+      "query": "differential coefficient tangent slope",
+      "maxRank": 1,
+      "sourceHref": "OEBPS/7731425094544341602_33283-h-17.htm.xhtml",
+      "sourceFragment": "CHAPTER_X",
+      "sectionLabel": "CHAPTER X. GEOMETRICAL MEANING OF DIFFERENTIATION.",
+      "mustContain": "This tangent to the curve has evidently the same slope",
+      "requiredCitationFields": ["bookId", "sectionTitle", "text", "startCfi", "endCfi", "textFingerprint"],
+      "rangeRule": "startCfi and endCfi resolve in the named source to exact text containing mustContain"
+    },
+    {
+      "book": "calculus",
+      "query": "45 degrees dy dx equals one",
+      "maxRank": 3,
+      "sourceHref": "OEBPS/7731425094544341602_33283-h-17.htm.xhtml",
+      "sourceFragment": "CHAPTER_X",
+      "sectionLabel": "CHAPTER X. GEOMETRICAL MEANING OF DIFFERENTIATION.",
+      "mustContain": "If a curve is sloping up at 45",
+      "requiredCitationFields": ["bookId", "sectionTitle", "text", "startCfi", "endCfi", "textFingerprint"],
+      "rangeRule": "startCfi and endCfi resolve in the named source to exact text containing mustContain"
+    },
+    {
+      "book": "isolation",
+      "query": "deterministic selection anchor",
+      "maxRank": 1,
+      "sourceHref": "OEBPS/chapter-1.xhtml",
+      "sourceFragment": "selection-anchor",
+      "sectionLabel": "Foundations",
+      "mustContain": "This sentence is the deterministic selection anchor.",
+      "requiredCitationFields": ["bookId", "sectionTitle", "text", "startCfi", "endCfi", "textFingerprint"],
+      "rangeRule": "startCfi and endCfi resolve in the named source to exact text containing mustContain"
+    }
+  ],
+  "isolationRule": "No result may come from a book other than the open book."
+}

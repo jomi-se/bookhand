@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "cases": [
+    { "name": "raw-html", "payload": { "title": "hostile-html-sentinel", "blocks": [{ "kind": "markdown", "text": "<img src=x onerror=alert(1)>" }] }, "expected": "rendered-as-text-or-stripped-no-execution" },
+    { "name": "caller-url", "payload": { "title": "hostile-url-sentinel", "blocks": [{ "kind": "markdown", "text": "[leak](https://example.invalid/book-content)" }] }, "expected": "link-disabled-no-request" },
+    { "name": "mermaid-click", "payload": { "title": "hostile-mermaid-sentinel", "blocks": [{ "kind": "mermaid", "source": "flowchart LR\nA-->B\nclick A javascript:alert(1)" }] }, "expected": "rejected-visible-error" },
+    { "name": "executable-curve", "payload": { "title": "hostile-eval-sentinel", "blocks": [{ "kind": "interactive_plot", "curve": { "kind": "expression", "source": "globalThis.localStorage.clear()" } }] }, "expected": "rejected-visible-error" },
+    { "name": "prototype-key", "payload": { "title": "hostile-prototype-sentinel", "blocks": [{ "kind": "callout", "tone": "note", "title": "x", "body": "x", "__proto__": { "polluted": true } }] }, "expected": "rejected-visible-error" },
+    { "name": "oversized", "generator": { "titleCodeUnits": 8001, "blockCount": 17 }, "expected": "rejected-visible-error" }
+  ],
+  "globalExpected": ["no-script-execution", "no-parent-access", "no-storage-access", "no-non-origin-request", "no-prototype-pollution"]
+}
