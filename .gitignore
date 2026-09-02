@@ -29,3 +29,13 @@ test-results/
 *.njsproj
 *.sln
 *.sw?
+
+# Impeccable session artifacts. `.impeccable/config.json` and `design.json` are
+# shared project decisions and stay tracked; everything below is per-run state.
+.impeccable/config.local.json
+.impeccable/mocks/
+.impeccable/review/
+.impeccable/critique/
+.impeccable/build/
+.impeccable/live/sessions/
+.impeccable/hook.cache.json
