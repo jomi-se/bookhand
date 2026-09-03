@@ -294,6 +294,23 @@
   font-size: var(--step--1);
 }
 
+.study-inline-math {
+  display: inline-block;
+  max-inline-size: 100%;
+  margin-inline: 0.08em;
+  vertical-align: -0.08em;
+  white-space: nowrap;
+}
+
+.study-inline-math math {
+  font-family: var(--serif);
+}
+
+.study-inline-math[data-fallback='true'] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+
 .block-equation {
   margin: 0;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { CornerUpLeft, Link, RefreshCw, Sparkles, Trash2, Undo2 } from 'lucide-react'
 import type { StudyItem, StudyItemPayload } from '../domain/index.ts'
 import { compileTex } from '../remaster/tex.ts'
@@ -37,6 +37,40 @@ function RenderedEquation({ expression }: { readonly expression: string }) {
   return <div ref={host} className="block-equation-rendered" />
 }
 
+function InlineStudyMath({ expression }: { readonly expression: string }) {
+  const host = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    const element = host.current
+    if (!element) return
+    element.replaceChildren()
+    try {
+      const compiled = compileTex(expression, { document: element.ownerDocument, display: false })
+      element.appendChild(compiled.element)
+      element.setAttribute('aria-label', compiled.text)
+      element.dataset.fallback = 'false'
+    } catch {
+      element.textContent = expression
+      element.dataset.fallback = 'true'
+    }
+  }, [expression])
+  return <span ref={host} className="study-inline-math" />
+}
+
+/** Render bounded TeX delimiters without interpreting any other lesson markup. */
+function StudyText({ text }: { readonly text: string }) {
+  const parts: ReactNode[] = []
+  const delimiters = /\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]/g
+  let cursor = 0
+  for (const match of text.matchAll(delimiters)) {
+    const index = match.index
+    if (index > cursor) parts.push(text.slice(cursor, index))
+    parts.push(<InlineStudyMath key={`${index}-${match[0]}`} expression={match[0]} />)
+    cursor = index + match[0].length
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor))
+  return <>{parts}</>
+}
+
 export function StudyPayloadBody({
   payload,
   blockId,
@@ -46,11 +80,11 @@ export function StudyPayloadBody({
 }) {
   switch (payload.kind) {
     case 'prose':
-      return <p className="block-prose">{payload.text}</p>
+      return <p className="block-prose"><StudyText text={payload.text} /></p>
     case 'quotation':
       return (
         <figure className="block-quotation">
-          <blockquote>{payload.text}</blockquote>
+          <blockquote><StudyText text={payload.text} /></blockquote>
           {payload.attribution ? <figcaption>{payload.attribution}</figcaption> : null}
         </figure>
       )
@@ -67,7 +101,7 @@ export function StudyPayloadBody({
           {payload.title ? <p className="block-steps-title">{payload.title}</p> : null}
           <ol>
             {payload.steps.map((step, index) => (
-              <li key={`${blockId}-step-${index}`}>{step}</li>
+              <li key={`${blockId}-step-${index}`}><StudyText text={step} /></li>
             ))}
           </ol>
         </div>
@@ -75,11 +109,11 @@ export function StudyPayloadBody({
     case 'question':
       return (
         <div className="block-question">
-          <p className="block-question-prompt">{payload.prompt}</p>
+          <p className="block-question-prompt"><StudyText text={payload.prompt} /></p>
           {payload.answer ? (
             <details>
               <summary>Show answer</summary>
-              <p>{payload.answer}</p>
+              <p><StudyText text={payload.answer} /></p>
             </details>
           ) : null}
         </div>

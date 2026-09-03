@@ -4,7 +4,7 @@ import { render, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { StudyItem } from '../../src/domain/index.ts'
-import { StudyItemCard } from '../../src/study/StudyItemCard.tsx'
+import { StudyItemCard, StudyPayloadBody } from '../../src/study/StudyItemCard.tsx'
 
 function equation(expression: string): StudyItem {
   return {
@@ -45,5 +45,38 @@ describe('Study equation presentation', () => {
       expect(view.container.querySelector('[data-fallback="true"]')).not.toBeNull()
     })
     expect(view.getByText('\\unknown{x}')).toBeVisible()
+  })
+})
+
+describe('Study inline mathematics', () => {
+  it('renders delimited mathematics inside quotations as native MathML', async () => {
+    const view = render(
+      <StudyPayloadBody
+        blockId="quote-1"
+        payload={{
+          kind: 'quotation',
+          text: 'The symbol \\({\\int}\\) means a sum, as does \\({\\sum}\\).',
+          attribution: 'Chapter XVII',
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(view.container.querySelectorAll('blockquote math')).toHaveLength(2))
+    expect(view.getByText('The symbol', { exact: false })).toBeVisible()
+    expect(view.container.querySelectorAll('.study-inline-math[data-fallback="false"]')).toHaveLength(2)
+    expect(view.container.querySelector('blockquote math')?.getAttribute('alttext')).toBe('∫')
+    expect(view.getByText('Chapter XVII')).toBeVisible()
+  })
+
+  it('leaves unsupported inline notation visible', async () => {
+    const view = render(
+      <StudyPayloadBody
+        blockId="quote-2"
+        payload={{ kind: 'quotation', text: 'Keep \\(\\unknown{x}\\) readable.' }}
+      />,
+    )
+
+    await waitFor(() => expect(view.container.querySelector('[data-fallback="true"]')).not.toBeNull())
+    expect(view.getByText('\\(\\unknown{x}\\)')).toBeVisible()
   })
 })
