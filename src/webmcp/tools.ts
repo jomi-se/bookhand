@@ -1033,7 +1033,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     {
       name: 'edit_section',
       description:
-        "Make a small coding-agent style edit to the section source you just read, without returning the whole chapter. Every oldText must occur exactly once in the evolving source and the entire ordered batch is rejected if any edit is stale, missing, or ambiguous. sourceFingerprint and sectionIndex must both be copied from the same latest get_section_source result. The accepted result uses the same sanitizer, saved revision, Foliate rebuild, Undo, and Reset path as rewrite_section. Omit css to preserve the current remaster stylesheet; send css only when replacing that agent-owned stylesheet.",
+        "Make a small coding-agent style edit to the section source you just read, without returning the whole chapter. Every oldText must occur exactly once in the evolving source and the entire ordered batch is rejected if any edit is stale, missing, or ambiguous. sourceFingerprint and sectionIndex must both be copied from the same latest get_section_source result. The accepted result uses the same sanitizer, saved revision, stable-frame refresh, Undo, and Reset path as rewrite_section. Omit css to preserve the current remaster stylesheet; send css only when replacing that agent-owned stylesheet.",
       inputSchema: {
         type: 'object',
         properties: {

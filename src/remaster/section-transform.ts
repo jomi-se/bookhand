@@ -16,7 +16,7 @@
  */
 
 import type { FoliateBook } from '../reader/foliate-types.ts'
-import { buildResourceMap } from './resources.ts'
+import { buildResourceMap, type ResourceMap } from './resources.ts'
 import { applyVersion, type SectionVersion } from './rewrite.ts'
 
 /** MIME types whose payload is a section document. */
@@ -37,6 +37,7 @@ interface DataEventDetail {
 export function installSectionTransform(
   book: FoliateBook,
   resolve: (sectionIndex: number) => SectionVersion | undefined,
+  onResources?: (sectionIndex: number, resources: ResourceMap) => void,
 ): () => void {
   const target = book.transformTarget
   if (!target) return () => {}
@@ -57,8 +58,6 @@ export function installSectionTransform(
       if (typeof source !== 'string' || typeof type !== 'string' || !SECTION_TYPES.has(type)) {
         return source
       }
-      const version = resolve(sectionIndex)
-      if (!version) return source
       try {
         const parsed = new DOMParser().parseFromString(source, type as DOMParserSupportedType)
         if (parsed.querySelector('parsererror')) return source
@@ -67,6 +66,9 @@ export function installSectionTransform(
         // book's own source is, so pair the two documents to learn what each
         // relative reference became.
         const resources = await resourceMap(book, detail.name, parsed)
+        onResources?.(sectionIndex, resources)
+        const version = resolve(sectionIndex)
+        if (!version) return source
         applyVersion(parsed, version, resources)
         return new XMLSerializer().serializeToString(parsed)
       } catch {

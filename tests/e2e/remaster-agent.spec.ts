@@ -136,6 +136,10 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
   expect(figureSrc).toBeTruthy()
   expect(figureSrc).not.toContain('blob:')
 
+  // The ChatGPT/Codex browser rejects a new post-load blob iframe navigation.
+  // Mark the mounted reader so the rewrite proves it updates this exact view.
+  await page.locator('foliate-view').evaluate((view) => view.setAttribute('data-test-stable-view', ''))
+
   // 3. The agent writes the chapter it decided on. Here that is a small,
   //    deterministic stand-in for a model's judgement — a real heading, a real
   //    equation, a real figure — because the point under test is that whatever
@@ -174,6 +178,7 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
   const bar = page.locator('.remaster-bar')
   await expect(bar).toContainText('Rewrite ready')
   await bar.getByRole('button', { name: 'Rewritten' }).click()
+  await expect(page.locator('foliate-view')).toHaveAttribute('data-test-stable-view', '')
   await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('id="ch3"')
   const after = await renderedHtml(page)
   expect(after).toContain('id="ch3"')

@@ -69,7 +69,7 @@ ordered `{ oldText, newText }` replacements to `edit_section`, instead of paying
 to emit the complete chapter again. Every match must be exact and unique at its
 point in the batch; a stale fingerprint or one bad match rejects the whole
 operation without creating a revision. The resulting document still passes
-through the same sanitizer, persistence, renderer rebuild, Undo, and Reset path
+through the same sanitizer, persistence, stable-frame refresh, Undo, and Reset path
 as a full rewrite. `rewrite_section` remains the right tool when the agent is
 changing the document as a whole.
 
@@ -107,23 +107,21 @@ translates the agent's references through it. `tests/e2e/remaster-agent.spec.ts`
 proves a non-equation figure written with a package-relative path still loads,
 and that the source handed to the agent contains no `blob:` URL.
 
-### Showing a rewrite means rebuilding the view
+### Showing a rewrite preserves the frame
 
-A rendered section cannot be repaired from the outside. Foliate paginates what
-it parses and keeps ranges into the nodes it measured; replacing the body of a
-rendered section leaves the reader an empty column and a location that has
-drifted into another chapter, and nothing recovers it, because the damage is to
-state the paginator owns. Navigating to the section it is already on does not
-help either: `Paginator.#goTo` skips the load entirely when the index has not
-changed (`paginator.js:1004`), so the loader is never asked again.
+Foliate normally loads a section by navigating its iframe to a generated
+`blob:` URL. Replacing the entire view after a rewrite therefore creates a new
+post-load subframe navigation. The ChatGPT/Codex browser-control policy blocks
+that navigation, leaving a blank reader until a fresh tab is opened.
 
-So the view is replaced: `close()`, a fresh `foliate-view`, `open(book)`,
-`init()`, and back to the section. Rebuilds are serialized, because two
-overlapping navigations leave the renderer with no view at all.
-
-The cost is that a rewrite lands at the top of its chapter rather than exactly
-where the reader was standing. That is honest — it is not the chapter they were
-partway through.
+Bookhand instead keeps the mounted `foliate-view` and its iframe. It replaces
+the existing document body's children with the selected sanitized version,
+translates package-relative resources through the map captured at Foliate's
+loader seam, invokes the paginator's public `render()` hook, and resets its
+same-section anchor to zero. The body node—and therefore Foliate's content
+range—survives, while no `iframe.src` changes. Original, Rewritten, Undo, and
+Reset all use this stable-frame path. A section that is not mounted needs no
+refresh; the transform supplies the selected version on ordinary navigation.
 
 ## Guardrails, not a boundary
 
@@ -251,7 +249,7 @@ In:
 - `src/remaster/section-transform.ts` — serving a version at `transformTarget`.
 - `src/remaster/diagnose.ts` — facts about a section, classifying nothing.
 - `src/remaster/tex.ts`, `src/remaster/document.ts` — the optional shortcut.
-- Adapter wiring on both Foliate paths, plus the view rebuild.
+- Adapter wiring on both Foliate paths, plus the stable-frame refresh.
 - A visible Original / Rewritten control with Undo and Reset.
 - The five WebMCP tools above.
 

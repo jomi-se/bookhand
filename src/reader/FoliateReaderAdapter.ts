@@ -58,12 +58,14 @@ import {
   prepareRewrite,
   readSection,
   REMASTER_STYLE_ID,
+  replaceBody,
   type RewriteResult,
   type SectionRewrite,
   type SectionSource,
   type SectionVersion,
 } from '../remaster/rewrite.ts'
 import { installSectionTransform } from '../remaster/section-transform.ts'
+import { translateResources, type ResourceMap } from '../remaster/resources.ts'
 import { boundCustomCss } from './custom-css.ts'
 import { isInteractiveTarget, tapZone, type TapZone } from './tap-intent.ts'
 import { localized, mapMetadata } from './metadata.ts'
@@ -175,7 +177,8 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   #showRewritten = true
   /** Revisions saved by an agent which await an explicit human reveal. */
   #pendingRewriteSections = new Set<number>()
-  #rebuilding: Promise<void> = Promise.resolve()
+  /** Stable package-relative to mounted-resource URLs for each loaded section. */
+  #sectionResourceMaps = new Map<number, ResourceMap>()
   #remasterMutations: Promise<void> = Promise.resolve()
   /** Which book is open, and where its rewrites are kept between sessions. */
   #bookId: string | undefined
@@ -461,8 +464,13 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     // replace it, which reads as the app changing its mind.
     await this.#hydrateRewrites(revision)
     // Rewrites are served here, before Foliate parses or paginates a section.
-    const uninstallTransform = installSectionTransform(book, (sectionIndex) =>
-      this.#showRewritten ? currentVersion(this.#rewrites.get(sectionIndex) ?? emptyRewrite) : undefined,
+    const uninstallTransform = installSectionTransform(
+      book,
+      (sectionIndex) =>
+        this.#showRewritten
+          ? currentVersion(this.#rewrites.get(sectionIndex) ?? emptyRewrite)
+          : undefined,
+      (sectionIndex, resources) => this.#sectionResourceMaps.set(sectionIndex, resources),
     )
     const view = document.createElement('foliate-view') as FoliateView
     // Foliate's defaults are desktop-shaped: 48px of margin top and bottom,
@@ -935,7 +943,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
    * Matching happens before sanitization or persistence, so a stale,
    * missing, or ambiguous edit cannot leave half a batch in the book. The
    * resulting complete document deliberately goes through rewriteSection:
-   * there is one security boundary, one revision mechanism, and one rebuild.
+   * there is one security boundary, one revision mechanism, and one refresh.
    */
   async editSection(
     sectionIndex: number,
@@ -1046,7 +1054,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       .map((content) => content.index)
       .filter((index) => this.#rewrites.has(index))
     for (const sectionIndex of rendered) {
-      await this.#rebuildSection(sectionIndex)
+      await this.#refreshSectionInPlace(sectionIndex)
       if (showRewritten) this.#pendingRewriteSections.delete(sectionIndex)
     }
     return rendered.length
@@ -1064,7 +1072,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     await this.#persist((store, bookId) => store.reset(bookId, sectionIndex))
     this.#rewrites.delete(sectionIndex)
     this.#pendingRewriteSections.delete(sectionIndex)
-    await this.#rebuildSection(sectionIndex)
+    if (this.#showRewritten) await this.#refreshSectionInPlace(sectionIndex)
     return true
   }
 
@@ -1081,7 +1089,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     if (versions.length === 0) this.#rewrites.delete(sectionIndex)
     else this.#rewrites.set(sectionIndex, { ...existing, versions })
     this.#pendingRewriteSections.delete(sectionIndex)
-    await this.#rebuildSection(sectionIndex)
+    if (this.#showRewritten) await this.#refreshSectionInPlace(sectionIndex)
     return { versions: versions.length }
   }
 
@@ -1157,7 +1165,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       return false
     }
     this.#showRewritten = true
-    await this.#rebuildSection(sectionIndex)
+    await this.#refreshSectionInPlace(sectionIndex)
     this.#pendingRewriteSections.delete(sectionIndex)
     return true
   }
@@ -1180,71 +1188,45 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   }
 
   /**
-   * Show a section again after its markup changed.
+   * Replace the body of an already mounted section and ask Foliate to measure
+   * it again. Keeping the iframe itself alive is load-bearing: browser-control
+   * hosts may reject a post-load navigation to Foliate's next `blob:` URL.
    *
-   * The renderer has to build the document itself for this to work. Foliate
-   * paginates what it parses and keeps ranges into the nodes it measured, so a
-   * section cannot be repaired from the outside: swapping the body of a
-   * rendered section leaves the reader an empty column and a location that has
-   * drifted into another chapter. Navigating to the section it is already on
-   * does not help either — `Paginator.#goTo` skips the load entirely when the
-   * index has not changed (`paginator.js:1004`), so the loader is never asked
-   * again and the cached markup keeps being what is shown.
-   *
-   * So the view is replaced. `close()` releases the section, a fresh
-   * `foliate-view` opens the same book, and the section transform serves
-   * whichever version should be showing while Foliate builds it. The reader is
-   * returned to the section they were on.
-   *
-   * The cost is that this lands at the top of the chapter rather than exactly
-   * where they were standing. That is honest: it is not the chapter they were
-   * partway through.
+   * Foliate's content range points at the body, which survives replaceChildren,
+   * and its public render hook recalculates columns from that range. Resetting
+   * the same-section anchor afterwards discards any Range into removed nodes.
+   * A section not currently mounted needs no work; the transform supplies the
+   * selected version when ordinary navigation loads it later.
    */
-  async #rebuildSection(sectionIndex: number): Promise<void> {
-    // Serialized: two overlapping rebuilds leave the renderer with no view.
-    this.#rebuilding = this.#rebuilding.then(() => this.#rebuildNow(sectionIndex))
-    await this.#rebuilding
-  }
+  async #refreshSectionInPlace(sectionIndex: number): Promise<void> {
+    const active = this.#active
+    if (!active) return
+    const content = active.view.renderer.getContents().find((candidate) => candidate.index === sectionIndex)
+    if (!content) return
 
-  async #rebuildNow(sectionIndex: number): Promise<void> {
-    const previous = this.#active
-    if (!previous) return
-    const revision = this.#revision
-    const view = document.createElement('foliate-view') as FoliateView
-    const cleanups = [...this.#listen(view), configureForViewport(view, () => this.#style.pageLayout ?? 'auto')]
+    const body = content.doc.body ?? content.doc.documentElement
+    if (!body) throw new ReaderSectionLoadError(sectionIndex, this.#sectionLabel(sectionIndex))
+    const resources = this.#sectionResourceMaps.get(sectionIndex) ?? new Map<string, string>()
+    const version = this.#showRewritten ? this.#currentVersion(sectionIndex) : undefined
+
     this.#suppressRelocations += 1
     try {
-      previous.view.close()
-      for (const cleanup of previous.cleanups) cleanup()
-      previous.book.sections[sectionIndex]?.unload?.()
+      active.view.deselect()
+      this.#clearSelection()
+      if (version) {
+        applyVersion(content.doc, version, resources)
+      } else {
+        const original = await this.#sectionSource(sectionIndex)()
+        const originalBody = original.body ?? original.documentElement
+        replaceBody(content.doc, body, originalBody?.innerHTML ?? '')
+        body.removeAttribute('data-bookhand-remastered')
+        content.doc.getElementById(REMASTER_STYLE_ID)?.remove()
+        translateResources(content.doc, resources)
+      }
 
-      this.#active = {
-        book: previous.book,
-        view,
-        cleanups,
-        ...(previous.transformCleanup ? { transformCleanup: previous.transformCleanup } : {}),
-      }
-      this.#host.replaceChildren(view)
-      await view.open(previous.book)
-      this.#assertCurrent(revision)
-      cleanups.push(this.#listenForRendererRelocations(view))
-      view.renderer.setStyles?.(makeReaderCss(this.#style))
-      await view.init({ showTextStart: true })
-      this.#assertCurrent(revision)
-      const resolved = view.resolveNavigation(sectionIndex)
-      if (resolved) await view.renderer.goTo(resolved)
-      this.#suppressRelocations = Math.max(0, this.#suppressRelocations - 1)
-      this.#captureRelocation(view.lastLocation)
-    } catch (error) {
-      // Reuse the same guarded replacement path as a stalled navigation. A
-      // failed remaster refresh must either restore a readable view or report
-      // a real failure; silently returning success with a half-open paginator
-      // is worse than refusing the rewrite.
-      const stalled = this.#active
-      if (stalled?.view === view) {
-        await this.#recoverStalledView(stalled, revision)
-      }
-      throw error
+      active.view.renderer.render?.()
+      const resolved = active.view.resolveNavigation(sectionIndex)
+      if (resolved) await active.view.renderer.goTo({ ...resolved, anchor: 0 })
     } finally {
       this.#suppressRelocations = Math.max(0, this.#suppressRelocations - 1)
     }
@@ -1418,6 +1400,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#marks = []
     this.#rewrites.clear()
     this.#pendingRewriteSections.clear()
+    this.#sectionResourceMaps.clear()
   }
 }
 

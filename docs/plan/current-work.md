@@ -244,6 +244,9 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
   compact/coarse-pointer reading remains single-column.
 - Text zoom scales the reader root, so repaired chapters cannot strand rem-based
   headings or native MathML at a fixed size.
+- Original, Rewritten, Undo, and Reset now update the mounted section in place
+  and ask Foliate to repaginate. They never replace the reader or trigger a new
+  post-load `blob:` iframe navigation, which the ChatGPT/Codex browser blocks.
 - The bundled *Calculus Made Easy* is judging content, not a permanent product
   dependency.
 - Keep embeddings optional and after lexical retrieval.
