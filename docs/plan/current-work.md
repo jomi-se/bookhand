@@ -124,9 +124,10 @@ This direction is recorded in:
   or optionally compiles publisher-supplied `data-tex` to MathML. Exact-edit
   batches are serialized, all-or-nothing revisions and preserve the existing
   agent stylesheet when omitted. Publisher bytes remain immutable;
-  Original/Rewritten, Undo, and Reset are visible. In-place replacement now
-  performs a second post-observer pagination pass, preventing a saved rewrite
-  from displaying as a blank page until the person pages away and back.
+  Original/Rewritten, Undo, and Reset are visible. The persistent-frame build
+  patch rebinds Foliate's private body measurement range before each pagination
+  pass, preventing either version from displaying as a blank page after an
+  in-place toggle.
 - Schema v5 persists bounded sanitized rewrite history before it is shown and
   hydrates it before Foliate's first render. Markup, CSS, summary, Undo, and
   Reset survive reload. Reindexing, EPUB export, and annotation re-anchoring do

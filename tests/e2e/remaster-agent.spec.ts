@@ -67,6 +67,11 @@ const hasVisibleBookText = (page: Page) =>
     if (!(frame instanceof HTMLElement) || !doc?.body) return false
     const frameRect = frame.getBoundingClientRect()
     const readerRect = view.getBoundingClientRect()
+    const clipLeft = Math.max(frameRect.left, readerRect.left)
+    const clipRight = Math.min(frameRect.right, readerRect.right)
+    const clipTop = Math.max(frameRect.top, readerRect.top)
+    const clipBottom = Math.min(frameRect.bottom, readerRect.bottom)
+    if (clipRight <= clipLeft || clipBottom <= clipTop) return false
     const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if (!node.textContent?.trim()) continue
@@ -76,8 +81,8 @@ const hasVisibleBookText = (page: Page) =>
         const left = frameRect.left + rect.left
         const top = frameRect.top + rect.top
         if (
-          left < readerRect.right && left + rect.width > readerRect.left &&
-          top < readerRect.bottom && top + rect.height > readerRect.top
+          left < clipRight && left + rect.width > clipLeft &&
+          top < clipBottom && top + rect.height > clipTop
         ) return true
       }
     }
@@ -329,11 +334,15 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
   await bar.getByRole('button', { name: /Agent rewrite/ }).click()
   await expect(bar).not.toHaveClass(/remaster-bar-collapsed/)
 
-  await bar.getByRole('button', { name: 'Original' }).click()
-  await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('data-tex')
+  for (let cycle = 0; cycle < 3; cycle += 1) {
+    await bar.getByRole('button', { name: 'Original' }).click()
+    await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('data-tex')
+    await expect.poll(() => hasVisibleBookText(page), { timeout: 15_000 }).toBe(true)
 
-  await bar.getByRole('button', { name: 'Rewritten' }).click()
-  await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('<math')
+    await bar.getByRole('button', { name: 'Rewritten' }).click()
+    await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('<math')
+    await expect.poll(() => hasVisibleBookText(page), { timeout: 15_000 }).toBe(true)
+  }
 
   // 6. Reset returns the book exactly as published, and the control retires.
   await bar.getByRole('button', { name: 'Reset' }).click()

@@ -124,7 +124,33 @@ export function foliatePersistentFrame() {
         this.#element.append(overlayer.element)
     }`
 
-      const needles = [iframeField, constructorEnd, originalLoad, originalCreateView, originalOverlayer]
+      const originalRender = `    render(layout) {
+        if (!layout) return
+        this.#column = layout.flow !== 'scrolled'
+        this.#layout = layout
+        if (this.#column) this.columnize(layout)
+        else this.scrolled(layout)
+    }`
+      const persistentRender = `    render(layout) {
+        if (!layout) return
+        // Bookhand can replace a mounted section body without navigating this
+        // iframe. DOM Range mutation rules leave the old measurement range at
+        // the removal boundary, so rebind it before every pagination pass.
+        this.#contentRange.selectNodeContents(this.document.body)
+        this.#column = layout.flow !== 'scrolled'
+        this.#layout = layout
+        if (this.#column) this.columnize(layout)
+        else this.scrolled(layout)
+    }`
+
+      const needles = [
+        iframeField,
+        constructorEnd,
+        originalLoad,
+        originalCreateView,
+        originalOverlayer,
+        originalRender,
+      ]
       if (needles.some((needle) => !code.includes(needle))) {
         throw new Error('Pinned Foliate paginator changed; persistent-frame patch was not applied')
       }
@@ -138,7 +164,8 @@ export function foliatePersistentFrame() {
           )
           .replace(originalLoad, persistentLoad)
           .replace(originalCreateView, persistentCreateView)
-          .replace(originalOverlayer, persistentOverlayer),
+          .replace(originalOverlayer, persistentOverlayer)
+          .replace(originalRender, persistentRender),
         map: null,
       }
     },
