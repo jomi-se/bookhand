@@ -60,6 +60,18 @@ test('genuine guidance points, yields, returns, stops, and keeps durable marks i
   })
   expect(highlighted.isError).toBeFalsy()
 
+  // Mark the actual EPUB browsing context. Chapter changes must replace its
+  // document, not the iframe/window that ChatGPT's browser already accepted.
+  await page.evaluate(() => {
+    const view = document.querySelector('foliate-view') as unknown as {
+      renderer?: { getContents?: () => { doc: Document }[] }
+    }
+    const frameWindow = view?.renderer?.getContents?.()[0]?.doc?.defaultView as
+      | (Window & { __bookhandPersistentFrame?: string })
+      | null
+    if (frameWindow) frameWindow.__bookhandPersistentFrame = 'chapter-x-origin'
+  })
+
   // This must cross an EPUB section boundary, not merely turn one page.
   await call(page, 'navigate_book', { sectionIndex: origin.visible.range.sectionIndex + 1 })
   const beforeFocus = await call(page, 'get_reading_context')
@@ -87,6 +99,15 @@ test('genuine guidance points, yields, returns, stops, and keeps durable marks i
   }
   expect(focusedContext.sectionIndex).toBe(origin.visible.range.sectionIndex)
   expect(focusedContext.visible.text.length).toBeGreaterThan(200)
+  expect(await page.evaluate(() => {
+    const view = document.querySelector('foliate-view') as unknown as {
+      renderer?: { getContents?: () => { doc: Document }[] }
+    }
+    const frameWindow = view?.renderer?.getContents?.()[0]?.doc?.defaultView as
+      | (Window & { __bookhandPersistentFrame?: string })
+      | null
+    return frameWindow?.__bookhandPersistentFrame
+  })).toBe('chapter-x-origin')
   await expect(page.getByLabel('Tutor guidance')).toContainText('Notice how the argument turns')
   await expect(page.getByRole('button', { name: 'Back' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible()

@@ -164,6 +164,11 @@ demonstration; W7 through W11 remain recorded rather than discarded.
 The WebMCP Challenge closes 2026-09-03T20:00Z.
 
 - Live surface: https://bookhand.jomi-se.workers.dev/
+- ADR 0005 replaces Foliate's blocked per-section `blob:` iframe navigation
+  with one persistent same-origin frame. Focused production tests prove frame
+  identity across Chapter X to XI to X, offline navigation, remaster reload,
+  keyboard paging, and hostile-book containment. Confirm the deployed build in
+  a fresh ChatGPT browser tab before recording.
 - Deployed commit `bf7b2f0` was verified with persistent browser storage,
   twenty-one genuine WebMCP tools, `search_book` reaching `ready / results` with
   corpus-derived hits, the document-remaster tools present, reload survival,

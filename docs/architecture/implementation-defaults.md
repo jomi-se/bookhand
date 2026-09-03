@@ -34,6 +34,11 @@ canvas framework in v0.
 Create a `ReaderAdapter` around Foliate.js. UI components and WebMCP handlers
 must not reach through it to arbitrary viewer internals. Its initial surface is:
 
+The judged ChatGPT browser rejects Foliate's generated `blob:` section iframe
+navigations. ADR 0005 therefore keeps one same-origin frame and replaces its
+parsed document in place. Do not restore `blob:`, `data:`, or `srcdoc` frame
+navigation without testing inside the controlled browser.
+
 ```ts
 interface ReaderAdapter {
   open(blob: Blob): Promise<BookMetadata>
