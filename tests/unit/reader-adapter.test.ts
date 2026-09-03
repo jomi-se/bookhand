@@ -732,7 +732,7 @@ describe('FoliateReaderAdapter', () => {
     )
     const broad = reducedMotionDraw(broadRects, call?.[3] as Record<string, unknown>)
     expect(broad).toHaveAttribute('data-bookhand-tutor-scope', 'broad')
-    expect(broad.children.length).toBeLessThanOrEqual(4)
+    expect(broad.children).toHaveLength(2)
     expect(broad.children[1]).toHaveAttribute('x', '13')
     expect(animate).toHaveBeenCalledTimes(1)
     Reflect.deleteProperty(SVGElement.prototype, 'animate')

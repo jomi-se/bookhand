@@ -1664,33 +1664,29 @@ function drawTutorCue(
   group.setAttribute('data-bookhand-tutor-scope', broad ? 'broad' : 'precise')
 
   if (broad) {
-    const groups: readonly CueRect[][] = !vertical && all.width > 600
-      ? [
-          rects.filter((rect) => (rect.left + rect.right) / 2 < (all.left + all.right) / 2),
-          rects.filter((rect) => (rect.left + rect.right) / 2 >= (all.left + all.right) / 2),
-        ].filter((column) => column.length > 0)
-      : [rects]
-    for (const column of groups) {
-      const bounds = cueBounds(column)
-      appendCueRect(group, bounds, { fill: color, opacity: 0.1, rx: 3 })
-      const rule = svgElement('rect')
-      if (vertical) {
-        rule.setAttribute('x', String(bounds.left))
-        rule.setAttribute('y', String(Math.max(0, bounds.top - 7)))
-        rule.setAttribute('width', String(bounds.width))
-        rule.setAttribute('height', '3')
-      } else {
-        // The rule points from the margin. Drawing it on the range boundary
-        // covers the first stroke of the book's own text, especially at small
-        // sizes and in justified columns.
-        rule.setAttribute('x', String(Math.max(0, bounds.left - 7)))
-        rule.setAttribute('y', String(bounds.top))
-        rule.setAttribute('width', '3')
-        rule.setAttribute('height', String(bounds.height))
-      }
-      rule.setAttribute('fill', color)
-      group.append(rule)
+    // Rectangle midpoint is not a reliable column signal: inline MathML and
+    // justified text can span enough width to be classified into a second
+    // pseudo-column. That produced overlapping washes and an accent rule in
+    // the middle of the paragraph. A broad request is intentionally one calm
+    // region, even when that includes the gutter of a real two-page spread.
+    appendCueRect(group, all, { fill: color, opacity: 0.08, rx: 3 })
+    const rule = svgElement('rect')
+    if (vertical) {
+      rule.setAttribute('x', String(all.left))
+      rule.setAttribute('y', String(Math.max(0, all.top - 7)))
+      rule.setAttribute('width', String(all.width))
+      rule.setAttribute('height', '3')
+    } else {
+      // The rule points from the margin. Drawing it on the range boundary
+      // covers the first stroke of the book's own text, especially at small
+      // sizes and in justified columns.
+      rule.setAttribute('x', String(Math.max(0, all.left - 7)))
+      rule.setAttribute('y', String(all.top))
+      rule.setAttribute('width', '3')
+      rule.setAttribute('height', String(all.height))
     }
+    rule.setAttribute('fill', color)
+    group.append(rule)
     return group
   }
 
