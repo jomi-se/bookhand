@@ -19,20 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This license covers Bookhand's own source code and assets.
-
-Third-party material distributed with this repository keeps its own terms:
-
-- `public/books/calculus-made-easy.epub` and its extracted cover are the
-  unmodified Project Gutenberg edition of *Calculus Made Easy* (eBook #33283).
-  The underlying work is public domain in the United States, but Project
-  Gutenberg's trademark and redistribution terms still apply to that edition,
-  and readers outside the United States must check their own copyright law.
-  See `public/books/README.md` and the license preserved inside the EPUB.
-- `tests/fixtures/epub/` contains Bookhand-authored CC0 fixtures; see
-  `tests/fixtures/epub/LICENSE`.
-- Dependencies keep the licenses declared in their own packages, including
-  foliate-js (MIT) and SQLite WASM (public domain).

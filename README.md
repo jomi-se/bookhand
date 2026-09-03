@@ -123,5 +123,6 @@ for provenance and terms.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE), which also records the terms of the bundled
-book and other third-party material.
+Bookhand is MIT licensed. See [`LICENSE`](LICENSE) for Bookhand's license and
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the bundled books,
+fixtures, and dependencies.
