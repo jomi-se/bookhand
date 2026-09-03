@@ -276,7 +276,7 @@ test('an agent arriving at the library can see it and open a book itself', async
     )
     .toEqual(expect.arrayContaining(['list_books', 'open_book']))
 
-  await expect(page.locator('.book-open')).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('.book-open').first()).toBeVisible({ timeout: 20_000 })
   const listed = await agentCall(page, 'list_books')
   expect(listed.isError).toBe(false)
   expect(listed.text).toContain('Calculus Made Easy')
