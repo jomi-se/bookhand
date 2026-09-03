@@ -116,6 +116,7 @@ beforeAll(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
   document.body.replaceChildren()
 })
@@ -206,6 +207,7 @@ describe('FoliateReaderAdapter', () => {
   })
 
   it('replaces a stalled Foliate view and lets the queued learner link proceed', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const relocations: (number | undefined)[] = []
     let adapter!: FoliateReaderAdapter
     let linkNavigation!: Promise<void>
@@ -235,6 +237,52 @@ describe('FoliateReaderAdapter', () => {
     expect(replacement).not.toBe(stalledView)
     expect(adapter.getLocation().sectionIndex).toBe(0)
     expect(relocations).toEqual([72])
+  })
+
+  it('keeps the last reader and location when navigation and recovery both fail', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const adapter = makeAdapter(document.createElement('div'), { navigationDeadlineMs: 10 })
+    await adapter.open(new Blob(['fixture']))
+    await adapter.navigate({ kind: 'section', sectionIndex: 1 })
+
+    const workingView = document.querySelector('foliate-view') as FakeFoliateView
+    workingView.renderer.goTo = vi.fn(async () => new Promise<void>(() => undefined))
+    vi.spyOn(FakeFoliateView.prototype, 'open').mockImplementation(async function (
+      this: FakeFoliateView,
+    ) {
+      if (this !== workingView) throw new Error('Replacement failed to initialize')
+    })
+
+    await expect(adapter.navigate({ kind: 'section', sectionIndex: 0 })).rejects.toBeInstanceOf(
+      ReaderNavigationError,
+    )
+
+    expect(document.querySelectorAll('foliate-view')).toHaveLength(1)
+    expect(document.querySelector('foliate-view')).toBe(workingView)
+    expect(adapter.getLocation()).toMatchObject({ sectionIndex: 1 })
+  })
+
+  it('publishes a chapter location only after its render operation succeeds', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const published: number[] = []
+    const adapter = makeAdapter(document.createElement('div'), {
+      onLocationChange: (location) => { published.push(location.sectionIndex) },
+    })
+    await adapter.open(new Blob(['fixture']))
+    const view = document.querySelector('foliate-view') as FakeFoliateView
+    const render = view.renderer.goTo.bind(view.renderer)
+    published.length = 0
+    view.renderer.goTo = vi.fn(async (target: FoliateResolvedTarget) => {
+      await render(target)
+      throw new Error('Renderer failed after relocation')
+    })
+
+    await expect(adapter.navigate({ kind: 'section', sectionIndex: 1 })).rejects.toBeInstanceOf(
+      ReaderSectionLoadError,
+    )
+
+    expect(published).toEqual([])
+    expect(adapter.getLocation()).toMatchObject({ sectionIndex: 0 })
   })
 
   it('does not let an incidental anchor reflow consume an issued navigation identity', async () => {

@@ -60,9 +60,11 @@ test('genuine guidance points, yields, returns, stops, and keeps durable marks i
   })
   expect(highlighted.isError).toBeFalsy()
 
-  await call(page, 'navigate_book', { direction: 'next' })
+  // This must cross an EPUB section boundary, not merely turn one page.
+  await call(page, 'navigate_book', { sectionIndex: origin.visible.range.sectionIndex + 1 })
   const beforeFocus = await call(page, 'get_reading_context')
   const before = beforeFocus.structuredContent.readingContext as { sectionIndex: number; progressPercent: number }
+  expect(before.sectionIndex).toBe(origin.visible.range.sectionIndex + 1)
 
   const focused = await call(page, 'focus_passage', {
     bookId: origin.bookId,
@@ -78,6 +80,13 @@ test('genuine guidance points, yields, returns, stops, and keeps durable marks i
   expect(focused.structuredContent).toMatchObject({
     focus: { outcome: 'applied', guidance: { state: 'guiding', canBack: true } },
   })
+  await expect(page.locator('foliate-view')).toHaveCount(1)
+  const focusedContext = (await call(page, 'get_reading_context')).structuredContent.readingContext as {
+    sectionIndex: number
+    visible: { text: string }
+  }
+  expect(focusedContext.sectionIndex).toBe(origin.visible.range.sectionIndex)
+  expect(focusedContext.visible.text.length).toBeGreaterThan(200)
   await expect(page.getByLabel('Tutor guidance')).toContainText('Notice how the argument turns')
   await expect(page.getByRole('button', { name: 'Back' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible()

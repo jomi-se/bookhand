@@ -160,9 +160,17 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     readonly learnerEpoch: number
     readonly relative: boolean
   } | undefined
+  #pendingNavigationRelocation: {
+    readonly operationId: number
+    readonly location: ReaderLocation
+    readonly navigationId?: number
+  } | undefined
   #navigationSequence = 0
   #learnerIntentEpoch = 0
-  readonly #relocationProvenance: (number | undefined)[] = []
+  readonly #relocationProvenance: {
+    readonly issued: boolean
+    readonly navigationId?: number
+  }[] = []
   #suppressRelocations = 0
   /**
    * Rewrites an agent has made, by section index.
@@ -361,12 +369,27 @@ export class FoliateReaderAdapter implements ReaderAdapter {
           this.#options.navigationDeadlineMs ?? READER_NAVIGATION_DEADLINE_MS,
           this.#options.clock ?? systemClock,
         )
+        this.#commitNavigationRelocation(operationId)
       } catch (error) {
+        this.#discardNavigationRelocation(operationId)
+        console.error('[Bookhand reader] Navigation failed.', {
+          stage: error instanceof DeadlineExceededError ? 'section-render-timeout' : 'section-render',
+          target,
+          error,
+        })
         if (error instanceof DeadlineExceededError) {
           if (this.#activeNavigation?.operationId === operationId) {
             this.#activeNavigation = undefined
           }
-          await this.#recoverStalledView(active, revision)
+          try {
+            await this.#recoverStalledView(active, revision)
+          } catch (recoveryError) {
+            console.error('[Bookhand reader] Navigation recovery failed.', {
+              stage: 'replacement-reader-init',
+              target,
+              error: recoveryError,
+            })
+          }
         }
         if (error instanceof ReaderSectionLoadError || error instanceof ReaderNavigationError) throw error
         throw new ReaderNavigationError(target, error)
@@ -682,9 +705,36 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       chapterLabel: localized(detail.tocItem?.label) || this.#sectionLabel(sectionIndex),
       textFingerprint: detail.range ? fingerprintText(detail.range.toString()) : undefined,
     }
-    const navigationId = this.#relocationProvenance.shift()
+    const provenance = this.#relocationProvenance.shift()
+    const navigationId = provenance?.navigationId
+    const activeNavigation = this.#activeNavigation
+    if (activeNavigation && provenance?.issued) {
+      this.#pendingNavigationRelocation = {
+        operationId: activeNavigation.operationId,
+        location,
+        ...(navigationId === undefined ? {} : { navigationId }),
+      }
+      return
+    }
     const accepted = this.#options.onLocationChange?.(structuredClone(location), navigationId)
     if (accepted !== false) this.#location = location
+  }
+
+  #commitNavigationRelocation(operationId: number): void {
+    const pending = this.#pendingNavigationRelocation
+    if (!pending || pending.operationId !== operationId) return
+    this.#pendingNavigationRelocation = undefined
+    const accepted = this.#options.onLocationChange?.(
+      structuredClone(pending.location),
+      pending.navigationId,
+    )
+    if (accepted !== false) this.#location = pending.location
+  }
+
+  #discardNavigationRelocation(operationId: number): void {
+    if (this.#pendingNavigationRelocation?.operationId === operationId) {
+      this.#pendingNavigationRelocation = undefined
+    }
   }
 
   #listenForRendererRelocations(view: FoliateView): () => void {
@@ -700,7 +750,14 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         (reason === 'navigation' ||
           (unchangedLearnerEpoch && reason == null) ||
           (active.relative && unchangedLearnerEpoch && reason === 'page'))
-      this.#relocationProvenance.push(issuedRelocation ? active.id : undefined)
+      this.#relocationProvenance.push(
+        issuedRelocation
+          ? {
+              issued: true,
+              ...(active.id === undefined ? {} : { navigationId: active.id }),
+            }
+          : { issued: false },
+      )
     }
     view.renderer.addEventListener('relocate', onRelocate, { capture: true })
     return () => view.renderer.removeEventListener('relocate', onRelocate, { capture: true })
@@ -1317,10 +1374,17 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   async #recoverStalledView(stalled: ActiveReader, revision: number): Promise<void> {
     if (revision !== this.#revision || this.#active !== stalled) return
     const { book } = stalled
-    this.#active = undefined
-    this.#dispose(stalled, false)
 
     const view = document.createElement('foliate-view') as FoliateView
+    // Recovery is speculative. Keep the last reader mounted until its
+    // replacement has rendered successfully, so a second failure cannot turn
+    // one bad chapter load into an empty application-wide reader.
+    Object.assign(view.style, {
+      position: 'fixed',
+      inset: '0',
+      visibility: 'hidden',
+      pointerEvents: 'none',
+    })
     const cleanups = [...this.#listen(view), configureForViewport(view, () => this.#style.pageLayout ?? 'auto')]
     const replacement: ActiveReader = {
       book,
@@ -1328,8 +1392,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       cleanups,
       ...(stalled.transformCleanup ? { transformCleanup: stalled.transformCleanup } : {}),
     }
-    this.#active = replacement
-    this.#host.replaceChildren(view)
+    this.#host.append(view)
     this.#suppressRelocations += 1
     try {
       await withDeadline(
@@ -1337,7 +1400,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         this.#options.openDeadlineMs ?? BOOK_OPEN_DEADLINE_MS,
         this.#options.clock ?? systemClock,
       )
-      if (revision !== this.#revision || this.#active !== replacement) throw new ReaderClosedError()
+      if (revision !== this.#revision || this.#active !== stalled) throw new ReaderClosedError()
       cleanups.push(this.#listenForRendererRelocations(view))
       view.renderer.setStyles?.(makeReaderCss(this.#style))
       await withDeadline(
@@ -1348,15 +1411,20 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         this.#options.openDeadlineMs ?? BOOK_OPEN_DEADLINE_MS,
         this.#options.clock ?? systemClock,
       )
-      if (revision !== this.#revision || this.#active !== replacement) throw new ReaderClosedError()
+      if (revision !== this.#revision || this.#active !== stalled) throw new ReaderClosedError()
+      this.#active = replacement
+      Object.assign(view.style, {
+        position: '',
+        inset: '',
+        visibility: '',
+        pointerEvents: '',
+      })
+      this.#host.replaceChildren(view)
+      this.#dispose(stalled, false)
       this.renderAnnotations(this.#marks)
       if (this.#tutorTarget) void this.#renderTutorOverlay(this.#tutorGeneration)
     } catch (error) {
-      if (this.#active === replacement) {
-        this.#active = undefined
-        this.#dispose(replacement)
-        this.#host.replaceChildren()
-      }
+      this.#dispose(replacement, false)
       throw error
     } finally {
       this.#suppressRelocations = Math.max(0, this.#suppressRelocations - 1)
