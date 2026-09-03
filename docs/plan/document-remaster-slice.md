@@ -43,9 +43,10 @@ theme, and reaches a screen reader as `30 Superscript ring`.
 
 | Tool | What it is for |
 | --- | --- |
-| `get_section_source` | The section's packaged XHTML and its named stylesheets. |
+| `get_section_source` | The section's packaged XHTML, named stylesheets, revision, and edit fingerprint. |
 | `diagnose_section` | Counts and structure — facts, with nothing classified. |
 | `rewrite_section` | The agent's markup, and optionally CSS, for the whole section. |
+| `edit_section` | One atomic batch of small exact replacements against the source just read. |
 | `compile_section_math` | An optional shortcut, described below. |
 | `set_section_view` | `original`, `rewritten`, `undo`, `reset`. |
 
@@ -61,6 +62,16 @@ every agent that trusted it.
 `get_section_source` returns the document from `section.createDocument()`, with
 `src`, `href` and `url()` still **package-relative**, and the section's
 stylesheets by packaged name rather than concatenated into one anonymous blob.
+It also returns a revision count and a byte-exact fingerprint bound to the book,
+section, editable XHTML, and agent-owned stylesheet. For a small correction,
+the model sends that fingerprint and section index back with only one to fifty
+ordered `{ oldText, newText }` replacements to `edit_section`, instead of paying
+to emit the complete chapter again. Every match must be exact and unique at its
+point in the batch; a stale fingerprint or one bad match rejects the whole
+operation without creating a revision. The resulting document still passes
+through the same sanitizer, persistence, renderer rebuild, Undo, and Reset path
+as a full rewrite. `rewrite_section` remains the right tool when the agent is
+changing the document as a whole.
 
 This matters more than it looks. The rendered DOM carries `blob:` URLs that
 exist only for this page load. A rewrite built from those would be meaningless

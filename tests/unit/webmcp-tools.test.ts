@@ -100,6 +100,15 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
       actions: [{ kind: 'undo' as const, label: 'Undo', description: 'Put it back.' }],
     })),
     listStudyItems: vi.fn(async () => []),
+    editSection: vi.fn(async (_sectionIndex, _fingerprint, edits: readonly unknown[]) => ({
+      sectionIndex: 3,
+      applied: true,
+      editsApplied: edits.length,
+      sanitized: { removedElements: {}, removedAttributes: {}, modified: false },
+      cssModified: false,
+      before: { elements: 10, bytes: 500 },
+      after: { elements: 10, bytes: 492 },
+    })),
     setStudyBoardView: vi.fn(async (mode: string) => ({
       operation: 'update' as const,
       origin: 'agent' as const,
@@ -148,6 +157,7 @@ describe('the WebMCP tool surface', () => {
       'get_section_source',
       'diagnose_section',
       'rewrite_section',
+      'edit_section',
       'compile_section_math',
       'set_section_view',
       'set_study_board_view',
@@ -229,6 +239,7 @@ describe('the WebMCP tool surface', () => {
       'get_section_source',
       'diagnose_section',
       'rewrite_section',
+      'edit_section',
       'compile_section_math',
       'set_section_view',
     ]) {
@@ -238,6 +249,54 @@ describe('the WebMCP tool surface', () => {
         },
       })
     }
+  })
+
+  it('applies a fingerprinted exact-edit batch through the public tool', async () => {
+    const { tool, commands } = setup()
+    const result = await tool('edit_section').execute({
+      sectionIndex: 3,
+      sourceFingerprint: 'fnv1a-12345678',
+      edits: [
+        { oldText: '<p class="title">Chapter</p>', newText: '<h2>Chapter</h2>' },
+        { oldText: '<span>typo</span>', newText: '<span>correction</span>' },
+      ],
+      summary: 'Promoted the heading and corrected one word',
+    })
+
+    expect(result.isError).toBeFalsy()
+    expect(result.content[0]?.text).toContain('Applied 2 exact edits')
+    expect(commands.editSection).toHaveBeenCalledWith(
+      3,
+      'fnv1a-12345678',
+      [
+        { oldText: '<p class="title">Chapter</p>', newText: '<h2>Chapter</h2>' },
+        { oldText: '<span>typo</span>', newText: '<span>correction</span>' },
+      ],
+      { summary: 'Promoted the heading and corrected one word' },
+    )
+  })
+
+  it('rejects malformed exact edits before calling the command layer', async () => {
+    const { tool, commands } = setup()
+    const result = await tool('edit_section').execute({
+      sectionIndex: 3,
+      sourceFingerprint: 'fnv1a-12345678',
+      edits: [{ oldText: '', newText: 'replacement' }],
+    })
+
+    expect(result.isError).toBe(true)
+    expect(commands.editSection).not.toHaveBeenCalled()
+  })
+
+  it('requires the section identity from the same source read', async () => {
+    const { tool, commands } = setup()
+    const result = await tool('edit_section').execute({
+      sourceFingerprint: 'fnv1a64-source-1234567890abcdef',
+      edits: [{ oldText: 'before', newText: 'after' }],
+    })
+
+    expect(result.isError).toBe(true)
+    expect(commands.editSection).not.toHaveBeenCalled()
   })
 
   it('rejects malformed tutor cues before they reach reader commands', async () => {

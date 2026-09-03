@@ -775,7 +775,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     {
       name: 'get_section_source',
       description:
-        "Read the current editable source for one section: the publisher's packaged XHTML on first read, or your latest rewrite on later reads, plus its stylesheets. This is a source file, not a summary — treat it the way you would treat a file you are about to edit. Paths in it (src, href, url()) are package-relative; keep them relative when you write it back and Bookhand resolves them the same way the book does. Use diagnose_section alongside this when you want counts first, and rewrite_section when you are ready to write.",
+        "Read the current editable source for one section: the publisher's packaged XHTML on first read, or your latest rewrite on later reads, plus its stylesheets, revision, and sourceFingerprint. This is a source file, not a summary — treat it the way you would treat a file you are about to edit. Paths in it (src, href, url()) are package-relative; keep them relative when you write it back and Bookhand resolves them the same way the book does. Use diagnose_section when you want counts first, edit_section for small exact changes without returning the chapter, and rewrite_section for a complete transformation.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -789,7 +789,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             typeof input.sectionIndex === 'number' ? input.sectionIndex : undefined,
           )
           return textResult(
-            `Section ${source.sectionIndex}${source.label ? ` (${source.label})` : ''}: ${source.bytes} bytes of packaged XHTML and ${source.stylesheets.length} stylesheet${source.stylesheets.length === 1 ? '' : 's'}${source.rewritten ? ', currently showing your rewrite' : ''}.`,
+            `Section ${source.sectionIndex}${source.label ? ` (${source.label})` : ''}: ${source.revision} saved revision${source.revision === 1 ? '' : 's'}, fingerprint ${source.sourceFingerprint}; ${source.bytes} bytes of packaged XHTML and ${source.stylesheets.length} stylesheet${source.stylesheets.length === 1 ? '' : 's'}${source.rewritten ? ', currently showing your rewrite' : ''}.`,
             { ...source },
           )
         }),
@@ -863,6 +863,86 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             : ''
           return textResult(
             `Rewrote section ${result.sectionIndex}: ${result.before.elements} elements became ${result.after.elements}.${refused}${styleRefused}`,
+            { ...result },
+          )
+        }),
+    },
+    {
+      name: 'edit_section',
+      description:
+        "Make a small coding-agent style edit to the section source you just read, without returning the whole chapter. Every oldText must occur exactly once in the evolving source and the entire ordered batch is rejected if any edit is stale, missing, or ambiguous. sourceFingerprint and sectionIndex must both be copied from the same latest get_section_source result. The accepted result uses the same sanitizer, saved revision, Foliate rebuild, Undo, and Reset path as rewrite_section. Omit css to preserve the current remaster stylesheet; send css only when replacing that agent-owned stylesheet.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sourceFingerprint: {
+            type: 'string',
+            minLength: 1,
+            description: 'Copy unchanged from the same latest get_section_source result as sectionIndex.',
+          },
+          edits: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 50,
+            description: 'Ordered exact replacements. Include surrounding markup when oldText is not unique.',
+            items: {
+              type: 'object',
+              properties: {
+                oldText: { type: 'string', minLength: 1 },
+                newText: { type: 'string' },
+              },
+              required: ['oldText', 'newText'],
+              additionalProperties: false,
+            },
+          },
+          css: {
+            type: 'string',
+            description: 'Optional complete replacement for the agent-owned remaster stylesheet.',
+          },
+          summary: {
+            type: 'string',
+            maxLength: 240,
+            description: 'What you changed, in a sentence shown beside Undo.',
+          },
+          sectionIndex: SECTION_INDEX_SCHEMA,
+        },
+        required: ['sourceFingerprint', 'edits', 'sectionIndex'],
+        additionalProperties: false,
+      },
+      execute: (input) =>
+        run('edit_section', () => 'edited this chapter’s markup', async () => {
+          if (typeof input.sourceFingerprint !== 'string' || !input.sourceFingerprint) {
+            return errorResult('sourceFingerprint must come from get_section_source.')
+          }
+          if (!Number.isInteger(input.sectionIndex) || (input.sectionIndex as number) < 0) {
+            return errorResult('sectionIndex must be copied from get_section_source.')
+          }
+          if (!Array.isArray(input.edits) || input.edits.length < 1 || input.edits.length > 50) {
+            return errorResult('Send between 1 and 50 exact edits.')
+          }
+          const edits = input.edits.map((value, index) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) {
+              throw new Error(`Edit ${index + 1} must contain oldText and newText.`)
+            }
+            const record = value as Record<string, unknown>
+            if (
+              typeof record.oldText !== 'string' || !record.oldText ||
+              typeof record.newText !== 'string' ||
+              Object.keys(record).some((key) => key !== 'oldText' && key !== 'newText')
+            ) throw new Error(`Edit ${index + 1} must contain exactly non-empty oldText and string newText.`)
+            return { oldText: record.oldText, newText: record.newText }
+          })
+          const result = await commands.editSection(input.sectionIndex as number, input.sourceFingerprint, edits, {
+            ...(typeof input.css === 'string' ? { css: input.css } : {}),
+            ...(typeof input.summary === 'string' ? { summary: input.summary } : {}),
+          })
+          const refused = result.sanitized.modified
+            ? ` Removed: ${describeRefusals(result.sanitized)}.`
+            : ''
+          const styleRefused = result.cssModified
+            ? ' Some stylesheet rules were removed for reaching off-origin.'
+            : ''
+          return textResult(
+            `Applied ${result.editsApplied} exact edit${result.editsApplied === 1 ? '' : 's'} to section ${result.sectionIndex}.${refused}${styleRefused}`,
             { ...result },
           )
         }),

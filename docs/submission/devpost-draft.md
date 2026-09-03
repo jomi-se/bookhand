@@ -1,16 +1,15 @@
 # Devpost submission draft
 
-Date: 2026-09-02
+Date: 2026-09-03
 
 **Status: draft for José to rewrite.** This is scaffolding with the facts
-checked, not authored prose. Deployed claims below refer to commit `74b880b`;
-local claims refer to the combined main branch after the tutor, Study, and
-document-remaster work. Promote `[LOCAL]` to `[DEPLOYED]` only after pushing and
-verifying the live origin through ChatGPT Desktop.
+checked, not authored prose. Deployed claims below refer to commit `06d4c2d`;
+the local claim is the surgical remaster edit now in the working tree. Promote
+`[LOCAL]` to `[DEPLOYED]` only after pushing and verifying the live origin.
 
 Three tiers are marked throughout and must stay separated when this is edited:
 
-- **[DEPLOYED]** — live at the submission URL right now (W0–W5).
+- **[DEPLOYED]** — live at the submission URL at commit `06d4c2d`.
 - **[LOCAL]** — implemented and production-browser tested, but not yet verified
   on the deployed origin.
 - **[FUTURE]** — not built. Appears only under "What's next," never as a claim.
@@ -67,19 +66,22 @@ it says. That turned out to be the most interesting thing I built.
 - Works completely without an agent. WebMCP is what makes the tutor behavior
   possible; it is not what makes the reader work.
 
-**Thirteen capabilities published to the page's agent. [DEPLOYED]**
+**Twenty capabilities published to the page's agent. [DEPLOYED]**
 
 Registered through genuine `document.modelContext`:
 `get_design_context`, `list_books`, `open_book`, `get_reading_context`,
 `get_table_of_contents`, `get_passage`, `navigate_book`, `save_annotation`,
 `search_book`, `set_reading_style`, `upsert_study_item`, `list_study_items`,
-`set_study_board_view`.
-
-**Twenty capabilities on current main. [LOCAL]**
-
-The shipped set above plus `focus_passage`, `control_guidance`,
+`set_study_board_view`, `focus_passage`, `control_guidance`,
 `get_section_source`, `diagnose_section`, `rewrite_section`,
-`compile_section_math`, and `set_section_view`.
+`compile_section_math`, `set_section_view`.
+
+**One more token-efficient editing capability in the working tree. [LOCAL]**
+
+`edit_section` applies a small, exact batch against the fingerprinted source the
+agent just read. It returns only the replacements rather than the whole chapter,
+while retaining the same sanitizer, saved history, rendering, Undo, and Reset
+as `rewrite_section`.
 
 **The page tells the agent how to compose. [DEPLOYED]**
 
@@ -277,7 +279,7 @@ foundation already built beneath it.
 ## Links
 
 - **Live demo:** <https://bookhand.jomi-se.workers.dev/> — deployed commit
-  `74b880b` was verified through genuine WebMCP and ordinary Search before
+  `06d4c2d` was verified through genuine WebMCP and ordinary Search before
   recording.
 - **Repository:** `<GITHUB URL — repository must be made public before
   submitting>`
@@ -329,5 +331,5 @@ A checklist for the rewrite. None of these are true on current main:
 - a user-facing diagnostics surface (diagnostics have been removed from Study,
   not relocated into a finished Activity UI);
 - remaster-aware FTS reindexing, annotation re-anchoring, or EPUB export;
-- any tool beyond the twenty listed after the current branch is deployed;
+- any tool beyond the twenty-one listed after `edit_section` is deployed;
 - physical Android validation.

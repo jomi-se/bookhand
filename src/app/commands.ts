@@ -48,6 +48,8 @@ import type { BoardMode, SurfaceStore } from './surface.ts'
 import type {
   DocumentRemasterPort,
   SectionDiagnosis,
+  SectionEditResult,
+  SectionExactEdit,
   SectionRewriteResult,
   SectionSource,
 } from '../domain/remaster.ts'
@@ -327,6 +329,20 @@ export class BookhandCommands {
   ): Promise<SectionRewriteResult> {
     const index = await this.#resolveSection(options.sectionIndex)
     const result = await this.#remaster().rewriteSection(index, html, {
+      ...(options.css === undefined ? {} : { css: options.css }),
+      ...(options.summary === undefined ? {} : { summary: options.summary }),
+    })
+    this.#changed()
+    return result
+  }
+
+  async editSection(
+    sectionIndex: number,
+    sourceFingerprint: string,
+    edits: readonly SectionExactEdit[],
+    options: { readonly css?: string; readonly summary?: string } = {},
+  ): Promise<SectionEditResult> {
+    const result = await this.#remaster().editSection(sectionIndex, sourceFingerprint, edits, {
       ...(options.css === undefined ? {} : { css: options.css }),
       ...(options.summary === undefined ? {} : { summary: options.summary }),
     })

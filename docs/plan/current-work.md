@@ -1,14 +1,14 @@
 # Current work
 
-Last updated: 2026-09-02
+Last updated: 2026-09-03
 
 ## Next executable wave
 
 Deploy and exercise the combined **tutor + document remaster + composed Study**
-surface through ChatGPT Desktop. The local runtime now has twenty tools. The
+surface through ChatGPT Desktop. The local runtime now has twenty-one tools. The
 highest-value engineering continuation is W9's bounded temporary explanation
 and direct Study reveal; the highest-value owner action is an intent-only model
-run that proves the agent discovers the five remaster tools, reads actual XHTML,
+run that proves the agent discovers the six remaster tools, reads actual XHTML,
 rewrites one chapter, and leaves the person able to compare, Undo, Reset, and
 reload the result.
 
@@ -46,10 +46,10 @@ This direction is recorded in:
 - Slices 1 through 3 are implemented: local library/import, Foliate EPUB
   reading, SQLite WASM persistence, highlights/notes, the native Study board,
   and genuine `document.modelContext` registration.
-- The deployed open-book runtime exposes thirteen tools. The current local
-  runtime exposes twenty: the deployed set plus W6's two guidance tools and the
-  five document-remaster tools. Deployment truth must remain separate until
-  the current head is pushed and verified.
+- Deployed commit `06d4c2d` exposes twenty open-book tools. The current local
+  runtime exposes twenty-one: the deployed set plus the fingerprinted atomic
+  `edit_section` tool. Deployment truth must remain separate until this change
+  is pushed and verified.
 - W0 through W3 are implemented: runtime design-context discovery, source and
   persistence trust, shared observable style/board state, and the mobile/desktop
   reader reset.
@@ -97,11 +97,14 @@ This direction is recorded in:
   persistence, serialized navigation, stalled-view recovery, and a dedicated
   tutor-overlay identifier space that cannot replace durable annotations.
   W9 now supplies the production cue; anchored explanation remains open.
-- Document remaster is implemented through five genuine WebMCP tools. An agent
+- Document remaster is implemented through six genuine WebMCP tools. An agent
   reads current package-relative XHTML/CSS, diagnoses it without heuristic
   classification, rewrites the complete section through Foliate's own loader,
-  or optionally compiles publisher-supplied `data-tex` to MathML. Publisher
-  bytes remain immutable; Original/Rewritten, Undo, and Reset are visible.
+  makes small fingerprinted exact edits without returning the whole chapter,
+  or optionally compiles publisher-supplied `data-tex` to MathML. Exact-edit
+  batches are serialized, all-or-nothing revisions and preserve the existing
+  agent stylesheet when omitted. Publisher bytes remain immutable;
+  Original/Rewritten, Undo, and Reset are visible.
 - Schema v5 persists bounded sanitized rewrite history before it is shown and
   hydrates it before Foliate's first render. Markup, CSS, summary, Undo, and
   Reset survive reload. Reindexing, EPUB export, and annotation re-anchoring do
@@ -139,10 +142,10 @@ demonstration; W7 through W11 remain recorded rather than discarded.
 The WebMCP Challenge closes 2026-09-03T20:00Z.
 
 - Live surface: https://bookhand.jomi-se.workers.dev/
-- Deployed commit `74b880b` was verified with persistent browser storage,
-  thirteen genuine WebMCP tools, `search_book` reaching `ready / results` with
-  corpus-derived hits, ordinary human Search, reload survival, and no observed
-  page, console, request, or off-origin errors.
+- Deployed commit `06d4c2d` was verified with persistent browser storage,
+  twenty genuine WebMCP tools, `search_book` reaching `ready / results` with
+  corpus-derived hits, the document-remaster tools present, reload survival,
+  and no observed page, console, request, or off-origin errors.
 - Cloudflare Workers Builds deploys pushes to `main`.
 - `LICENSE` is committed. Making the GitHub repository public and attaching the
   final domain are owner actions.
@@ -185,6 +188,11 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
   first-render hydration are covered. The combined post-merge typecheck, lint,
   targeted units, production build, remaster browser, and Study/WebMCP browser
   suites pass.
+- Fingerprinted surgical remaster editing adds focused ordered/missing/
+  ambiguous/stale/concurrent/CSS-preservation units and a genuine production
+  WebMCP browser flow covering targeted rendering, atomic rejection, reload,
+  and one-step Undo. It remains local until pushed and checked on the deployed
+  origin.
 - The production tutor cue passes typed/schema validation, native Foliate
   painter selection, exact verified-range rendering, durable-highlight
   coexistence, transient cleanup, reduced-motion behavior, and the real

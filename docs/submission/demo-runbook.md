@@ -68,6 +68,12 @@ If it stops after formula conversion, use this intent-only follow-up:
 > the semantic structure, accessibility, and typography while preserving the
 > text.
 
+For later small corrections, let the model discover `edit_section`: it can read
+the current fingerprint and return only exact replacements rather than emitting
+the chapter again. Keep the filmed prompt intent-only, for example: “The chapter
+is good; change only that heading and fix this one typo.” Use a complete rewrite
+when the desired change is genuinely chapter-wide.
+
 ### Tutor: point inside the book
 
 > Where does this chapter explain what the integral sign really means? Take me
@@ -147,4 +153,3 @@ as evidence of model judgment.
 - continuous observation of the learner;
 - anchored temporary explanations or direct Study-item reveal;
 - atomic titled lesson entities, plots, or recoverable deletion.
-

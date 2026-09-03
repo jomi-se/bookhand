@@ -275,6 +275,60 @@ test('the deterministic shortcut is one call the agent may choose', async ({ pag
   await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('data-tex')
 })
 
+test('an agent can make a fingerprinted surgical edit that survives reload and undoes once', async ({ page }) => {
+  await openChapter(page)
+  await expect
+    .poll(() =>
+      page.evaluate(async () => (await document.modelContext!.getTools()).map((tool) => tool.name)),
+    )
+    .toContain('edit_section')
+
+  const sourceResult = await agentCall(page, 'get_section_source')
+  const source = sourceResult.structured as {
+    html?: string
+    sourceFingerprint?: string
+    revision?: number
+  }
+  expect(source.revision).toBe(0)
+  expect(source.sourceFingerprint).toMatch(/^fnv1a64-source-/)
+  const heading = source.html?.match(/<h2[^>]*>[\s\S]*?<\/h2>/)?.[0]
+  expect(heading).toBeTruthy()
+
+  const edited = await agentCall(page, 'edit_section', {
+    sectionIndex: sourceResult.structured.sectionIndex,
+    sourceFingerprint: source.sourceFingerprint,
+    edits: [{
+      oldText: heading,
+      newText: '<h2 id="surgical-heading">Chapter III — repaired without returning the chapter</h2>',
+    }],
+    summary: 'Repaired only the chapter heading',
+  })
+  expect(edited.isError).toBe(false)
+  expect(edited.structured).toMatchObject({ editsApplied: 1, sectionIndex: expect.any(Number) })
+  await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('id="surgical-heading"')
+  // Content outside the one exact replacement remains: this was not a tiny
+  // payload disguising a whole-section rewrite.
+  expect(await renderedHtml(page)).toContain('data-tex')
+  await expect(page.locator('.remaster-bar')).toContainText('Repaired only the chapter heading')
+
+  const stale = await agentCall(page, 'edit_section', {
+    sectionIndex: sourceResult.structured.sectionIndex,
+    sourceFingerprint: source.sourceFingerprint,
+    edits: [{ oldText: 'repaired without returning', newText: 'stale change' }],
+  })
+  expect(stale.isError).toBe(true)
+  expect(stale.text).toContain('changed after you read it')
+  expect(await renderedHtml(page)).toContain('repaired without returning')
+
+  await page.reload()
+  await reopenChapter(page)
+  await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('id="surgical-heading"')
+
+  await page.locator('.remaster-bar').getByRole('button', { name: 'Undo' }).click()
+  await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).not.toContain('id="surgical-heading"')
+  await expect(page.locator('.remaster-bar')).toBeHidden()
+})
+
 test('the person keeps a usable reading surface and touch controls on a compact screen', async ({
   page,
 }) => {

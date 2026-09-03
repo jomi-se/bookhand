@@ -77,7 +77,22 @@ export interface SectionSource {
   readonly html: string
   readonly stylesheets: readonly SectionStylesheet[]
   readonly rewritten: boolean
+  /** Number of agent-authored revisions currently retained for this section. */
+  readonly revision: number
+  /** Revision guard over the editable HTML and agent-owned stylesheet. */
+  readonly sourceFingerprint: string
   readonly bytes: number
+}
+
+export interface SectionExactEdit {
+  /** Exact source text which must occur once at this point in the batch. */
+  readonly oldText: string
+  /** Its replacement; empty removes the matched source. */
+  readonly newText: string
+}
+
+export interface SectionEditResult extends SectionRewriteResult {
+  readonly editsApplied: number
 }
 
 export interface SectionRewriteResult {
@@ -160,6 +175,12 @@ export interface DocumentRemasterPort {
     html: string,
     options?: { readonly css?: string; readonly summary?: string },
   ): Promise<SectionRewriteResult>
+  editSection(
+    sectionIndex: number,
+    sourceFingerprint: string,
+    edits: readonly SectionExactEdit[],
+    options?: { readonly css?: string; readonly summary?: string },
+  ): Promise<SectionEditResult>
   compileSectionMath(sectionIndex: number): Promise<RemasterReport>
   isShowingRewritten(): boolean
   hasRewrite(sectionIndex: number): boolean

@@ -1,5 +1,10 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { FoliateReaderAdapter } from '../../src/reader/index.ts'
+import {
+  applyExactEdits,
+  ExactEditError,
+  fingerprintSectionSource,
+} from '../../src/remaster/rewrite.ts'
 import type {
   RemasterStore,
   SectionRewriteVersion,
@@ -17,6 +22,44 @@ import type {
  * image carrying its LaTeX, and an ordinary figure that is not mathematics.
  */
 const SECTION = `<h1 class="ctitle">CHAPTER III</h1><p class="para">The ratio <img alt="d y by d x" data-tex="\\({\\dfrac{dy}{dx}}\\)" src="images/eq-1.svg" /> is what we hunt.</p><figure><img src="images/fig4.svg" alt="Fig. 4" /><figcaption>Fig. 4</figcaption></figure>`
+
+describe('exact section edits', () => {
+  it('fingerprints raw source bytes and binds them to the book and section', () => {
+    const base = { bookId: 'book-1', sectionIndex: 3, html: '<p>x</p>', css: 'p { color: red; }' }
+    const fingerprint = fingerprintSectionSource(base)
+    expect(fingerprint).toMatch(/^fnv1a64-source-[0-9a-f]{16}$/)
+    expect(fingerprintSectionSource({ ...base, html: '  <p>x</p>  ' })).not.toBe(fingerprint)
+    expect(fingerprintSectionSource({ ...base, css: 'p  { color: red; }' })).not.toBe(fingerprint)
+    expect(fingerprintSectionSource({ ...base, bookId: 'book-2' })).not.toBe(fingerprint)
+    expect(fingerprintSectionSource({ ...base, sectionIndex: 4 })).not.toBe(fingerprint)
+  })
+
+  it('applies ordered replacements against the evolving source', () => {
+    expect(applyExactEdits('<p>Alpha</p>', [
+      { oldText: 'Alpha', newText: 'Beta' },
+      { oldText: '<p>Beta</p>', newText: '<h2>Beta</h2>' },
+    ])).toBe('<h2>Beta</h2>')
+  })
+
+  it('rejects missing and ambiguous matches without changing the caller source', () => {
+    const source = '<p>same</p><p>same</p>'
+    expect(() => applyExactEdits(source, [
+      { oldText: 'same', newText: 'changed' },
+    ])).toThrow(ExactEditError)
+    expect(() => applyExactEdits(source, [
+      { oldText: '<h2>missing</h2>', newText: '' },
+    ])).toThrow(/did not match/)
+    expect(source).toBe('<p>same</p><p>same</p>')
+  })
+
+  it('rejects empty, oversized, and malformed batches', () => {
+    expect(() => applyExactEdits('x', [])).toThrow(/between 1 and 50/)
+    expect(() => applyExactEdits('x', Array.from({ length: 51 }, () => ({
+      oldText: 'x', newText: 'y',
+    })))).toThrow(/between 1 and 50/)
+    expect(() => applyExactEdits('x', [{ oldText: '', newText: 'y' }])).toThrow(/must not be empty/)
+  })
+})
 
 /** What Foliate's loader does before the transform sees a section. */
 function asLoaded(source: string): string {
@@ -253,6 +296,8 @@ describe('the agent’s read and write seam', () => {
     const source = await adapter.getSectionSource(0)
     expect(source.html).toContain('images/eq-1.svg')
     expect(source.html).not.toContain('blob:')
+    expect(source.revision).toBe(0)
+    expect(source.sourceFingerprint).toMatch(/^fnv1a64-source-/)
   })
 
   it('applies whatever markup the agent decides on', async () => {
@@ -267,6 +312,88 @@ describe('the agent’s read and write seam', () => {
     expect(rendered().querySelector('h2')?.textContent).toBe('Chapter III')
     expect(rendered().querySelector('math')).not.toBeNull()
     expect(rendered().querySelector('img')).toBeNull()
+  })
+
+  it('applies one atomic exact-edit revision and preserves remaster CSS', async () => {
+    const { adapter, rendered } = await openAdapter()
+    await adapter.rewriteSection(0, '<h2>Draft</h2><p>Small typo.</p>', {
+      css: 'p { line-height: 1.6; }',
+    })
+    const source = await adapter.getSectionSource(0)
+    const result = await adapter.editSection(0, source.sourceFingerprint, [
+      { oldText: 'Draft', newText: 'Polished' },
+      { oldText: 'Small typo.', newText: 'Small correction.' },
+    ], { summary: 'Corrected the heading and one sentence' })
+
+    expect(result.editsApplied).toBe(2)
+    expect(result.before.bytes).toBe(source.html.length)
+    expect(result.before.elements).toBe(2)
+    expect(rendered().querySelector('h2')?.textContent).toBe('Polished')
+    expect(rendered().body.textContent).toContain('Small correction.')
+    expect(adapter.describeRewrite(0)?.versions).toBe(2)
+    const edited = await adapter.getSectionSource(0)
+    expect(edited.revision).toBe(2)
+    expect(edited.stylesheets.find((sheet) => sheet.name === 'bookhand-remaster')?.css)
+      .toContain('line-height: 1.6')
+
+    await adapter.undoSection(0)
+    expect(rendered().querySelector('h2')?.textContent).toBe('Draft')
+  })
+
+  it('replaces the agent stylesheet when an edit explicitly supplies CSS', async () => {
+    const { adapter } = await openAdapter()
+    await adapter.rewriteSection(0, '<h2>Draft</h2>', { css: 'h2 { color: red; }' })
+    const source = await adapter.getSectionSource(0)
+
+    await adapter.editSection(0, source.sourceFingerprint, [
+      { oldText: 'Draft', newText: 'Polished' },
+    ], { css: 'h2 { color: blue; }' })
+
+    const edited = await adapter.getSectionSource(0)
+    const css = edited.stylesheets.find((sheet) => sheet.name === 'bookhand-remaster')?.css
+    expect(css).toContain('color: blue')
+    expect(css).not.toContain('color: red')
+  })
+
+  it('rejects stale or ambiguous edits before saving or rendering anything', async () => {
+    const persistence = makeStore()
+    const { adapter, rendered } = await openAdapter({ rewrites: persistence.store })
+    const original = await adapter.getSectionSource(0)
+    await adapter.rewriteSection(0, '<h2>Newer</h2><p>same same</p>')
+
+    await expect(adapter.editSection(0, original.sourceFingerprint, [
+      { oldText: 'CHAPTER III', newText: 'Changed' },
+    ])).rejects.toThrow(/changed after you read/)
+    const current = await adapter.getSectionSource(0)
+    await expect(adapter.editSection(0, current.sourceFingerprint, [
+      { oldText: 'Newer', newText: 'Newest' },
+      { oldText: 'same', newText: 'different' },
+    ])).rejects.toThrow(/ambiguous/)
+
+    expect(adapter.describeRewrite(0)?.versions).toBe(1)
+    expect(persistence.sections.get(0)).toHaveLength(1)
+    expect(persistence.calls.filter((call) => call === 'append')).toHaveLength(1)
+    expect(rendered().querySelector('h2')?.textContent).toBe('Newer')
+    expect(rendered().body.textContent).toContain('same same')
+  })
+
+  it('serializes competing edits so only one use of a fingerprint can commit', async () => {
+    const { adapter, rendered } = await openAdapter()
+    const source = await adapter.getSectionSource(0)
+    const [first, second] = await Promise.allSettled([
+      adapter.editSection(0, source.sourceFingerprint, [
+        { oldText: 'CHAPTER III', newText: 'FIRST EDIT' },
+      ]),
+      adapter.editSection(0, source.sourceFingerprint, [
+        { oldText: 'CHAPTER III', newText: 'SECOND EDIT' },
+      ]),
+    ])
+
+    expect(first.status).toBe('fulfilled')
+    expect(second.status).toBe('rejected')
+    expect(adapter.describeRewrite(0)?.versions).toBe(1)
+    expect(rendered().body.textContent).toContain('FIRST EDIT')
+    expect(rendered().body.textContent).not.toContain('SECOND EDIT')
   })
 
   it('refuses what could run or reach the network, and says what it removed', async () => {

@@ -45,11 +45,16 @@ import type {
   RemasterReport,
   RemasterStore,
   RewriteSummary,
+  SectionEditResult,
+  SectionExactEdit,
 } from '../domain/remaster.ts'
 import type { SectionStylesheet } from '../remaster/rewrite.ts'
 import {
   applyVersion,
+  applyExactEdits,
   currentVersion,
+  ExactEditError,
+  fingerprintSectionSource,
   prepareRewrite,
   readSection,
   REMASTER_STYLE_ID,
@@ -167,6 +172,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   #rewrites = new Map<number, SectionRewrite>()
   #showRewritten = true
   #rebuilding: Promise<void> = Promise.resolve()
+  #remasterMutations: Promise<void> = Promise.resolve()
   /** Which book is open, and where its rewrites are kept between sessions. */
   #bookId: string | undefined
   #rewriteStore: RemasterStore | undefined
@@ -836,9 +842,17 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     const label = this.#sectionLabel(sectionIndex)
     const version = this.#currentVersion(sectionIndex)
     const stylesheets = await this.#readStylesheets(book, sectionIndex, document_)
+    const html = (document_.body ?? document_.documentElement)?.innerHTML ?? ''
     return readSection(document_, sectionIndex, {
       ...(label === undefined ? {} : { label }),
       rewritten: this.#rewrites.has(sectionIndex),
+      revision: this.#rewrites.get(sectionIndex)?.versions.length ?? 0,
+      sourceFingerprint: fingerprintSectionSource({
+        ...(this.#bookId === undefined ? {} : { bookId: this.#bookId }),
+        sectionIndex,
+        html,
+        ...(version?.css === undefined ? {} : { css: version.css }),
+      }),
       // The agent's own stylesheet comes back too, so a second pass edits what
       // it wrote rather than starting from a sheet it cannot see.
       stylesheets: version?.css
@@ -889,10 +903,19 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     html: string,
     options: { readonly css?: string; readonly summary?: string } = {},
   ): Promise<RewriteResult> {
-    const rendered = this.#renderedSection(sectionIndex)
+    return this.#mutateRemaster(() => this.#rewriteSectionNow(sectionIndex, html, options))
+  }
+
+  async #rewriteSectionNow(
+    sectionIndex: number,
+    html: string,
+    options: { readonly css?: string; readonly summary?: string },
+    previousHtml?: string,
+  ): Promise<RewriteResult> {
+    const beforeHtml = previousHtml ?? (await this.getSectionSource(sectionIndex)).html
     const before = {
-      elements: rendered?.doc.body?.querySelectorAll('*').length ?? 0,
-      bytes: rendered?.doc.body?.innerHTML.length ?? 0,
+      elements: countElements(beforeHtml),
+      bytes: beforeHtml.length,
     }
     const prepared = prepareRewrite({
       html,
@@ -911,6 +934,44 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   }
 
   /**
+   * Apply a coding-agent style patch to the exact source it just read.
+   *
+   * Matching happens before sanitization or persistence, so a stale,
+   * missing, or ambiguous edit cannot leave half a batch in the book. The
+   * resulting complete document deliberately goes through rewriteSection:
+   * there is one security boundary, one revision mechanism, and one rebuild.
+   */
+  async editSection(
+    sectionIndex: number,
+    sourceFingerprint: string,
+    edits: readonly SectionExactEdit[],
+    options: { readonly css?: string; readonly summary?: string } = {},
+  ): Promise<SectionEditResult> {
+    return this.#mutateRemaster(async () => {
+      const source = await this.getSectionSource(sectionIndex)
+      if (source.sourceFingerprint !== sourceFingerprint) {
+        throw new ExactEditError(
+          'The section changed after you read it. Read get_section_source again and rebuild the edit from that source.',
+        )
+      }
+      const html = applyExactEdits(source.html, edits)
+      const existingCss = this.#currentVersion(sectionIndex)?.css
+      const result = await this.#rewriteSectionNow(
+        sectionIndex,
+        html,
+        {
+          ...(options.css === undefined
+            ? existingCss === undefined ? {} : { css: existingCss }
+            : { css: options.css }),
+          ...(options.summary === undefined ? {} : { summary: options.summary }),
+        },
+        source.html,
+      )
+      return { ...result, editsApplied: edits.length }
+    })
+  }
+
+  /**
    * The deterministic bulk repair, offered as a tool rather than imposed.
    *
    * A TeX-derived EPUB carries its own LaTeX in `data-tex`, and compiling that
@@ -920,6 +981,10 @@ export class FoliateReaderAdapter implements ReaderAdapter {
    * agent chooses, never something that happens to a book on its own.
    */
   async compileSectionMath(sectionIndex: number): Promise<RemasterReport> {
+    return this.#mutateRemaster(() => this.#compileSectionMathNow(sectionIndex))
+  }
+
+  async #compileSectionMathNow(sectionIndex: number): Promise<RemasterReport> {
     // From the section's *source*, never the rendered DOM. The rendered copy
     // has had its references replaced with `blob:` URLs that die with the page,
     // so compiling from it would store a version that cannot survive a reload
@@ -962,6 +1027,10 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
   /** Show the publisher's markup or the agent's, across the whole book. */
   async showRewritten(showRewritten: boolean): Promise<number> {
+    return this.#mutateRemaster(() => this.#showRewrittenNow(showRewritten))
+  }
+
+  async #showRewrittenNow(showRewritten: boolean): Promise<number> {
     if (this.#showRewritten === showRewritten) return 0
     this.#showRewritten = showRewritten
     // Only what is on screen has to be rebuilt; the rest is served correctly
@@ -975,6 +1044,10 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
   /** Throw an agent's work away and put the publisher's section back. */
   async resetSection(sectionIndex: number): Promise<boolean> {
+    return this.#mutateRemaster(() => this.#resetSectionNow(sectionIndex))
+  }
+
+  async #resetSectionNow(sectionIndex: number): Promise<boolean> {
     if (!this.#rewrites.has(sectionIndex)) return false
     // Forget it in the library first: a reset the library did not accept would
     // come back on the next reload, which is the opposite of what Reset means.
@@ -986,6 +1059,10 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
   /** Step back one revision. Returns how many of the agent's remain. */
   async undoSection(sectionIndex: number): Promise<{ readonly versions: number } | undefined> {
+    return this.#mutateRemaster(() => this.#undoSectionNow(sectionIndex))
+  }
+
+  async #undoSectionNow(sectionIndex: number): Promise<{ readonly versions: number } | undefined> {
     const existing = this.#rewrites.get(sectionIndex)
     if (!existing || existing.versions.length === 0) return undefined
     await this.#persist((store, bookId) => store.undo(bookId, sectionIndex))
@@ -994,6 +1071,13 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     else this.#rewrites.set(sectionIndex, { ...existing, versions })
     await this.#rebuildSection(sectionIndex)
     return { versions: versions.length }
+  }
+
+  /** Serialize remaster writes so a fingerprint is a real compare-and-set guard. */
+  #mutateRemaster<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.#remasterMutations.then(operation, operation)
+    this.#remasterMutations = result.then(() => undefined, () => undefined)
+    return result
   }
 
   /**
@@ -1140,16 +1224,6 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     if (this.#marks.length > 0) this.renderAnnotations(this.#marks)
     if (this.#tutorTarget) void this.#renderTutorOverlay(this.#tutorGeneration)
   }
-
-
-
-
-  #renderedSection(sectionIndex: number) {
-    return this.#active?.view.renderer
-      .getContents()
-      .find((entry) => entry.index === sectionIndex)
-  }
-
   #sectionSource(sectionIndex: number): () => Promise<Document> {
     const { book } = this.#requireActive()
     if (!this.#isValidSection(sectionIndex)) throw new ReaderSectionLoadError(sectionIndex)

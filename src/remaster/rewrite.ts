@@ -14,7 +14,11 @@ import {
   translateResources,
   type ResourceMap,
 } from './resources.ts'
-import type { SectionRewriteVersion, StoredSectionRewrite } from '../domain/remaster.ts'
+import type {
+  SectionExactEdit,
+  SectionRewriteVersion,
+  StoredSectionRewrite,
+} from '../domain/remaster.ts'
 import { sanitizeCss, sanitizeSectionHtml, type SanitizeResult } from './sanitize.ts'
 
 /** Marks the stylesheet Bookhand injects on an agent's behalf. */
@@ -39,6 +43,8 @@ export interface SectionSource {
   readonly stylesheets: readonly SectionStylesheet[]
   /** Whether this section is currently showing an agent's rewrite. */
   readonly rewritten: boolean
+  readonly revision: number
+  readonly sourceFingerprint: string
   readonly bytes: number
 }
 
@@ -66,6 +72,8 @@ export function readSection(
   options: {
     readonly label?: string
     readonly rewritten: boolean
+    readonly revision: number
+    readonly sourceFingerprint: string
     readonly stylesheets: readonly SectionStylesheet[]
   },
 ): SectionSource {
@@ -77,8 +85,60 @@ export function readSection(
     html,
     stylesheets: options.stylesheets,
     rewritten: options.rewritten,
+    revision: options.revision,
+    sourceFingerprint: options.sourceFingerprint,
     bytes: html.length,
   }
+}
+
+export class ExactEditError extends Error {}
+
+/**
+ * Fingerprint source bytes, not normalized reading text.
+ *
+ * Length framing keeps the tuple unambiguous even when content contains the
+ * separator characters. This is an optimistic-concurrency token rather than
+ * an authorization secret, but 64 bits makes accidental collisions remote.
+ */
+export function fingerprintSectionSource(input: {
+  readonly bookId?: string
+  readonly sectionIndex: number
+  readonly html: string
+  readonly css?: string
+}): string {
+  const components = [input.bookId ?? '', String(input.sectionIndex), input.html, input.css ?? '']
+  const framed = components.map((component) => `${component.length}:${component}`).join('|')
+  let hash = 0xcbf29ce484222325n
+  for (let index = 0; index < framed.length; index += 1) {
+    hash ^= BigInt(framed.charCodeAt(index))
+    hash = BigInt.asUintN(64, hash * 0x100000001b3n)
+  }
+  return `fnv1a64-source-${hash.toString(16).padStart(16, '0')}`
+}
+
+/** Apply an ordered patch without interpreting the model's markup. */
+export function applyExactEdits(
+  html: string,
+  edits: readonly SectionExactEdit[],
+): string {
+  if (edits.length < 1 || edits.length > 50) {
+    throw new ExactEditError('Send between 1 and 50 exact edits.')
+  }
+  let result = html
+  edits.forEach((edit, index) => {
+    if (!edit.oldText) throw new ExactEditError(`Edit ${index + 1} oldText must not be empty.`)
+    const first = result.indexOf(edit.oldText)
+    if (first < 0) {
+      throw new ExactEditError(`Edit ${index + 1} did not match the current section source.`)
+    }
+    if (result.indexOf(edit.oldText, first + edit.oldText.length) >= 0) {
+      throw new ExactEditError(
+        `Edit ${index + 1} is ambiguous because oldText occurs more than once. Include more surrounding source.`,
+      )
+    }
+    result = result.slice(0, first) + edit.newText + result.slice(first + edit.oldText.length)
+  })
+  return result
 }
 
 export interface RewriteResult {

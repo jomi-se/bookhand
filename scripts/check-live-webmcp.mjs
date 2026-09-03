@@ -72,6 +72,7 @@ try {
   }
   if (!reading.includes('get_reading_context')) throw new Error('reading tools never appeared')
   if (!reading.includes('search_book')) throw new Error('deployed build does not expose search_book')
+  if (!reading.includes('edit_section')) throw new Error('deployed build does not expose edit_section')
   console.log('reading tools:', reading.join(', '))
 
   let search
