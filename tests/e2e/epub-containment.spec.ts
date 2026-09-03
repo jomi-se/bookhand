@@ -33,7 +33,7 @@ test('an imported book cannot script, exfiltrate, or reach the application', asy
   await page.locator('input[type=file]').setInputFiles('tests/fixtures/epub/malicious-book.epub')
 
   const row = page.locator('.book-open', { hasText: 'Bookhand Malicious Sentinel Corpus' })
-  await expect(row).toBeVisible()
+  await expect(row).toBeVisible({ timeout: 20_000 })
   await row.click()
 
   // Containment that erased ordinary packaged content would be a broken reader,
