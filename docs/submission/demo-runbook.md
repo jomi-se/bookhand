@@ -6,6 +6,9 @@ Status: operator checklist and draft narration. This is not proof that the
 current local head is deployed. Promote a capability on camera only after the
 deployed origin and ChatGPT Desktop have demonstrated it.
 
+Run `docs/submission/chatgpt-desktop-test-checklist.md` first and record its
+five must-win results before filming.
+
 ## The story
 
 Lead with the capability that an ordinary ebook reader plus a chatbot cannot
