@@ -203,8 +203,8 @@ retain a visible route back to a named shipped theme or the publisher baseline.
   together.
 - **Reader and source first:** Give the book the calmest and largest reading
   region. Study artifacts lead with the learning material and keep exact,
-  navigable source relationships; they do not default to chat transcripts or
-  equally weighted card grids.
+  navigable source relationships. Multi-part teaching becomes one titled,
+  ordered lesson rather than a flat feed or an equally weighted card grid.
 - **Accessible by construction:** Preserve WCAG AA text contrast, 3:1
   meaningful non-text state, visible focus, disabled and selection contrast,
   44px coarse-pointer targets, reduced motion, and mobile reflow.
@@ -380,6 +380,14 @@ kind that cannot yet render meaningfully — an equation still shown as its raw
 source — is a gap in the rendering, not permission to hand the surface a
 foreign renderer or raw markup.
 
+Composed teaching is a first-class lesson: a meaningful title establishes the
+conceptual hierarchy, ordered blocks carry the progression, and shared source
+and provenance appear once at lesson level. Standalone blocks remain useful as
+quiet notes, but action-group metadata is never presented as if it were a
+lesson. Expanded Study gives the lesson a centered reading measure and demotes
+the book to reference; on compact screens Study becomes the full working
+surface rather than compressing two columns.
+
 **The Diagnostics Are Not Study Rule.** Raw agent telemetry — tool names, call
 lists, counts, success and failure history — never appears in Study. Study is
 the learner's material; a scrolling log of what a model did is a different
@@ -387,9 +395,7 @@ surface with a different audience, and putting it in the study viewport tells
 the learner the machinery matters as much as the lesson. The only agent-facing
 element Study may carry is a compact semantic status for guidance happening
 right now, saying what is being explained and exposing Back and Stop. This is
-an invariant, and the shipped board does not yet satisfy it: `StudyBoardPanel`
-still accepts and renders an `agentActivity` node above the learner's content.
-Treat that as a defect against this rule, not as precedent.
+an invariant. Observability must remain a separate diagnostics surface.
 
 ### Motion
 

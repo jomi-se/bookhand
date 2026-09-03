@@ -249,6 +249,23 @@ export class StorageWorkerRuntime {
           type: 'study-items',
           items: this.requireRepository().listStudyItems(request.boardId),
         }
+      case 'commit-study-experience':
+        return {
+          type: 'study-experience-committed',
+          commit: this.requireRepository().commitStudyExperience(
+            request.experience,
+            request.mutation,
+            new Date().toISOString(),
+          ),
+        }
+      case 'delete-study-experience':
+        this.requireRepository().deleteStudyExperience(request.experienceId, request.boardId)
+        return { type: 'study-experience-deleted', experienceId: request.experienceId }
+      case 'list-study-experiences':
+        return {
+          type: 'study-experiences',
+          experiences: this.requireRepository().listStudyExperiences(request.boardId),
+        }
       case 'get-index-state':
         return { type: 'index-state', state: this.requireRepository().getIndexState(request.bookId) }
       case 'begin-index':

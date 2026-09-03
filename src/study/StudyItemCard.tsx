@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { CornerUpLeft, Link, RefreshCw, Sparkles, Trash2, Undo2 } from 'lucide-react'
-import type { StudyItem } from '../domain/index.ts'
+import type { StudyItem, StudyItemPayload } from '../domain/index.ts'
 import { compileTex } from '../remaster/tex.ts'
 
 export interface StudyItemCardProps {
@@ -37,8 +37,13 @@ function RenderedEquation({ expression }: { readonly expression: string }) {
   return <div ref={host} className="block-equation-rendered" />
 }
 
-function Body({ item }: { readonly item: StudyItem }) {
-  const payload = item.payload
+export function StudyPayloadBody({
+  payload,
+  blockId,
+}: {
+  readonly payload: StudyItemPayload
+  readonly blockId: string
+}) {
   switch (payload.kind) {
     case 'prose':
       return <p className="block-prose">{payload.text}</p>
@@ -62,7 +67,7 @@ function Body({ item }: { readonly item: StudyItem }) {
           {payload.title ? <p className="block-steps-title">{payload.title}</p> : null}
           <ol>
             {payload.steps.map((step, index) => (
-              <li key={`${item.id}-step-${index}`}>{step}</li>
+              <li key={`${blockId}-step-${index}`}>{step}</li>
             ))}
           </ol>
         </div>
@@ -163,7 +168,7 @@ export function StudyItemCard({
           </button>
         </div>
       ) : null}
-      <Body item={item} />
+      <StudyPayloadBody payload={item.payload} blockId={item.id} />
     </li>
   )
 }

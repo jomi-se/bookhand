@@ -150,51 +150,90 @@ test('an agent reads the page, highlights it, and builds a source-linked lesson'
   expect(fabricated.isError).toBe(true)
   expect(fabricated.text).toContain('does not match the text at that location')
 
-  // 4. Build a source-linked lesson on the study board.
-  const lesson = await agentCall(page, 'upsert_study_item', {
-    kind: 'steps',
+  // 4. Build one source-linked lesson atomically, after reading its design
+  // context. The title and progression are structure, not action metadata.
+  const design = await agentCall(page, 'get_design_context', { surface: 'study' })
+  const designContextVersion = /guidance version (sha256:[0-9a-f]{64})/.exec(design.text)?.[1]
+  expect(designContextVersion).toBeTruthy()
+  const lesson = await agentCall(page, 'create_study_lesson', {
     title: 'Reading a slope',
-    steps: ['Take two points on the curve', 'Divide the rise by the run'],
-    actionToken: 'slope-steps',
+    blocks: [
+      {
+        id: 'approach',
+        kind: 'steps',
+        steps: ['Take two points on the curve', 'Divide the rise by the run'],
+      },
+      {
+        id: 'ratio',
+        kind: 'equation',
+        expression: '\\dfrac{dy}{dx}',
+        caption: 'The differential coefficient',
+      },
+      {
+        id: 'check',
+        kind: 'question',
+        prompt: 'What happens as the two points come together?',
+        answer: 'The secant ratio approaches the tangent slope.',
+      },
+    ],
+    actionToken: 'slope-lesson',
     actionGroupId: 'slope-lesson',
+    designContextVersion,
     bookId,
     sourceRange: visibleRange,
     sourceQuote: quote,
     sourceLabel: 'Chapter X',
   })
-  expect(lesson.isError).toBe(false)
-  // The receipt names the person's own reversals and hands over the one-time
-  // token, which is the only way the agent can revise this block later.
-  expect(lesson.text).toContain('updateToken:')
-  expect(lesson.text).toContain('Undo')
-
-  const equation = await agentCall(page, 'upsert_study_item', {
-    kind: 'equation',
-    expression: '\\dfrac{dy}{dx}',
-    caption: 'The differential coefficient',
-    actionToken: 'slope-equation',
-    actionGroupId: 'slope-lesson',
-    bookId,
-    sourceRange: visibleRange,
-    sourceQuote: quote,
-    sourceLabel: 'Chapter X',
-  })
-  expect(equation.isError).toBe(false)
+  expect(lesson.isError, lesson.text).toBe(false)
+  expect(lesson.text).toContain('3 ordered blocks')
 
   // The person sees all of it in the ordinary interface.
   await page.getByRole('button', { name: 'Study' }).click()
-  await expect(page.locator('.study-item[data-kind="steps"]')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Reading a slope', level: 3 })).toBeVisible()
   await expect(page.getByText('Divide the rise by the run')).toBeVisible()
-  await expect(page.locator('.study-item-group[data-composed="true"]')).toHaveCount(1)
+  await expect(page.locator('#study-experience-19-lesson-slope-lesson-block-5-ratio')).toBeVisible()
   await expect(page.locator('.block-equation-rendered math')).toBeVisible()
   await expect(page.locator('.block-equation pre')).toHaveCount(0)
   await expect(page.locator('.highlight')).toHaveCount(1)
   await expect(page.getByText('Worth revisiting')).toBeVisible()
 
+  if (process.env.CAPTURE_STUDY === '1') {
+    await page.screenshot({ path: '.impeccable/review/desktop-docked.png', fullPage: true })
+    await page.getByRole('button', { name: 'Expand the study board' }).click()
+    await expect(page.locator('.reader')).toHaveAttribute('data-board', 'expanded')
+    await page.screenshot({ path: '.impeccable/review/desktop.png', fullPage: true })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.screenshot({ path: '.impeccable/review/mobile.png', fullPage: true })
+    await page.setViewportSize({ width: 320, height: 720 })
+    await page.screenshot({ path: '.impeccable/review/mobile-320.png', fullPage: true })
+    await agentCall(page, 'set_reading_style', { theme: 'dark' })
+    await page.screenshot({ path: '.impeccable/review/mobile-dark.png', fullPage: true })
+    await agentCall(page, 'set_reading_style', { theme: 'sepia' })
+    await page.screenshot({ path: '.impeccable/review/mobile-sepia.png', fullPage: true })
+    await agentCall(page, 'set_reading_style', { theme: 'publisher' })
+  }
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 720 })
+    expect(
+      await page
+        .locator('#reader-study-panel')
+        .evaluate((element) => element.scrollWidth <= element.clientWidth),
+    ).toBe(true)
+    const backToBook = await page
+      .getByRole('button', { name: 'Close study and return to the book' })
+      .boundingBox()
+    expect(backToBook?.height).toBeGreaterThanOrEqual(44)
+    expect(backToBook?.width).toBeGreaterThanOrEqual(44)
+    const sourceControl = await page.locator('.study-lesson-tools .button-text').boundingBox()
+    expect(sourceControl?.height).toBeGreaterThanOrEqual(44)
+    const revealControl = await page.locator('.study-lesson summary').boundingBox()
+    expect(revealControl?.height).toBeGreaterThanOrEqual(44)
+  }
+
   // Tool logs are observability, not learning content. Study contains the
   // result and its authorship, never raw handler names or call history.
   await expect(page.locator('.agent-activity')).toHaveCount(0)
-  await expect(page.getByText('upsert_study_item')).toHaveCount(0)
+  await expect(page.getByText('create_study_lesson')).toHaveCount(0)
 
   // The highlight is drawn over the book itself, not merely stored.
   await expect
@@ -213,11 +252,15 @@ test('an agent reads the page, highlights it, and builds a source-linked lesson'
   // their source-linked presentation.
   await reopenBook(page)
   await page.getByRole('button', { name: 'Study' }).click()
-  await expect(page.locator('.study-item[data-kind="steps"]')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Reading a slope', level: 3 })).toBeVisible()
   await expect(page.getByText('Divide the rise by the run')).toBeVisible()
-  await expect(page.locator('.study-item-group[data-composed="true"]')).toHaveCount(1)
+  await expect(page.locator('#study-experience-19-lesson-slope-lesson-block-5-ratio')).toBeVisible()
   await expect(page.locator('.block-equation-rendered math')).toBeVisible()
   await expect(page.getByText('Worth revisiting')).toBeVisible()
+  const lessonsAfterReload = await agentCall(page, 'list_study_lessons')
+  expect(lessonsAfterReload.isError).toBe(false)
+  expect(lessonsAfterReload.text).toContain('lesson-slope-lesson')
+  expect(lessonsAfterReload.text).toContain('ratio:equation')
   await expect(page.locator('.highlight')).toHaveCount(1)
 })
 

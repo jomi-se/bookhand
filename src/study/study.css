@@ -1,10 +1,115 @@
 .study-panel {
   min-inline-size: 0;
+  container-type: inline-size;
+}
+
+.study-lessons {
+  display: grid;
+  gap: 28px;
+}
+
+.study-lesson {
+  max-inline-size: 48rem;
+  margin-inline: auto;
+  padding-block: 8px 24px;
+  border-block-end: 1px solid var(--rule);
+  outline: none;
+}
+
+.study-lesson:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 26%, transparent);
+}
+
+.study-lesson-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-block-end: 22px;
+}
+
+.study-lesson-head h3 {
+  max-inline-size: 24ch;
+  margin: 3px 0 0;
+  font-family: var(--serif);
+  font-size: clamp(var(--step-2), 1.15rem + 0.9vw, var(--step-3));
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.study-lesson-origin {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--step--2);
+}
+
+.study-lesson-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.study-lesson-tools .button-text {
+  min-block-size: var(--tap);
+}
+
+.study-lesson-blocks {
+  display: grid;
+  gap: 0;
+}
+
+.study-lesson-block {
+  padding-block: 15px;
+}
+
+.study-lesson-block + .study-lesson-block {
+  border-block-start: 1px solid color-mix(in oklab, var(--rule) 70%, transparent);
+}
+
+.study-lesson-block[data-kind='prose'],
+.study-lesson-block[data-kind='quotation'] {
+  font-family: var(--serif);
+  font-size: var(--step-0);
+}
+
+.study-lesson-block[data-kind='question'] {
+  margin-block-start: 6px;
+  padding: 18px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--raised);
+}
+
+.study-notes,
+.highlights,
+.study-authoring {
+  max-inline-size: 48rem;
+  margin-inline: auto;
+}
+
+.study-notes {
+  margin-block-start: 28px;
+}
+
+.study-notes .section-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .panel-head-tools {
   display: flex;
   gap: 2px;
+}
+
+.study-close-compact,
+.study-close-label {
+  display: none;
 }
 
 /* Expanded view: the board becomes the workspace and the book steps back to a
@@ -82,7 +187,7 @@
   margin-block: 14px;
   padding: 4px 14px;
   border: 1px solid var(--rule);
-  border-radius: 8px;
+  border-radius: 6px;
   background: color-mix(in oklab, var(--raised) 72%, var(--canvas));
 }
 
@@ -238,9 +343,24 @@
 }
 
 .block-question summary {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--tap);
   color: var(--accent);
   font-size: var(--step--1);
   cursor: pointer;
+}
+
+@container (max-width: 420px) {
+  .study-lesson-head {
+    flex-direction: column;
+    margin-block-end: 14px;
+  }
+
+  .study-lesson-tools {
+    inline-size: 100%;
+    justify-content: space-between;
+  }
 }
 
 .block-question details p {
@@ -264,7 +384,7 @@
   grid-column: 1;
   padding: 0 0 0 12px;
   border: 0;
-  border-inline-start: 3px solid var(--accent);
+  border-inline-start: 1px solid var(--accent);
   background: none;
   color: inherit;
   font: inherit;
@@ -303,5 +423,47 @@
 @media (max-width: 860px) {
   .reader[data-board='expanded'][data-panel='study'] .reader-stage {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .study-lesson-head {
+    gap: 12px;
+  }
+
+  .study-view-toggle,
+  .study-close-wide {
+    display: none;
+  }
+
+  .study-close {
+    inline-size: auto;
+    min-inline-size: var(--tap);
+    padding-inline: 10px;
+    gap: 6px;
+  }
+
+  .study-close-compact,
+  .study-close-label {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 520px) {
+  .study-lesson {
+    padding-block-start: 2px;
+  }
+
+  .study-lesson-head {
+    flex-direction: column;
+    margin-block-end: 14px;
+  }
+
+  .study-lesson-tools {
+    inline-size: 100%;
+    justify-content: space-between;
+  }
+
+  .study-lesson-block[data-kind='question'] {
+    margin-inline: -6px;
+    padding: 14px;
   }
 }

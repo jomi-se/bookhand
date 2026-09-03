@@ -15,6 +15,10 @@ import type {
   StudyItemCommit,
   StudyItemPayload,
   StudyMutation,
+  StudyExperience,
+  StudyExperienceCommit,
+  StudyExperienceMutation,
+  StudyExperienceBlock,
   SourceLink,
   IndexChunk,
   IndexState,
@@ -661,6 +665,107 @@ export class LibraryRepository {
     return rows.map(studyItemFromRow)
   }
 
+  /** Atomically persist one composed lesson and its ordered blocks. */
+  commitStudyExperience(
+    experience: StudyExperience,
+    mutation: StudyExperienceMutation,
+    now: string,
+  ): StudyExperienceCommit {
+    return this.db.transaction('IMMEDIATE', () => {
+      const digest = canonicalize({
+        entity: 'study-experience',
+        id: experience.id,
+        boardId: experience.boardId,
+        title: experience.title,
+        blocks: experience.blocks,
+        sourceRange: experience.sourceRange ?? null,
+        sourceLabel: experience.sourceLabel ?? null,
+        source: experience.source ?? null,
+      })
+      const replay = this.#findReceipt({ ...mutation, operation: 'create' })
+      if (replay) {
+        if (replay.operation !== 'create-study-experience' || replay.payload_digest !== digest) {
+          throw new OwnershipError(
+            'That action was already used for a different change.',
+            `Action token reused for study experience ${experience.id}`,
+          )
+        }
+        return {
+          ...(parseJson<StudyExperienceCommit>(replay.result_json, 'action receipt')),
+          replayed: true,
+        }
+      }
+      if (this.db.selectValue('SELECT count(*) FROM study_experiences WHERE id = ?', [experience.id])) {
+        throw new OwnershipError(
+          'That lesson id is already in use.',
+          `create with existing experience id ${experience.id}`,
+        )
+      }
+      const created: StudyExperience = {
+        ...experience,
+        origin: mutation.origin,
+        actionGroupId: mutation.actionGroupId,
+        revision: 1,
+        updatedAt: now,
+      }
+      this.db.exec({
+        sql: `INSERT INTO study_experiences (
+                id, board_id, title, blocks_json, source_range_json, source_label,
+                source_json, sort_order, created_at, updated_at, origin,
+                action_group_id, revision
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+        bind: [
+          created.id,
+          created.boardId,
+          created.title,
+          JSON.stringify(created.blocks),
+          created.sourceRange ? JSON.stringify(created.sourceRange) : null,
+          created.sourceLabel ?? null,
+          created.source ? JSON.stringify(created.source) : null,
+          created.sortOrder,
+          created.createdAt,
+          created.updatedAt,
+          created.origin,
+          created.actionGroupId,
+        ],
+      })
+      const commit: StudyExperienceCommit = { experience: created, replayed: false }
+      this.db.exec({
+        sql: `INSERT INTO action_receipts
+              (book_id, origin, action_token, operation, payload_digest, result_json, created_at)
+              VALUES (?, ?, ?, 'create-study-experience', ?, ?, ?)`,
+        bind: [
+          mutation.bookId,
+          mutation.origin,
+          mutation.actionToken,
+          digest,
+          JSON.stringify(commit),
+          now,
+        ],
+      })
+      return commit
+    })
+  }
+
+  listStudyExperiences(boardId: string): readonly StudyExperience[] {
+    return this.db
+      .selectObjects(
+        `SELECT id, board_id, title, blocks_json, source_range_json, source_label,
+                source_json, sort_order, created_at, updated_at, origin,
+                action_group_id, revision
+         FROM study_experiences WHERE board_id = ? ORDER BY sort_order ASC, created_at ASC`,
+        [boardId],
+      )
+      .map(studyExperienceFromRow)
+  }
+
+  deleteStudyExperience(experienceId: string, boardId: string): void {
+    this.db.exec({
+      sql: 'DELETE FROM study_experiences WHERE id = ? AND board_id = ?',
+      bind: [experienceId, boardId],
+    })
+  }
+
   nextStudyItemOrder(boardId: string): number {
     return (
       Number(
@@ -1008,6 +1113,30 @@ function sourceJson(item: StudyItem): string | null {
   return item.sourceRange
     ? JSON.stringify({ range: item.sourceRange, label: item.sourceLabel ?? null })
     : null
+}
+
+function studyExperienceFromRow(row: Row): StudyExperience {
+  return {
+    id: asString(row.id, 'study experience id'),
+    boardId: asString(row.board_id, 'study experience board id'),
+    title: asString(row.title, 'study experience title'),
+    blocks: parseJson<readonly StudyExperienceBlock[]>(row.blocks_json, 'study experience blocks'),
+    origin: asString(row.origin, 'study experience origin') as StudyExperience['origin'],
+    actionGroupId: asString(row.action_group_id, 'study experience action group'),
+    revision: Number(row.revision ?? 1),
+    ...(row.source_range_json === null || row.source_range_json === undefined
+      ? {}
+      : { sourceRange: parseJson<BookRange>(row.source_range_json, 'study experience source') }),
+    ...(row.source_label === null || row.source_label === undefined
+      ? {}
+      : { sourceLabel: asString(row.source_label, 'study experience source label') }),
+    ...(row.source_json === null || row.source_json === undefined
+      ? {}
+      : { source: parseJson<SourceLink>(row.source_json, 'study experience canonical source') }),
+    sortOrder: Number(row.sort_order ?? 0),
+    createdAt: asString(row.created_at, 'study experience created time'),
+    updatedAt: asString(row.updated_at, 'study experience updated time'),
+  }
 }
 
 /**

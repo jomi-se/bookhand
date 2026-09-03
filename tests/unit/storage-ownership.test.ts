@@ -3,7 +3,7 @@
 import sqlite3InitModule, { type Database } from '@sqlite.org/sqlite-wasm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import type { ImportBookInput, StudyItem, StudyMutation } from '../../src/domain/index.ts'
+import type { ImportBookInput, StudyExperience, StudyItem, StudyMutation } from '../../src/domain/index.ts'
 import { OwnershipError } from '../../src/domain/provenance.ts'
 import { fingerprintText } from '../../src/reader/text.ts'
 import { LibraryRepository } from '../../src/storage/library-repository.ts'
@@ -89,6 +89,77 @@ describe('who may write to a study board', () => {
     expect(revised.prior?.payload).toEqual({ kind: 'prose', text: 'The slope at a point' })
     repository.deleteStudyItem('item-1')
     expect(repository.listStudyItems(boardId)).toEqual([])
+  })
+
+  it('commits a titled lesson and all ordered blocks as one retry-safe record', () => {
+    const experience: StudyExperience = {
+      id: 'lesson-action-1',
+      boardId,
+      origin: 'agent',
+      actionGroupId: 'lesson-group',
+      revision: 1,
+      title: 'Why the derivative is a ratio',
+      blocks: [
+        { id: 'idea', payload: { kind: 'prose', text: 'Begin with a small change.' } },
+        { id: 'formula', payload: { kind: 'equation', expression: 'dy/dx' } },
+        { id: 'check', payload: { kind: 'question', prompt: 'What shrinks?' } },
+      ],
+      sortOrder: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    }
+    const authority = {
+      origin: 'agent' as const,
+      bookId,
+      actionToken: 'lesson-action-1',
+      actionGroupId: 'lesson-group',
+    }
+    const first = repository.commitStudyExperience(experience, authority, NOW)
+    const replay = repository.commitStudyExperience(experience, authority, NOW)
+    expect(first.replayed).toBe(false)
+    expect(replay.replayed).toBe(true)
+    expect(repository.listStudyExperiences(boardId)).toEqual([first.experience])
+    expect(() =>
+      repository.commitStudyExperience(
+        { ...experience, title: 'A different lesson wearing the same token' },
+        authority,
+        NOW,
+      ),
+    ).toThrow(OwnershipError)
+    expect(repository.listStudyExperiences(boardId)).toHaveLength(1)
+    repository.deleteStudyExperience(experience.id, boardId)
+    expect(repository.listStudyExperiences(boardId)).toEqual([])
+  })
+
+  it('rolls back the lesson when its action receipt cannot be recorded', () => {
+    db.exec(`CREATE TRIGGER refuse_lesson_receipt BEFORE INSERT ON action_receipts
+             WHEN NEW.operation = 'create-study-experience'
+             BEGIN SELECT RAISE(ABORT, 'injected receipt failure'); END;`)
+    const experience: StudyExperience = {
+      id: 'lesson-failed',
+      boardId,
+      origin: 'agent',
+      actionGroupId: 'lesson-failed',
+      revision: 1,
+      title: 'This must not half-land',
+      blocks: [{ id: 'only', payload: { kind: 'prose', text: 'Atomic or absent.' } }],
+      sortOrder: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    }
+    expect(() =>
+      repository.commitStudyExperience(
+        experience,
+        {
+          origin: 'agent',
+          bookId,
+          actionToken: 'lesson-failed',
+          actionGroupId: 'lesson-failed',
+        },
+        NOW,
+      ),
+    ).toThrow(/injected receipt failure/)
+    expect(repository.listStudyExperiences(boardId)).toEqual([])
   })
 
   it('gives an agent a token when it creates, and never lists that token back', () => {

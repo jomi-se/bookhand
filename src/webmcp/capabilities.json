@@ -4,12 +4,14 @@
     "applicationWorlds": false,
     "epubCss": true,
     "nativeStudyItems": true,
+    "nativeStudyLessons": true,
     "tutorGuidance": true
   },
   "reversals": {
     "boardView": ["undo"],
     "readingStyle": ["preview", "apply", "cancel", "undo", "reset"],
     "studyItem": ["undo", "delete", "return-to-source"],
+    "studyLesson": ["delete", "return-to-source"],
     "guidance": ["back", "stop"]
   },
   "study": {

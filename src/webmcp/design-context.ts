@@ -226,6 +226,10 @@ export function composeDesignContext(
       CAPABILITY_MANIFEST.scopes.nativeStudyItems ? 'creates' : 'cannot create'
     } native study blocks that render through Bookhand’s own semantic`,
     '  theme. Supply structure and content, not styling.',
+    `- create_study_lesson ${
+      CAPABILITY_MANIFEST.scopes.nativeStudyLessons ? 'creates' : 'cannot create'
+    } one titled, ordered native lesson atomically. Read this guidance first,`,
+    '  then pass its designContextVersion; use list_study_lessons to discover stable lesson and block ids.',
     '- Whole-application custom worlds — theming the library, chrome, panels, and Study together —',
     ...(CAPABILITY_MANIFEST.scopes.applicationWorlds
       ? ['  are available through the advertised semantic-world tool.']

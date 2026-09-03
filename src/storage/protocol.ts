@@ -27,6 +27,10 @@ function isString(value: unknown, maximum = 10_000): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= maximum
 }
 
+function isNonBlankString(value: unknown, maximum = 10_000): value is string {
+  return isString(value, maximum) && value.trim().length > 0
+}
+
 function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || isString(value)
 }
@@ -214,6 +218,45 @@ function isStudyItemCommit(value: unknown): boolean {
   )
 }
 
+function isStudyExperience(value: unknown): boolean {
+  const blocks = isRecord(value) && Array.isArray(value.blocks) ? value.blocks : []
+  return (
+    isRecord(value) &&
+    isString(value.id, 200) &&
+    isString(value.boardId, 256) &&
+    ORIGINS.includes(String(value.origin)) &&
+    isString(value.actionGroupId, 200) &&
+    Number.isInteger(value.revision) &&
+    isNonBlankString(value.title, 500) &&
+    blocks.length >= 1 &&
+    blocks.length <= 12 &&
+    blocks.every(
+      (block) => isRecord(block) && isNonBlankString(block.id, 200) && isStudyPayload(block.payload),
+    ) &&
+    new Set(blocks.map((block) => (isRecord(block) ? block.id : undefined))).size === blocks.length &&
+    (value.sourceRange === undefined || isBookRange(value.sourceRange)) &&
+    (value.source === undefined || isSourceLink(value.source)) &&
+    isOptionalString(value.sourceLabel) &&
+    Number.isInteger(value.sortOrder) &&
+    isString(value.createdAt) &&
+    isString(value.updatedAt)
+  )
+}
+
+function isStudyExperienceMutation(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    ORIGINS.includes(String(value.origin)) &&
+    isString(value.bookId, 256) &&
+    isString(value.actionToken, 200) &&
+    isString(value.actionGroupId, 200)
+  )
+}
+
+function isStudyExperienceCommit(value: unknown): boolean {
+  return isRecord(value) && isStudyExperience(value.experience) && typeof value.replayed === 'boolean'
+}
+
 function isBoard(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -365,6 +408,15 @@ export function assertStorageWorkerRequest(value: unknown): asserts value is Sto
       if (isString(value.itemId, 200)) return
       break
     case 'list-study-items':
+      if (isString(value.boardId, 256)) return
+      break
+    case 'commit-study-experience':
+      if (isStudyExperience(value.experience) && isStudyExperienceMutation(value.mutation)) return
+      break
+    case 'delete-study-experience':
+      if (isString(value.experienceId, 200) && isString(value.boardId, 256)) return
+      break
+    case 'list-study-experiences':
       if (isString(value.boardId, 256)) return
       break
     case 'begin-index':
@@ -530,6 +582,15 @@ export function assertStorageWorkerResponse(
       break
     case 'study-items':
       if (Array.isArray(result.items) && result.items.every(isStudyItem)) return
+      break
+    case 'study-experience-committed':
+      if (isStudyExperienceCommit(result.commit)) return
+      break
+    case 'study-experience-deleted':
+      if (isString(result.experienceId, 200)) return
+      break
+    case 'study-experiences':
+      if (Array.isArray(result.experiences) && result.experiences.every(isStudyExperience)) return
       break
     case 'index-state':
       if (result.state === null || isIndexState(result.state)) return

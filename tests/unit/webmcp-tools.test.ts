@@ -99,6 +99,21 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
       persisted: true,
       actions: [{ kind: 'undo' as const, label: 'Undo', description: 'Put it back.' }],
     })),
+    createStudyExperience: vi.fn(async (input) => ({
+      operation: 'create' as const,
+      origin: 'agent' as const,
+      actionGroupId: input.actionGroupId ?? 'lesson-group',
+      applied: {
+        id: `lesson-${input.actionToken}`,
+        title: input.title,
+        blocks: input.blocks,
+        revision: 1,
+      },
+      scope: 'One composed lesson on the study board.',
+      warnings: [],
+      persisted: true,
+      actions: [{ kind: 'undo' as const, label: 'Undo', description: 'Remove it.' }],
+    })),
     listStudyItems: vi.fn(async () => []),
     editSection: vi.fn(async (_sectionIndex, _fingerprint, edits: readonly unknown[]) => ({
       sectionIndex: 3,
@@ -152,6 +167,8 @@ describe('the WebMCP tool surface', () => {
       'control_guidance',
       'save_annotation',
       'set_reading_style',
+      'create_study_lesson',
+      'list_study_lessons',
       'upsert_study_item',
       'list_study_items',
       'get_section_source',
@@ -525,6 +542,25 @@ describe('the WebMCP tool surface', () => {
     expect(result.isError).toBe(true)
     expect(result.content[0].text).toContain('does not accept')
     expect(commands.upsertStudyItem).not.toHaveBeenCalled()
+  })
+
+  it('rejects missing or duplicate lesson block ids before calling commands', async () => {
+    const { tool, commands } = setup()
+    const base = {
+      title: 'A lesson',
+      actionToken: 'lesson-1',
+      designContextVersion: 'sha256:test',
+    }
+    for (const blocks of [
+      [{ id: '', kind: 'prose', text: 'x' }],
+      [
+        { id: 'same', kind: 'prose', text: 'x' },
+        { id: 'same', kind: 'question', prompt: 'x' },
+      ],
+    ]) {
+      expect((await tool('create_study_lesson').execute({ ...base, blocks })).isError).toBe(true)
+    }
+    expect(commands.createStudyExperience).not.toHaveBeenCalled()
   })
 })
 

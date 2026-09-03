@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Maximize2, Minimize2, Plus, Trash2 } from 'lucide-react'
+import { BookOpen, CornerUpLeft, Maximize2, Minimize2, Plus, Sparkles, Trash2, X } from 'lucide-react'
 
 import type {
   Annotation,
@@ -8,9 +8,10 @@ import type {
   StudyItem,
   StudyItemKind,
   StudyItemPayload,
+  StudyExperience,
 } from '../domain/index.ts'
 import { STUDY_ITEM_KINDS } from '../domain/study.ts'
-import { StudyItemCard } from './StudyItemCard.tsx'
+import { StudyItemCard, StudyPayloadBody } from './StudyItemCard.tsx'
 
 const STUDY_ITEM_LABEL: Readonly<Record<StudyItemKind, string>> = {
   prose: 'Note',
@@ -23,10 +24,12 @@ const STUDY_ITEM_LABEL: Readonly<Record<StudyItemKind, string>> = {
 export interface StudyBoardPanelProps {
   readonly board?: StudyBoard
   readonly items: readonly StudyItem[]
+  readonly experiences: readonly StudyExperience[]
   readonly annotations: readonly Annotation[]
   readonly selectionQuote?: string
   readonly onAddItem: (payload: StudyItemPayload, withSource: boolean) => void
   readonly onDeleteItem: (item: StudyItem) => void
+  readonly onDeleteExperience: (experience: StudyExperience) => void
   readonly onUndoItem: (item: StudyItem) => void
   readonly onRetryItemSource: (item: StudyItem) => void
   readonly onRelinkItemSource: (item: StudyItem) => void
@@ -74,8 +77,16 @@ function NoteEditor({
   )
 }
 
+function lessonDomId(experienceId: string): string {
+  return `study-experience-${experienceId.length}-${experienceId}`
+}
+
+function lessonBlockDomId(experienceId: string, blockId: string): string {
+  return `${lessonDomId(experienceId)}-block-${blockId.length}-${blockId}`
+}
+
 export function StudyBoardPanel(props: StudyBoardPanelProps) {
-  const { board, items, annotations, selectionQuote } = props
+  const { board, items, experiences, annotations, selectionQuote } = props
   const [composing, setComposing] = useState<StudyItemKind>()
   const [authoringOpen, setAuthoringOpen] = useState(false)
   const [draft, setDraft] = useState('')
@@ -105,15 +116,17 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
         <span className="panel-head-tools">
           <button
             type="button"
-            className="button button-icon"
+            className="button button-icon study-view-toggle"
             onClick={props.onToggleView}
             aria-label={expanded ? 'Dock the study board' : 'Expand the study board'}
             aria-pressed={expanded}
           >
             {expanded ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}
           </button>
-          <button type="button" className="button button-icon" onClick={props.onClose} aria-label="Close study">
-            ✕
+          <button type="button" className="button button-icon study-close" onClick={props.onClose} aria-label="Close study and return to the book">
+            <X className="study-close-wide" size={16} aria-hidden="true" />
+            <CornerUpLeft className="study-close-compact" size={16} aria-hidden="true" />
+            <span className="study-close-label">Book</span>
           </button>
         </span>
       </header>
@@ -160,12 +173,83 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
           </div>
         ) : null}
 
-        {items.length === 0 ? (
+        {items.length === 0 && experiences.length === 0 && annotations.length === 0 ? (
           <p className="panel-empty">
             Nothing on this board yet. Select a passage in the book and keep it here, or begin
             with a note below. Everything stays on this device.
           </p>
-        ) : (
+        ) : null}
+
+        {experiences.length > 0 ? (
+          <section className="study-lessons" aria-label="Lessons">
+            {experiences.map((experience) => (
+              <article
+                id={lessonDomId(experience.id)}
+                key={experience.id}
+                className="study-lesson"
+                tabIndex={-1}
+                aria-labelledby={`${lessonDomId(experience.id)}-title`}
+              >
+                <header className="study-lesson-head">
+                  <div>
+                    {experience.origin === 'agent' ? (
+                      <p className="study-lesson-origin">
+                        <Sparkles size={12} aria-hidden="true" /> Created with an agent
+                      </p>
+                    ) : null}
+                    <h3 id={`${lessonDomId(experience.id)}-title`}>{experience.title}</h3>
+                  </div>
+                  <div className="study-lesson-tools">
+                    {experience.sourceRange ? (
+                      <button
+                        type="button"
+                        className="button button-text"
+                        onClick={() => props.onGoToSource(experience.sourceRange!)}
+                      >
+                        <CornerUpLeft size={14} aria-hidden="true" />
+                        <span className="source-label">{experience.sourceLabel ?? 'Source'}</span>
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="button button-icon"
+                      aria-label={`Remove lesson “${experience.title}”`}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Remove “${experience.title}”? This lesson cannot yet be restored after removal.`,
+                          )
+                        ) {
+                          props.onDeleteExperience(experience)
+                        }
+                      }}
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                </header>
+                <div className="study-lesson-blocks">
+                  {experience.blocks.map((block) => (
+                    <section
+                      id={lessonBlockDomId(experience.id, block.id)}
+                      key={block.id}
+                      className="study-lesson-block"
+                      data-kind={block.payload.kind}
+                    >
+                      <StudyPayloadBody payload={block.payload} blockId={block.id} />
+                    </section>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </section>
+        ) : null}
+
+        {items.length > 0 ? (
+          <section className="study-notes" aria-labelledby="study-notes-heading">
+            <h3 id="study-notes-heading" className="section-heading">
+              <BookOpen size={14} aria-hidden="true" /> Notes
+            </h3>
           <ul className="study-items">
             {groupedItems.map((group) => (
               <li
@@ -194,7 +278,8 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
               </li>
             ))}
           </ul>
-        )}
+          </section>
+        ) : null}
 
         <section className="study-authoring" aria-label="Add to Study">
           {!authoringOpen ? (

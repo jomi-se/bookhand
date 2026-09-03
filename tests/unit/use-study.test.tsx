@@ -29,6 +29,7 @@ describe('Study availability boundary', () => {
         .mockResolvedValueOnce(board),
       listAnnotations: vi.fn().mockResolvedValue([]),
       listStudyItems: vi.fn().mockResolvedValue([]),
+      listStudyExperiences: vi.fn().mockResolvedValue([]),
     } as unknown as StorageClient
     const options = {
       entry: {
@@ -53,5 +54,49 @@ describe('Study availability boundary', () => {
     await waitFor(() => expect(result.current.error).toBeUndefined())
     expect(result.current.commands?.studyBoard).toEqual(board)
     expect(client.getBoard).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps successful Study streams when lesson loading fails', async () => {
+    const client = {
+      getBoard: vi.fn().mockResolvedValue(board),
+      listAnnotations: vi.fn().mockResolvedValue([
+        {
+          id: 'annotation-1',
+          bookId: 'book-1',
+          origin: 'user',
+          range: { startCfi: 'a', endCfi: 'b', sectionIndex: 1, textFingerprint: 'x' },
+          quote: 'Kept annotation',
+          color: 'amber',
+          createdAt: board.createdAt,
+          updatedAt: board.updatedAt,
+        },
+      ]),
+      listStudyItems: vi.fn().mockResolvedValue([
+        {
+          id: 'item-1',
+          boardId: board.id,
+          origin: 'user',
+          revision: 1,
+          payload: { kind: 'prose', text: 'Kept note' },
+          sortOrder: 0,
+          createdAt: board.createdAt,
+          updatedAt: board.updatedAt,
+        },
+      ]),
+      listStudyExperiences: vi.fn().mockRejectedValue(new Error('Lessons could not load')),
+    } as unknown as StorageClient
+    const options = {
+      entry: { id: 'book-1', metadata: { title: 'Calculus Made Easy' } } as BookCatalogEntry,
+      client,
+      bridge: new ReaderPortBridge(),
+      presentation: new PresentationStore(DEFAULT_READER_STYLE),
+      surface: new SurfaceStore(),
+      guidance: new GuidanceController(),
+    }
+    const { result } = renderHook(() => useStudy(options))
+    await waitFor(() => expect(result.current.error).toContain('Lessons could not load'))
+    expect(result.current.annotations).toHaveLength(1)
+    expect(result.current.items).toHaveLength(1)
+    expect(result.current.experiences).toEqual([])
   })
 })

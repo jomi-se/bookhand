@@ -4,6 +4,7 @@ import type {
   ReaderStyle,
   StudyItem,
   StudyItemPayload,
+  StudyExperienceBlock,
 } from '../domain/index.ts'
 import { ANNOTATION_COLORS, STUDY_ITEM_KINDS } from '../domain/study.ts'
 import type { BookhandCommands } from '../app/commands.ts'
@@ -43,6 +44,8 @@ const ACTION_GROUP_SCHEMA = {
   description:
     'Correlate writes from one intent for provenance. Existing blocks are undone one item at a time.',
 } as const
+
+const STABLE_ID_PATTERN = '^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$'
 
 const SECTION_INDEX_SCHEMA = {
   type: 'integer',
@@ -653,6 +656,138 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               : {}),
           })
           return textResult(describeStyleReceipt(receipt, 'Updated the presentation'), { receipt })
+        }),
+    },
+    {
+      name: 'create_study_lesson',
+      description:
+        'Create one durable, titled lesson as an ordered composition of prose, quotation, equation, steps, and question blocks. The whole lesson lands atomically or not at all, so a teaching sequence never appears as unrelated partial records. Call get_design_context first and follow its hierarchy guidance. Stable lesson and block ids let later tools reveal or address the exact teaching artifact.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', minLength: 1, maxLength: 500 },
+          blocks: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 12,
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', minLength: 1, maxLength: 200, pattern: STABLE_ID_PATTERN },
+                kind: { type: 'string', enum: [...STUDY_ITEM_KINDS] },
+                text: { type: 'string', maxLength: 32_000 },
+                attribution: { type: 'string', maxLength: 500 },
+                expression: { type: 'string', maxLength: 5_000 },
+                caption: { type: 'string', maxLength: 500 },
+                title: { type: 'string', maxLength: 500 },
+                steps: {
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 100,
+                  items: { type: 'string', minLength: 1, maxLength: 5_000 },
+                },
+                prompt: { type: 'string', maxLength: 20_000 },
+                answer: { type: 'string', maxLength: 20_000 },
+              },
+              required: ['id', 'kind'],
+              additionalProperties: false,
+            },
+          },
+          actionToken: {
+            type: 'string',
+            pattern: STABLE_ID_PATTERN,
+            description: 'Your stable name for this atomic action; identical retries do not duplicate it.',
+          },
+          actionGroupId: ACTION_GROUP_SCHEMA,
+          designContextVersion: {
+            type: 'string',
+            description: 'The exact version returned by get_design_context.',
+          },
+          bookId: BOOK_ID_SCHEMA,
+          sourceRange: RANGE_SCHEMA,
+          sourceQuote: { type: 'string', maxLength: 32_000 },
+          sourceLabel: { type: 'string', maxLength: 500 },
+        },
+        required: ['title', 'blocks', 'actionToken', 'designContextVersion'],
+        dependentRequired: {
+          sourceRange: ['bookId', 'sourceQuote'],
+          sourceQuote: ['bookId', 'sourceRange'],
+        },
+        additionalProperties: false,
+      },
+      execute: (input) =>
+        run('create_study_lesson', () => 'created a composed lesson', async () => {
+          if (typeof input.title !== 'string' || input.title.trim().length === 0 || input.title.length > 500) {
+            return errorResult('A lesson title must be a non-empty string of at most 500 characters.')
+          }
+          if (!Array.isArray(input.blocks) || input.blocks.length < 1 || input.blocks.length > 12) {
+            return errorResult('A lesson needs between one and twelve blocks.')
+          }
+          const ids = input.blocks.map((block) =>
+            typeof block === 'object' && block !== null ? String(block.id ?? '') : '',
+          )
+          const safeId = /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/
+          if (ids.some((id) => !safeId.test(id)) || new Set(ids).size !== ids.length) {
+            return errorResult('Every lesson block needs a unique id using only letters, numbers, hyphens, or underscores.')
+          }
+          if (typeof input.actionToken !== 'string' || !safeId.test(input.actionToken)) {
+            return errorResult('actionToken must use only letters, numbers, hyphens, or underscores.')
+          }
+          const blocks: StudyExperienceBlock[] = input.blocks.map((block) => {
+            const record = block as Record<string, unknown>
+            return { id: String(record.id), payload: toPayload(record) }
+          })
+          const receipt = await commands.createStudyExperience({
+            title: String(input.title ?? ''),
+            blocks,
+            origin: 'agent',
+            actionToken: String(input.actionToken),
+            ...(typeof input.actionGroupId === 'string'
+              ? { actionGroupId: input.actionGroupId }
+              : {}),
+            designContextVersion: String(input.designContextVersion),
+            ...(input.sourceRange
+              ? {
+                  bookId: String(input.bookId ?? ''),
+                  sourceRange: asRange(input.sourceRange),
+                  sourceQuote: String(input.sourceQuote ?? ''),
+                }
+              : {}),
+            ...(typeof input.sourceLabel === 'string' ? { sourceLabel: input.sourceLabel } : {}),
+          })
+          return textResult(
+            `Created lesson ${receipt.applied.id}, “${receipt.applied.title},” with ${receipt.applied.blocks.length} ordered blocks. It is stored locally and the person can remove it in one action.`,
+            { receipt },
+          )
+        }),
+    },
+    {
+      name: 'list_study_lessons',
+      description:
+        'List the durable composed lessons on this book’s Study surface, including each stable lesson id, title, ordered block ids and kinds, source label, provenance, and revision. Use it to find an existing teaching artifact without receiving its full learner-authored content.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute: () =>
+        run('list_study_lessons', () => 'read the lesson index', async () => {
+          const lessons = await commands.listStudyExperiences()
+          const summaries = lessons.map((lesson) => ({
+            id: lesson.id,
+            title: lesson.title,
+            blocks: lesson.blocks.map((block) => ({ id: block.id, kind: block.payload.kind })),
+            sourceLabel: lesson.sourceLabel ?? null,
+            origin: lesson.origin,
+            revision: lesson.revision,
+          }))
+          return textResult(
+            summaries.length === 0
+              ? 'There are no composed lessons on this board.'
+              : summaries
+                  .map(
+                    (lesson) =>
+                      `${lesson.id} · ${lesson.title} · ${lesson.blocks.map((block) => `${block.id}:${block.kind}`).join(', ')}`,
+                  )
+                  .join('\n'),
+            { lessons: summaries },
+          )
         }),
     },
     {

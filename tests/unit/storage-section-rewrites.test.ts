@@ -49,7 +49,7 @@ describe('saved section rewrites', () => {
 
   it('creates the version 5 table', () => {
     expect(db.selectValue('PRAGMA user_version')).toBe(STORAGE_SCHEMA_VERSION)
-    expect(STORAGE_SCHEMA_VERSION).toBe(5)
+    expect(STORAGE_SCHEMA_VERSION).toBe(6)
     expect(
       db.selectValue(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, [
         'section_rewrites',
@@ -217,7 +217,7 @@ describe('migrating a library that predates saved rewrites', () => {
 
     initializeSchema(db)
 
-    expect(db.selectValue('PRAGMA user_version')).toBe(5)
+    expect(db.selectValue('PRAGMA user_version')).toBe(6)
     expect(new LibraryRepository(db).listSectionRewrites(existing)).toEqual([])
     expect(repository.getBook(existing)?.metadata.title).toBe('Calculus Made Easy')
   })

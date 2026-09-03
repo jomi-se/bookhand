@@ -13,6 +13,8 @@ import type {
   StudyItem,
   StudyItemPayload,
   StudyMutation,
+  StudyExperience,
+  StudyExperienceBlock,
   SourceExcerpt,
   SourceOwnership,
   TocItem,
@@ -132,6 +134,16 @@ export interface UpsertStudyItemInput extends CallerIdentity {
   readonly sourceOwnership?: SourceOwnership
   readonly id?: string
   readonly sortOrder?: number
+}
+
+export interface CreateStudyExperienceInput extends CallerIdentity {
+  readonly title: string
+  readonly blocks: readonly StudyExperienceBlock[]
+  readonly designContextVersion?: string
+  readonly bookId?: string
+  readonly sourceRange?: BookRange
+  readonly sourceQuote?: string
+  readonly sourceLabel?: string
 }
 
 /**
@@ -463,12 +475,12 @@ export class BookhandCommands {
    * it. Nothing changes in the meantime, so a stale call is a no-op the caller
    * can recover from rather than a half-applied style.
    */
-  #requireDesignContext(offered: string | undefined): void {
+  #requireDesignContext(offered: string | undefined, subject = 'Custom book CSS'): void {
     const current = this.#context.designContextVersion
     if (offered === current) return
     throw new HandshakeError(
       offered === undefined
-        ? 'Custom book CSS needs the current design guidance. Call get_design_context, then send its version as designContextVersion. Nothing was changed.'
+        ? `${subject} needs the current design guidance. Call get_design_context, then send its version as designContextVersion. Nothing was changed.`
         : `That design guidance version is out of date. Call get_design_context again for the current one (${current}) and send that. Nothing was changed.`,
     )
   }
@@ -686,6 +698,83 @@ export class BookhandCommands {
       persisted: true,
       actions: reversalsFor(commit.item),
     }
+  }
+
+  async createStudyExperience(
+    input: CreateStudyExperienceInput,
+  ): Promise<MutationReceipt<StudyExperience>> {
+    this.#requireDesignContext(input.designContextVersion, 'A composed lesson')
+    let verifiedExcerpt: SourceExcerpt | undefined
+    if (input.sourceRange) {
+      if (input.bookId === undefined || input.sourceQuote === undefined) {
+        rejectSource(
+          'invented-quote',
+          'A lesson carrying a source range must also carry its bookId and the exact quote',
+        )
+      }
+      verifiedExcerpt = await this.#verifySource(input.bookId, input.sourceRange, input.sourceQuote)
+    }
+    const origin = input.origin ?? 'user'
+    const actionToken = input.actionToken ?? this.#id('action')
+    const actionGroupId = input.actionGroupId ?? this.#id('group')
+    const now = this.#timestamp()
+    const experience: StudyExperience = {
+      id: `lesson-${actionToken}`,
+      boardId: this.#context.board.id,
+      origin,
+      actionGroupId,
+      revision: 1,
+      title: input.title,
+      blocks: input.blocks.map((block) =>
+        verifiedExcerpt && block.payload.kind === 'quotation'
+          ? {
+              ...block,
+              payload: { ...block.payload, text: verifiedExcerpt.text },
+            }
+          : block,
+      ),
+      ...(verifiedExcerpt
+        ? {
+            sourceRange: verifiedExcerpt.range,
+            source: { status: 'resolved', ownership: 'authored', excerpt: verifiedExcerpt },
+          }
+        : {}),
+      ...(input.sourceLabel ? { sourceLabel: input.sourceLabel } : {}),
+      sortOrder: await this.#nextExperienceOrder(),
+      createdAt: now,
+      updatedAt: now,
+    }
+    const commit = await this.#context.client.commitStudyExperience(experience, {
+      origin,
+      bookId: this.#context.bookId,
+      actionToken,
+      actionGroupId,
+    })
+    this.#changed()
+    return {
+      operation: 'create',
+      origin,
+      actionGroupId,
+      applied: commit.experience,
+      scope: `One composed lesson on the study board for ${this.#context.bookTitle}. Nothing outside this book is reachable.`,
+      warnings: commit.replayed
+        ? ['This action had already been performed; the earlier result was returned unchanged.']
+        : [],
+      persisted: true,
+      actions: [
+        ...(commit.experience.sourceRange ? [RETURN_TO_SOURCE_ACTION] : []),
+        DELETE_ACTION,
+      ],
+    }
+  }
+
+  async listStudyExperiences(): Promise<readonly StudyExperience[]> {
+    return this.#context.client.listStudyExperiences(this.#context.board.id)
+  }
+
+  async deleteStudyExperience(experienceId: string): Promise<void> {
+    await this.#context.client.deleteStudyExperience(experienceId, this.#context.board.id)
+    this.#changed()
   }
 
   /**
@@ -921,6 +1010,14 @@ export class BookhandCommands {
   async #nextOrder(): Promise<number> {
     const items = await this.listStudyItems()
     return items.reduce((highest, item) => Math.max(highest, item.sortOrder + 1), 0)
+  }
+
+  async #nextExperienceOrder(): Promise<number> {
+    const experiences = await this.listStudyExperiences()
+    return experiences.reduce(
+      (highest, experience) => Math.max(highest, experience.sortOrder + 1),
+      0,
+    )
   }
 }
 

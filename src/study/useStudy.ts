@@ -7,6 +7,7 @@ import type {
   ReaderAnnotationMark,
   StudyBoard,
   StudyItem,
+  StudyExperience,
 } from '../domain/index.ts'
 import { BookhandCommands } from '../app/commands.ts'
 import type { PresentationStore } from '../app/presentation.ts'
@@ -57,7 +58,9 @@ export function useStudy({ entry, client, bridge, presentation, surface, guidanc
   const [commands, setCommands] = useState<BookhandCommands>()
   const [annotations, setAnnotations] = useState<readonly Annotation[]>([])
   const [items, setItems] = useState<readonly StudyItem[]>([])
-  const [error, setError] = useState<string>()
+  const [experiences, setExperiences] = useState<readonly StudyExperience[]>([])
+  const [boardError, setBoardError] = useState<string>()
+  const [contentError, setContentError] = useState<string>()
   const [mutationError, setMutationError] = useState<MutationFailure>()
   const [loadAttempt, setLoadAttempt] = useState(0)
 
@@ -78,7 +81,7 @@ export function useStudy({ entry, client, bridge, presentation, surface, guidanc
       try {
         const loaded = await client.getBoard(entry.id)
         if (!alive) return
-        setError(undefined)
+        setBoardError(undefined)
         setBoard(loaded)
         setCommands(makeCommands(loaded))
       } catch (cause) {
@@ -98,7 +101,7 @@ export function useStudy({ entry, client, bridge, presentation, surface, guidanc
         // the board cannot be loaded; Study calls then fail honestly at their
         // own storage boundary instead of disappearing from WebMCP entirely.
         setCommands(makeCommands(unavailableBoard))
-        setError(cause instanceof Error ? cause.message : 'Study board unavailable')
+        setBoardError(cause instanceof Error ? cause.message : 'Study board unavailable')
       }
     })()
     return () => {
@@ -109,17 +112,24 @@ export function useStudy({ entry, client, bridge, presentation, surface, guidanc
   const reload = useCallback(async () => {
     if (!commands) return
     try {
-      const [nextAnnotations, nextItems] = await Promise.all([
+      const [annotationResult, itemResult, experienceResult] = await Promise.allSettled([
         commands.listAnnotations(),
         commands.listStudyItems(),
+        commands.listStudyExperiences(),
       ])
-      setAnnotations(nextAnnotations)
-      setItems(nextItems)
+      const failures = [annotationResult, itemResult, experienceResult].filter(
+        (result): result is PromiseRejectedResult => result.status === 'rejected',
+      )
+      if (annotationResult.status === 'fulfilled') setAnnotations(annotationResult.value)
+      if (itemResult.status === 'fulfilled') setItems(itemResult.value)
+      if (experienceResult.status === 'fulfilled') setExperiences(experienceResult.value)
+      if (failures.length > 0) throw failures[0].reason
+      setContentError(undefined)
       // The board is refreshed here too, so a layout change made through a tool
       // shows without the interface having to be told about it separately.
       setBoard(commands.studyBoard)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Study content unavailable')
+      setContentError(cause instanceof Error ? cause.message : 'Study content unavailable')
     }
   }, [commands])
 
@@ -167,8 +177,9 @@ export function useStudy({ entry, client, bridge, presentation, surface, guidanc
     commands,
     annotations,
     items,
+    experiences,
     marks,
-    error,
+    error: boardError ?? contentError,
     retryLoad,
     mutationError,
     dismissMutationError,

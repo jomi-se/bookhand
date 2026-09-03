@@ -27,6 +27,7 @@ import { useWebMcpTools, type ToolCallReporter } from './webmcp/useWebMcpTools.t
 const DESIGN_BEARING_TOOLS = new Set([
   'set_reading_style',
   'upsert_study_item',
+  'create_study_lesson',
   'set_study_board_view',
 ])
 

@@ -408,12 +408,19 @@ export function ReaderScreen({
           <StudyBoardPanel
             board={study.board}
             items={study.items}
+            experiences={study.experiences}
             annotations={study.annotations}
             selectionQuote={reader.selection?.quote}
             onAddItem={addStudyItem}
             onDeleteItem={(item) =>
               study.commands &&
               study.run('delete that block', () => study.commands!.deleteStudyItem(item.id))
+            }
+            onDeleteExperience={(experience) =>
+              study.commands &&
+              study.run('remove that lesson', () =>
+                study.commands!.deleteStudyExperience(experience.id),
+              )
             }
             onUndoItem={(item) =>
               study.commands &&
@@ -470,17 +477,23 @@ export function ReaderScreen({
             onRetryLoad={study.retryLoad}
             onGoToSource={goToSource}
             onDeleteAnnotation={(annotation) =>
-              void study.commands?.deleteAnnotation(annotation.id)
+              study.commands &&
+              study.run('delete that highlight', () =>
+                study.commands!.deleteAnnotation(annotation.id),
+              )
             }
             onEditNote={(annotation, note) =>
-              void study.commands?.saveAnnotation({
-                bookId: study.commands.bookId,
-                id: annotation.id,
-                range: annotation.range,
-                quote: annotation.quote,
-                color: annotation.color,
-                note,
-              })
+              study.commands &&
+              study.run('save that note', () =>
+                study.commands!.saveAnnotation({
+                  bookId: study.commands!.bookId,
+                  id: annotation.id,
+                  range: annotation.range,
+                  quote: annotation.quote,
+                  color: annotation.color,
+                  note,
+                }),
+              )
             }
             focusNonce={surfaceState.focusNonce}
             agentChangedView={surfaceState.boardReversal?.origin === 'agent'}

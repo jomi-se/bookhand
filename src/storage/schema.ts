@@ -1,6 +1,6 @@
 import type { Database } from '@sqlite.org/sqlite-wasm'
 
-export const STORAGE_SCHEMA_VERSION = 5
+export const STORAGE_SCHEMA_VERSION = 6
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -78,6 +78,22 @@ CREATE TABLE IF NOT EXISTS study_item_versions (
   updated_at TEXT NOT NULL,
   source_json TEXT,
   PRIMARY KEY (item_id, revision)
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS study_experiences (
+  id TEXT PRIMARY KEY,
+  board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  blocks_json TEXT NOT NULL,
+  source_range_json TEXT,
+  source_label TEXT,
+  source_json TEXT,
+  sort_order INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  origin TEXT NOT NULL CHECK (origin IN ('user', 'agent')),
+  action_group_id TEXT NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1
 ) STRICT;
 
 -- What a caller already did, so an identical retry returns the first result
@@ -248,7 +264,8 @@ export function initializeSchema(db: Database): void {
     // the truthful state, and the books it holds are untouched.
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS chunks_book_order ON chunks(book_id, sort_order);
              CREATE INDEX IF NOT EXISTS chunks_book_section ON chunks(book_id, section_index, sort_order);
-             CREATE INDEX IF NOT EXISTS section_rewrites_book ON section_rewrites(book_id, section_index, revision);`)
+             CREATE INDEX IF NOT EXISTS section_rewrites_book ON section_rewrites(book_id, section_index, revision);
+             CREATE INDEX IF NOT EXISTS study_experiences_board_order ON study_experiences(board_id, sort_order, created_at);`)
     db.exec(`PRAGMA user_version = ${STORAGE_SCHEMA_VERSION}`)
   })
 }

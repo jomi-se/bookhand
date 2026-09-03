@@ -5,7 +5,7 @@ Last updated: 2026-09-03
 ## Next executable wave
 
 Deploy and exercise the combined **tutor + document remaster + composed Study**
-surface through ChatGPT Desktop. The local runtime now has twenty-one tools. The
+surface through ChatGPT Desktop. The local runtime now has twenty-three tools. The
 highest-value engineering continuation is W9's bounded temporary explanation
 and direct Study reveal; the highest-value owner action is an intent-only model
 run that proves the agent discovers the six remaster tools, reads actual XHTML,
@@ -46,10 +46,10 @@ This direction is recorded in:
 - Slices 1 through 3 are implemented: local library/import, Foliate EPUB
   reading, SQLite WASM persistence, highlights/notes, the native Study board,
   and genuine `document.modelContext` registration.
-- Deployed commit `06d4c2d` exposes twenty open-book tools. The current local
-  runtime exposes twenty-one: the deployed set plus the fingerprinted atomic
-  `edit_section` tool. Deployment truth must remain separate until this change
-  is pushed and verified.
+- Deployed commit `bf7b2f0` exposes twenty-one open-book tools. The current
+  local runtime exposes twenty-three: the deployed set plus atomic
+  `create_study_lesson` and summary-only `list_study_lessons`. Deployment truth
+  must remain separate until this change is pushed and verified.
 - W0 through W3 are implemented: runtime design-context discovery, source and
   persistence trust, shared observable style/board state, and the mobile/desktop
   reader reset.
@@ -69,18 +69,23 @@ This direction is recorded in:
 - Source-linked mutations verify current book, range, fingerprint, and quote.
   Agent-created item updates use ownership tokens, retry idempotency, revisions,
   provenance, and per-item Undo.
-- Consecutive blocks from one `actionGroupId` now compose into one calm visual
-  group while keeping per-item Undo truthfully independent. Shared source and
-  authorship context collapse only while they remain identical.
+- A first-class titled lesson now stores one ordered native-block composition
+  atomically in schema v6, with stable lesson/block IDs, source verification,
+  provenance, and retry idempotency. Lessons render as semantic articles;
+  legacy single blocks remain separately under Notes rather than masquerading
+  as lessons through action-group metadata.
 - Study equations compile through the bounded native MathML renderer, with
   unsupported notation kept visibly as code rather than disappearing. Storage
   type labels no longer outrank the lesson, existing content comes before one
   progressively disclosed manual-authoring path, and raw Agent Activity is no
   longer part of Study.
 - An initial Study-load failure is visible and retryable without unregistering
-  the reading/search/style/tutor tool surface. Recoverable removal, a
-  first-class titled lesson entity, safe plots, and the fully distinct
-  docked/expanded/mobile workspace remain open W7/W8 work.
+  the reading/search/style/tutor tool surface. Independent Study streams retain
+  successful lesson, block, or annotation data when another stream fails.
+  Expanded desktop gives Study the primary 48rem reading measure and keeps the
+  book as a narrow reference; compact Study is a full surface with an explicit
+  route back to the book. Recoverable removal, lesson updates, safe plots, and
+  richer per-block source relationships remain open W7 work.
 - `focus_passage` now draws a production transient cue over the exact verified
   words using Foliate's native highlight, underline, or outline painter. It
   briefly settles into place, respects reduced motion, coexists with durable
@@ -116,12 +121,13 @@ This direction is recorded in:
 - W5: complete and deployed — local lexical retrieval and `search_book`.
 - W6: complete — shared origin-aware navigation, navigation-only
   `focus_passage`, and the non-persistent tutor-session core.
-- W7: partial — native safe math and action-group composition have landed;
-  first-class titled experiences, safe plots, atomic lifecycle, and recoverable
-  removal remain.
-- W8: partial — diagnostics separation, content-first manual authoring, grouped
-  composition, and visible load recovery have landed; the fully differentiated
-  responsive workspace remains.
+- W7: partial — native safe math plus the focused first-class titled lesson
+  create/list lifecycle have landed atomically; updates, safe plots, richer
+  block types/sources, and recoverable removal remain.
+- W8: focused rescue landed — diagnostics separation, lesson-first semantic
+  composition, visible partial-load recovery, and distinct docked, expanded,
+  and compact layouts are implemented. Broader workspace refinement remains an
+  iterative quality wave rather than a missing data-model foundation.
 - W9: partial — production source cue presentation is complete; Study reveal
   and a bounded temporary explanation remain.
 - W10: combined real-model hero and evidence closure.
@@ -142,8 +148,8 @@ demonstration; W7 through W11 remain recorded rather than discarded.
 The WebMCP Challenge closes 2026-09-03T20:00Z.
 
 - Live surface: https://bookhand.jomi-se.workers.dev/
-- Deployed commit `06d4c2d` was verified with persistent browser storage,
-  twenty genuine WebMCP tools, `search_book` reaching `ready / results` with
+- Deployed commit `bf7b2f0` was verified with persistent browser storage,
+  twenty-one genuine WebMCP tools, `search_book` reaching `ready / results` with
   corpus-derived hits, the document-remaster tools present, reload survival,
   and no observed page, console, request, or off-origin errors.
 - Cloudflare Workers Builds deploys pushes to `main`.
@@ -188,6 +194,13 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
   first-render hydration are covered. The combined post-merge typecheck, lint,
   targeted units, production build, remaster browser, and Study/WebMCP browser
   suites pass.
+- The focused W7/W8 lesson rescue passes schema-v6 migration, protocol
+  rejection, atomic rollback, conflicting retry, source-handshake, partial-load,
+  and genuine WebMCP create/list/reload coverage. Production screenshots cover
+  docked and expanded desktop plus 390px and 320px light, dark, and sepia Study;
+  compact tests assert no horizontal overflow and 44px Book, source, and answer
+  controls. This evidence closes only `VAL-STUDY-LESSON-CORE`, not the broader
+  experience-update, safe-removal, or plot contracts.
 - Fingerprinted surgical remaster editing adds focused ordered/missing/
   ambiguous/stale/concurrent/CSS-preservation units and a genuine production
   WebMCP browser flow covering targeted rendering, atomic rejection, reload,

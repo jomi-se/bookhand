@@ -7,6 +7,9 @@ import type {
   StudyItem,
   StudyItemCommit,
   StudyMutation,
+  StudyExperience,
+  StudyExperienceCommit,
+  StudyExperienceMutation,
   ReadingState,
   StorageDiagnostics,
   StoredBook,
@@ -318,6 +321,30 @@ export class StorageClient {
   async listStudyItems(boardId: string): Promise<readonly StudyItem[]> {
     return expectResult(await this.request({ type: 'list-study-items', boardId }), 'study-items')
       .items
+  }
+
+  async commitStudyExperience(
+    experience: StudyExperience,
+    mutation: StudyExperienceMutation,
+  ): Promise<StudyExperienceCommit> {
+    return expectResult(
+      await this.request({ type: 'commit-study-experience', experience, mutation }),
+      'study-experience-committed',
+    ).commit
+  }
+
+  async deleteStudyExperience(experienceId: string, boardId: string): Promise<void> {
+    expectResult(
+      await this.request({ type: 'delete-study-experience', experienceId, boardId }),
+      'study-experience-deleted',
+    )
+  }
+
+  async listStudyExperiences(boardId: string): Promise<readonly StudyExperience[]> {
+    return expectResult(
+      await this.request({ type: 'list-study-experiences', boardId }),
+      'study-experiences',
+    ).experiences
   }
 
   async getIndexState(bookId: string): Promise<IndexState | null> {

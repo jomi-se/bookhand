@@ -75,6 +75,53 @@ describe('storage worker response validation', () => {
   })
 })
 
+describe('study lesson protocol boundary', () => {
+  const experience = {
+    id: 'lesson-1',
+    boardId: 'board-1',
+    origin: 'agent',
+    actionGroupId: 'group-1',
+    revision: 1,
+    title: 'A real lesson',
+    blocks: [{ id: 'idea', payload: { kind: 'prose', text: 'One idea.' } }],
+    sortOrder: 0,
+    createdAt: '2026-09-03T00:00:00.000Z',
+    updatedAt: '2026-09-03T00:00:00.000Z',
+  }
+  const request = {
+    requestId: 'request-lesson',
+    type: 'commit-study-experience',
+    experience,
+    mutation: {
+      origin: 'agent',
+      bookId: 'book-1',
+      actionToken: 'lesson-1',
+      actionGroupId: 'group-1',
+    },
+  }
+
+  it('accepts the lesson request and every lesson result shape', () => {
+    expect(() => assertStorageWorkerRequest(request)).not.toThrow()
+    for (const result of [
+      { type: 'study-experience-committed', commit: { experience, replayed: false } },
+      { type: 'study-experience-deleted', experienceId: experience.id },
+      { type: 'study-experiences', experiences: [experience] },
+    ]) {
+      expect(() =>
+        assertStorageWorkerResponse({ requestId: 'request-lesson', ok: true, result }),
+      ).not.toThrow()
+    }
+  })
+
+  it.each([
+    { ...experience, title: '' },
+    { ...experience, blocks: Array.from({ length: 13 }, (_, index) => ({ id: `b${index}`, payload: { kind: 'prose', text: 'x' } })) },
+    { ...experience, blocks: [{ id: 'same', payload: { kind: 'prose', text: 'x' } }, { id: 'same', payload: { kind: 'question', prompt: 'x' } }] },
+  ])('rejects an invalid lesson before it reaches SQLite', (invalid) => {
+    expect(() => assertStorageWorkerRequest({ ...request, experience: invalid })).toThrow(TypeError)
+  })
+})
+
 describe('the section rewrite boundary', () => {
   const version = { html: '<h2>Chapter III</h2>', at: 1_756_800_000_000 }
 

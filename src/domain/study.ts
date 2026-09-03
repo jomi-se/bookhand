@@ -108,3 +108,41 @@ export interface StudyItemCommit {
   /** True when this was a retry that wrote nothing new. */
   readonly replayed: boolean
 }
+
+/**
+ * A composed teaching artifact. Unlike an action group, this is durable
+ * learning structure: its title and block order belong together and are
+ * written atomically.
+ */
+export interface StudyExperienceBlock {
+  readonly id: string
+  readonly payload: StudyItemPayload
+}
+
+export interface StudyExperience {
+  readonly id: string
+  readonly boardId: string
+  readonly origin: MutationOrigin
+  readonly actionGroupId: string
+  readonly revision: number
+  readonly title: string
+  readonly blocks: readonly StudyExperienceBlock[]
+  readonly sourceRange?: BookRange
+  readonly sourceLabel?: string
+  readonly source?: SourceLink
+  readonly sortOrder: number
+  readonly createdAt: string
+  readonly updatedAt: string
+}
+
+export interface StudyExperienceMutation {
+  readonly origin: MutationOrigin
+  readonly bookId: BookIdentifier
+  readonly actionToken: string
+  readonly actionGroupId: string
+}
+
+export interface StudyExperienceCommit {
+  readonly experience: StudyExperience
+  readonly replayed: boolean
+}

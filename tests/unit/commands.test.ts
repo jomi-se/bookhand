@@ -5,6 +5,7 @@ import type {
   BookRange,
   ReaderAdapter,
   StudyBoard,
+  StudyExperience,
   StudyItem,
 } from '../../src/domain/index.ts'
 import { BookhandCommands, ReaderUnavailableError } from '../../src/app/commands.ts'
@@ -72,6 +73,7 @@ function fakeAdapter(overrides: Partial<ReaderAdapter> = {}): ReaderAdapter {
 function setup(overrides: Partial<ReaderAdapter> = {}) {
   const annotations: Annotation[] = []
   const items: StudyItem[] = []
+  const experiences: StudyExperience[] = []
   const client = {
     saveAnnotation: vi.fn(async (annotation: Annotation) => {
       const index = annotations.findIndex((a) => a.id === annotation.id)
@@ -111,6 +113,12 @@ function setup(overrides: Partial<ReaderAdapter> = {}) {
     }),
     listStudyItems: vi.fn(async () => items),
     deleteStudyItem: vi.fn(async () => undefined),
+    commitStudyExperience: vi.fn(async (experience: StudyExperience) => {
+      experiences.push(experience)
+      return { experience, replayed: false }
+    }),
+    listStudyExperiences: vi.fn(async () => experiences),
+    deleteStudyExperience: vi.fn(async () => undefined),
     setBoardView: vi.fn(async (_id: string, view: StudyBoard['view']) => ({ ...board, view })),
   } as unknown as StorageClient
 
@@ -146,7 +154,7 @@ function setup(overrides: Partial<ReaderAdapter> = {}) {
     now: () => new Date('2026-09-01T12:00:00.000Z'),
     newId: () => `generated-${++counter}`,
   })
-  return { commands, client, bridge, adapter, annotations, items, presentation, surface, guidance }
+  return { commands, client, bridge, adapter, annotations, items, experiences, presentation, surface, guidance }
 }
 
 describe('the shared command surface', () => {
@@ -731,6 +739,49 @@ describe('the reading presentation', () => {
     })
     expect(presentation.committed.customCss).toContain('color: red')
     expect(receipt.scope).toContain('cannot reach the library')
+  })
+
+  it('refuses a composed lesson until the current design guidance is presented', async () => {
+    const { commands } = setup()
+    await expect(
+      commands.createStudyExperience({
+        title: 'A lesson',
+        blocks: [{ id: 'idea', payload: { kind: 'prose', text: 'One idea.' } }],
+        origin: 'agent',
+      }),
+    ).rejects.toThrow(/get_design_context/)
+  })
+
+  it('refuses an incomplete source claim before attempting a lesson write', async () => {
+    const { commands } = setup()
+    await expect(
+      commands.createStudyExperience({
+        title: 'A lesson',
+        blocks: [{ id: 'idea', payload: { kind: 'prose', text: 'One idea.' } }],
+        origin: 'agent',
+        designContextVersion: 'sha256:test',
+        sourceRange: range,
+      }),
+    ).rejects.toThrow(/does not match the text/)
+  })
+
+  it('uses verified book text for a source-backed lesson quotation', async () => {
+    const { commands } = setup()
+    const receipt = await commands.createStudyExperience({
+      title: 'A sourced lesson',
+      blocks: [{ id: 'quote', payload: { kind: 'quotation', text: 'Invented words' } }],
+      origin: 'agent',
+      actionToken: 'sourced-lesson',
+      designContextVersion: 'sha256:test',
+      bookId: 'book-1',
+      sourceRange: range,
+      sourceQuote: 'Alpha exact',
+    })
+    expect(receipt.applied.blocks[0]?.payload).toEqual({
+      kind: 'quotation',
+      text: 'Alpha exact',
+    })
+    expect(receipt.actions.map((action) => action.kind)).toEqual(['return-to-source', 'delete'])
   })
 
   it('asks nothing of a person writing the same CSS through the panel', async () => {

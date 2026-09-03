@@ -11,6 +11,9 @@ import type {
   StudyItemCommit,
   StudyBoardView,
   StudyMutation,
+  StudyExperience,
+  StudyExperienceCommit,
+  StudyExperienceMutation,
 } from './study.ts'
 import type { IndexChunk, IndexCursor, IndexState, SearchResult } from './search.ts'
 import type { SectionRewriteVersion, StoredSectionRewrite } from './remaster.ts'
@@ -135,6 +138,19 @@ export type StorageWorkerRequest =
     }
   | { readonly requestId: string; readonly type: 'delete-study-item'; readonly itemId: string }
   | { readonly requestId: string; readonly type: 'list-study-items'; readonly boardId: string }
+  | {
+      readonly requestId: string
+      readonly type: 'commit-study-experience'
+      readonly experience: StudyExperience
+      readonly mutation: StudyExperienceMutation
+    }
+  | {
+      readonly requestId: string
+      readonly type: 'delete-study-experience'
+      readonly experienceId: string
+      readonly boardId: string
+    }
+  | { readonly requestId: string; readonly type: 'list-study-experiences'; readonly boardId: string }
   | { readonly requestId: string; readonly type: 'get-index-state'; readonly bookId: string }
   | { readonly requestId: string; readonly type: 'begin-index'; readonly bookId: string; readonly sectionsTotal: number }
   | { readonly requestId: string; readonly type: 'commit-index-batch'; readonly bookId: string; readonly epoch: number; readonly expected: IndexCursor; readonly chunks: readonly IndexChunk[]; readonly next: IndexCursor; readonly sectionsIndexed: number }
@@ -182,6 +198,9 @@ export type StorageWorkerResult =
   | { readonly type: 'study-item-undone'; readonly item: StudyItem | null }
   | { readonly type: 'study-item-deleted'; readonly itemId: string }
   | { readonly type: 'study-items'; readonly items: readonly StudyItem[] }
+  | { readonly type: 'study-experience-committed'; readonly commit: StudyExperienceCommit }
+  | { readonly type: 'study-experience-deleted'; readonly experienceId: string }
+  | { readonly type: 'study-experiences'; readonly experiences: readonly StudyExperience[] }
   | { readonly type: 'index-state'; readonly state: IndexState | null }
   | { readonly type: 'search-results'; readonly result: SearchResult }
   | { readonly type: 'section-rewrites'; readonly rewrites: readonly StoredSectionRewrite[] }
