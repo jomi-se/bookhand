@@ -265,6 +265,12 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
   // The agent said what it was doing, and that is what the person is shown.
   await expect(bar).toContainText('Set the chapter title as a heading')
 
+  await bar.getByRole('button', { name: 'Hide' }).click()
+  await expect(bar).toHaveClass(/remaster-bar-collapsed/)
+  await expect(bar).not.toContainText('Set the chapter title as a heading')
+  await bar.getByRole('button', { name: /Agent rewrite/ }).click()
+  await expect(bar).not.toHaveClass(/remaster-bar-collapsed/)
+
   await bar.getByRole('button', { name: 'Original' }).click()
   await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('data-tex')
 

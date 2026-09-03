@@ -237,6 +237,8 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
   size controls are visible; and Left/Right plus PageUp/PageDown page the book
   even after reader chrome receives focus. The focused remaster and ordinary
   desktop browser flows pass against the production build.
+- The chapter-remaster provenance strip can collapse to one quiet, session-only
+  disclosure without changing the selected version or its history.
 - The bundled *Calculus Made Easy* is judging content, not a permanent product
   dependency.
 - Keep embeddings optional and after lexical retrieval.

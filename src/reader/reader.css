@@ -791,9 +791,36 @@
   color: var(--ink);
 }
 
+.remaster-bar.remaster-bar-collapsed {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  padding: 0;
+  background: transparent;
+}
+
+.remaster-disclosure {
+  min-block-size: 36px;
+  padding-inline: 10px;
+  border-color: var(--rule);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.remaster-disclosure:hover {
+  color: var(--ink);
+}
+
 @media (max-width: 860px), (pointer: coarse) {
   .remaster-bar {
     gap: 0.35rem;
+  }
+
+  .remaster-bar.remaster-bar-collapsed {
+    flex-basis: auto;
+  }
+
+  .remaster-disclosure {
+    min-block-size: var(--tap);
   }
 
   .remaster-bar-note,

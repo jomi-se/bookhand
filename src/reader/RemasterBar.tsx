@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RotateCcw, Undo2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, RotateCcw, Undo2 } from 'lucide-react'
 
 import type { BookhandCommands } from '../app/commands.ts'
 
@@ -20,6 +20,7 @@ export function RemasterBar(props: RemasterBarProps) {
   const { commands, sectionIndex } = props
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  const [collapsed, setCollapsed] = useState(false)
   const [state, setState] = useState<{
     rewritten: boolean
     showing: boolean
@@ -56,12 +57,39 @@ export function RemasterBar(props: RemasterBarProps) {
     setBusy(true)
     setError(undefined)
     void action()
-      .catch(() => setError('That chapter view could not be changed. Your current version is still safe.'))
+      .catch(() => {
+        setCollapsed(false)
+        setError('That chapter view could not be changed. Your current version is still safe.')
+      })
       .finally(() => setBusy(false))
   }
 
+  if (collapsed) {
+    return (
+      <section
+        className="remaster-bar remaster-bar-collapsed"
+        aria-label="Chapter remaster"
+      >
+        <button
+          type="button"
+          className="button button-quiet remaster-disclosure"
+          aria-expanded="false"
+          onClick={() => setCollapsed(false)}
+        >
+          <ChevronDown size={14} aria-hidden="true" />
+          Agent rewrite · {state.showing ? 'Rewritten' : 'Original'}
+        </button>
+      </section>
+    )
+  }
+
   return (
-    <section className="remaster-bar" aria-label="Chapter remaster" aria-busy={busy}>
+    <section
+      id="chapter-remaster-details"
+      className="remaster-bar"
+      aria-label="Chapter remaster"
+      aria-busy={busy}
+    >
       {/* The agent's own sentence, when it gave one. A person deciding whether
           to keep a rewrite is better served by what was attempted than by a
           generic notice — and the tool promises this is where it appears. */}
@@ -113,6 +141,15 @@ export function RemasterBar(props: RemasterBarProps) {
         >
           <RotateCcw size={14} aria-hidden="true" />
           Reset
+        </button>
+        <button
+          type="button"
+          className="button button-text remaster-collapse"
+          aria-expanded="true"
+          onClick={() => setCollapsed(true)}
+        >
+          <ChevronUp size={14} aria-hidden="true" />
+          Hide
         </button>
       </div>
       {error ? <p className="remaster-bar-error" role="alert">{error}</p> : null}
