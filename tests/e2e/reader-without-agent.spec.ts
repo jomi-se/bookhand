@@ -37,6 +37,12 @@ test('desktop reading controls stay visible and keyboard paging survives focused
   await page.getByRole('button', { name: 'Increase text size' }).click()
   await expect(size).toHaveText(`${Math.min(200, beforeSize + 10)}%`)
 
+  await page.getByRole('button', { name: 'Text settings' }).click()
+  await page.getByRole('button', { name: 'Single', exact: true }).click()
+  await page.getByRole('button', { name: 'Apply' }).click()
+  await page.getByRole('button', { name: 'Close text settings' }).click()
+  await expect(page.locator('foliate-view')).toHaveAttribute('max-column-count', '1')
+
   const fraction = () =>
     page.evaluate(
       () =>

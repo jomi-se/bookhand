@@ -291,6 +291,7 @@ function isStyle(value: unknown): value is ReaderStyle {
     isFiniteNumber(value.measureCh) &&
     isFiniteNumber(value.paragraphSpacingEm) &&
     ['publisher', 'light', 'sepia', 'dark'].includes(String(value.theme)) &&
+    (value.pageLayout === undefined || ['auto', 'single', 'spread'].includes(String(value.pageLayout))) &&
     isOptionalString(value.customCss)
   )
 }

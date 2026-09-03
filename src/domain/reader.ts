@@ -90,6 +90,7 @@ export interface BookSectionSnapshot {
 }
 
 export type ReaderTheme = 'publisher' | 'light' | 'sepia' | 'dark'
+export type ReaderPageLayout = 'auto' | 'single' | 'spread'
 
 export interface ReaderStyle {
   readonly fontFamily?: string
@@ -98,6 +99,7 @@ export interface ReaderStyle {
   readonly measureCh: number
   readonly paragraphSpacingEm: number
   readonly theme: ReaderTheme
+  readonly pageLayout?: ReaderPageLayout
   readonly customCss?: string
 }
 

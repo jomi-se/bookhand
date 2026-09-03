@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import type { ReaderStyle, ReaderTheme } from '../domain/reader.ts'
+import type { ReaderPageLayout, ReaderStyle, ReaderTheme } from '../domain/reader.ts'
 import type { PresentationView, StylePatch } from '../app/presentation.ts'
 
 export interface TextPanelProps {
@@ -19,6 +19,12 @@ const THEMES: readonly { value: ReaderTheme; label: string }[] = [
   { value: 'light', label: 'Light' },
   { value: 'sepia', label: 'Sepia' },
   { value: 'dark', label: 'Dark' },
+]
+
+const PAGE_LAYOUTS: readonly { value: ReaderPageLayout; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'single', label: 'Single' },
+  { value: 'spread', label: 'Spread' },
 ]
 
 function Slider({
@@ -184,6 +190,23 @@ export function TextPanel({
                 onClick={() => change({ theme: theme.value })}
               >
                 {theme.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="control control-themes">
+          <legend>Page layout</legend>
+          <div className="theme-row">
+            {PAGE_LAYOUTS.map((layout) => (
+              <button
+                key={layout.value}
+                type="button"
+                className="button button-quiet"
+                aria-pressed={(shown.pageLayout ?? 'auto') === layout.value}
+                onClick={() => change({ pageLayout: layout.value })}
+              >
+                {layout.label}
               </button>
             ))}
           </div>

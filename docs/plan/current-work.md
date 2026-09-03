@@ -239,6 +239,11 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
   desktop browser flows pass against the production build.
 - The chapter-remaster provenance strip can collapse to one quiet, session-only
   disclosure without changing the selected version or its history.
+- Page layout is a persisted reader preference with Auto, Single, and Spread
+  controls in Text and the same bounded `set_reading_style` field for agents;
+  compact/coarse-pointer reading remains single-column.
+- Text zoom scales the reader root, so repaired chapters cannot strand rem-based
+  headings or native MathML at a fixed size.
 - The bundled *Calculus Made Easy* is judging content, not a permanent product
   dependency.
 - Keep embeddings optional and after lexical retrieval.

@@ -512,6 +512,15 @@ describe('the WebMCP tool surface', () => {
     })
   })
 
+  it('offers page layout as a bounded reader setting', async () => {
+    const { tool, commands } = setup()
+    await tool('set_reading_style').execute({ pageLayout: 'single' })
+    expect(commands.setReadingStyle).toHaveBeenCalledWith({
+      patch: { pageLayout: 'single' },
+      origin: 'agent',
+    })
+  })
+
   it('refuses a call that names no presentation field', async () => {
     const { tool, commands } = setup()
     const result = await tool('set_reading_style').execute({})
@@ -535,6 +544,7 @@ describe('the WebMCP tool surface', () => {
       { lineHeight: Number.NaN },
       { measureCh: 12 },
       { paragraphSpacingEm: -1 },
+      { pageLayout: 'poster' },
       { theme: 'bogus' },
       { customCss: 'x'.repeat(20_001), designContextVersion: 'sha256:test' },
     ]) {

@@ -154,6 +154,7 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
       `<img src="${figureSrc}" alt="Fig. 4"><figcaption>Fig. 4</figcaption></figure>` +
       '<script>fetch("https://evil.example")</script>',
     css:
+      'html { font-size: 9px !important; }' +
       'html, body { width: 1400px !important; height: 1200px !important; overflow: hidden !important; }' +
       '.remastered-note { color: rebeccapurple; }',
     summary: 'Set the chapter title as a heading and the derivative as MathML',
@@ -236,6 +237,23 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
     return h2 && doc?.defaultView ? doc.defaultView.getComputedStyle(h2).fontSize : ''
   })
   expect(Number.parseFloat(heading)).toBeLessThanOrEqual(32)
+
+  await page.getByRole('button', { name: 'Increase text size' }).click()
+  await expect
+    .poll(async () => {
+      const size = await page.evaluate(() => {
+        const view = document.querySelector('foliate-view') as unknown as {
+          renderer?: { getContents?: () => { doc: Document }[] }
+        }
+        const doc = view?.renderer?.getContents?.()[0]?.doc
+        const h2 = doc?.querySelector('h2')
+        return h2 && doc?.defaultView
+          ? Number.parseFloat(doc.defaultView.getComputedStyle(h2).fontSize)
+          : 0
+      })
+      return size
+    })
+    .toBeGreaterThan(Number.parseFloat(heading))
 
   // Native MathML, not an image: the mathematics is selectable text now.
   const mathText = await page.evaluate(() => {

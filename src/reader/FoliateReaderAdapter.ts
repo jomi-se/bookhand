@@ -131,6 +131,7 @@ export const DEFAULT_READER_STYLE: ReaderStyle = {
   measureCh: 68,
   paragraphSpacingEm: 0.75,
   theme: 'publisher',
+  pageLayout: 'auto',
 }
 
 export class FoliateReaderAdapter implements ReaderAdapter {
@@ -396,7 +397,9 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
   applyStyle(style: ReaderStyle): void {
     this.#style = structuredClone(style)
-    this.#active?.view.renderer.setStyles?.(makeReaderCss(this.#style))
+    const view = this.#active?.view
+    view?.renderer.setStyles?.(makeReaderCss(this.#style))
+    if (view) applyPageLayout(view, this.#style.pageLayout ?? 'auto')
   }
 
   getStyle(): ReaderStyle {
@@ -466,7 +469,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     // and no page-turn animation at all. On a phone that spent 96px of a 839px
     // screen on nothing, and made every turn snap without transition, which
     // reads as unresponsive rather than fast.
-    const cleanups = [...this.#listen(view), configureForViewport(view)]
+    const cleanups = [...this.#listen(view), configureForViewport(view, () => this.#style.pageLayout ?? 'auto')]
     this.#active = { book, view, cleanups, transformCleanup: uninstallTransform }
     this.#host.replaceChildren(view)
     try {
@@ -1208,7 +1211,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     if (!previous) return
     const revision = this.#revision
     const view = document.createElement('foliate-view') as FoliateView
-    const cleanups = [...this.#listen(view), configureForViewport(view)]
+    const cleanups = [...this.#listen(view), configureForViewport(view, () => this.#style.pageLayout ?? 'auto')]
     this.#suppressRelocations += 1
     try {
       previous.view.close()
@@ -1336,7 +1339,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#dispose(stalled, false)
 
     const view = document.createElement('foliate-view') as FoliateView
-    const cleanups = [...this.#listen(view), configureForViewport(view)]
+    const cleanups = [...this.#listen(view), configureForViewport(view, () => this.#style.pageLayout ?? 'auto')]
     const replacement: ActiveReader = {
       book,
       view,
@@ -1496,7 +1499,19 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
  * `animated` is withheld under reduced motion: the page turn then completes
  * instantly, which is the behaviour that setting asks for.
  */
-function configureForViewport(view: FoliateView): () => void {
+function applyPageLayout(
+  view: FoliateView,
+  layout: NonNullable<ReaderStyle['pageLayout']>,
+): void {
+  const isCompact = globalThis.matchMedia?.(COMPACT_QUERY).matches ?? false
+  const columns = layout === 'single' || isCompact ? '1' : '2'
+  view.setAttribute('max-column-count', columns)
+}
+
+function configureForViewport(
+  view: FoliateView,
+  pageLayout: () => NonNullable<ReaderStyle['pageLayout']>,
+): () => void {
   const compact = globalThis.matchMedia?.(COMPACT_QUERY)
   const reduced = globalThis.matchMedia?.(REDUCED_MOTION_QUERY)
 
@@ -1505,7 +1520,7 @@ function configureForViewport(view: FoliateView): () => void {
     const element = view as unknown as HTMLElement
     element.setAttribute('margin', isCompact ? '20px' : '48px')
     element.setAttribute('gap', isCompact ? '5%' : '7%')
-    element.setAttribute('max-column-count', isCompact ? '1' : '2')
+    applyPageLayout(view, pageLayout())
     if (reduced?.matches) element.removeAttribute('animated')
     else element.setAttribute('animated', '')
   }
@@ -1648,9 +1663,9 @@ function makeReaderCss(style: ReaderStyle): string {
   const theme = bookPalette(style.theme)
   const family = style.fontFamily ? JSON.stringify(style.fontFamily) : 'inherit'
   return `
-    :root { color-scheme: ${style.theme === 'dark' ? 'dark' : 'light'}; background: ${theme.canvas}; color: ${theme.ink}; }
+    :root { color-scheme: ${style.theme === 'dark' ? 'dark' : 'light'}; background: ${theme.canvas}; color: ${theme.ink}; font-size: ${style.fontSizePercent}% !important; }
     body { background: ${theme.canvas}; color: ${theme.ink}; }
-    body { max-width: ${style.measureCh}ch; margin-inline: auto; font-family: ${family}; font-size: ${style.fontSizePercent}%; }
+    body { max-width: ${style.measureCh}ch; margin-inline: auto; font-family: ${family}; font-size: 1rem !important; }
     p, li, blockquote, dd { line-height: ${style.lineHeight}; }
     p { margin-block: ${style.paragraphSpacingEm}em; }
     img, svg, video { max-inline-size: 100%; block-size: auto; }

@@ -158,6 +158,7 @@ function summarizeStyle(style: ReaderStyle | undefined): string {
     `line height ${style.lineHeight}`,
     `measure ${style.measureCh}ch`,
     `paragraph spacing ${style.paragraphSpacingEm}em`,
+    `page layout ${style.pageLayout ?? 'auto'}`,
     style.customCss ? `${style.customCss.length} characters of book CSS` : 'no book CSS',
   ].join(', ')
 }
@@ -544,7 +545,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     {
       name: 'set_reading_style',
       description:
-        'Change how the book is presented: text size, line height, measure, paragraph spacing, theme, or custom book CSS. Send only the fields you mean to change — anything you restate would overwrite a change the person made a moment ago. Every change is reversible by the person with one action. Picking a shipped theme or adjusting size needs nothing else; custom CSS additionally requires designContextVersion from get_design_context, which explains the semantic roles, contrast floors, and what this CSS can and cannot reach.',
+        'Change how the book is presented: text size, line height, measure, paragraph spacing, page layout (auto, single, or spread), theme, or custom book CSS. Send only the fields you mean to change — anything you restate would overwrite a change the person made a moment ago. Spread remains one column on compact/coarse-pointer devices. Every change is reversible by the person with one action. Picking a shipped theme or adjusting size needs nothing else; custom CSS additionally requires designContextVersion from get_design_context, which explains the semantic roles, contrast floors, and what this CSS can and cannot reach.',
       inputSchema: {
         type: 'object',
         oneOf: [
@@ -558,6 +559,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
                 { required: ['lineHeight'] },
                 { required: ['measureCh'] },
                 { required: ['paragraphSpacingEm'] },
+                { required: ['pageLayout'] },
                 { required: ['theme'] },
                 { required: ['customCss'] },
               ],
@@ -573,6 +575,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
                 { required: ['lineHeight'] },
                 { required: ['measureCh'] },
                 { required: ['paragraphSpacingEm'] },
+                { required: ['pageLayout'] },
                 { required: ['theme'] },
                 { required: ['customCss'] },
               ],
@@ -584,6 +587,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               { required: ['lineHeight'] },
               { required: ['measureCh'] },
               { required: ['paragraphSpacingEm'] },
+              { required: ['pageLayout'] },
               { required: ['theme'] },
               { required: ['customCss'] },
             ],
@@ -595,6 +599,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           lineHeight: { type: 'number', minimum: 1.1, maximum: 2.2 },
           measureCh: { type: 'number', minimum: 40, maximum: 110 },
           paragraphSpacingEm: { type: 'number', minimum: 0, maximum: 2 },
+          pageLayout: { type: 'string', enum: ['auto', 'single', 'spread'] },
           theme: { type: 'string', enum: ['publisher', 'light', 'sepia', 'dark'] },
           customCss: {
             type: 'string',
@@ -624,6 +629,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             'lineHeight',
             'measureCh',
             'paragraphSpacingEm',
+            'pageLayout',
             'theme',
             'customCss',
           ]
@@ -659,6 +665,9 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             ...(typeof input.measureCh === 'number' ? { measureCh: input.measureCh } : {}),
             ...(typeof input.paragraphSpacingEm === 'number'
               ? { paragraphSpacingEm: input.paragraphSpacingEm }
+              : {}),
+            ...(typeof input.pageLayout === 'string'
+              ? { pageLayout: input.pageLayout as NonNullable<ReaderStyle['pageLayout']> }
               : {}),
             ...(typeof input.theme === 'string'
               ? { theme: input.theme as ReaderStyle['theme'] }
