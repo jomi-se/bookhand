@@ -4,8 +4,6 @@ import { defineConfig, normalizePath, type Plugin } from 'vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 // @ts-expect-error -- build-time only, shared with the unit-test runner.
 import { designContextSource } from './scripts/vite-design-context-plugin.mjs'
-// @ts-expect-error -- build-time compatibility transform, intentionally plain JS.
-import { foliateStableFrame } from './scripts/vite-foliate-stable-frame-plugin.mjs'
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -15,7 +13,7 @@ const contentSecurityPolicy = [
   "img-src 'self' blob: data:",
   "font-src 'self' blob: data:",
   "media-src 'self' blob: data:",
-  "connect-src 'self' blob:",
+  "connect-src 'self'",
   "worker-src 'self' blob:",
   "frame-src 'self' blob:",
   "object-src 'none'",
@@ -97,7 +95,6 @@ function testControlBoundary(mode: string): Plugin {
 export default defineConfig(({ mode }) => ({
   base: process.env.BOOKHAND_BASE ?? '/',
   plugins: [
-    foliateStableFrame(),
     react(),
     developmentCsp(),
     testControlBoundary(mode),

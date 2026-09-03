@@ -247,11 +247,6 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
 - Original, Rewritten, Undo, and Reset now update the mounted section in place
   and ask Foliate to repaginate. They never replace the reader or trigger a new
   post-load `blob:` iframe navigation, which the ChatGPT/Codex browser blocks.
-- ADR 0005 removes the same blocked navigation from ordinary Foliate section
-  loads: generated document blobs are read locally and delivered through
-  `srcdoc`. Forced cross-chapter tutor focus, production Search/remaster, and
-  the hostile-EPUB containment checks pass; recovery retains the prior adapter
-  session until a replacement is ready.
 - The bundled *Calculus Made Easy* is judging content, not a permanent product
   dependency.
 - Keep embeddings optional and after lexical retrieval.
