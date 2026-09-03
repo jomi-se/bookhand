@@ -98,6 +98,8 @@ export interface SectionEditResult extends SectionRewriteResult {
 export interface SectionRewriteResult {
   readonly sectionIndex: number
   readonly applied: boolean
+  /** Whether this revision replaced the mounted reader during the call. */
+  readonly displayed: boolean
   readonly sanitized: {
     readonly removedElements: Readonly<Record<string, number>>
     readonly removedAttributes: Readonly<Record<string, number>>
@@ -158,6 +160,8 @@ export interface RewriteSummary {
   readonly sectionIndex: number
   readonly summary?: string
   readonly versions: number
+  /** Saved and ready, but deliberately not mounted by the agent call. */
+  readonly pending?: boolean
 }
 
 /**

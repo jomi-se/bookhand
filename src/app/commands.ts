@@ -368,7 +368,7 @@ export class BookhandCommands {
     const index = await this.#resolveSection(sectionIndex)
     const report = await this.#remaster().compileSectionMath(index, { deferDisplay: true })
     this.#changed()
-    return { sectionIndex: index, ...report }
+    return { sectionIndex: index, ...report, displayed: false }
   }
 
   async undoSectionRewrite(sectionIndex?: number) {

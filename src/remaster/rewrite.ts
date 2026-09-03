@@ -144,6 +144,7 @@ export function applyExactEdits(
 export interface RewriteResult {
   readonly sectionIndex: number
   readonly applied: boolean
+  readonly displayed: boolean
   readonly sanitized: SanitizeResult
   /** True when the agent's stylesheet had rules removed. */
   readonly cssModified: boolean

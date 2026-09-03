@@ -118,6 +118,7 @@ function setup(overrides: Partial<BookhandCommands> = {}) {
     editSection: vi.fn(async (_sectionIndex, _fingerprint, edits: readonly unknown[]) => ({
       sectionIndex: 3,
       applied: true,
+      displayed: false,
       editsApplied: edits.length,
       sanitized: { removedElements: {}, removedAttributes: {}, modified: false },
       cssModified: false,
@@ -326,6 +327,7 @@ describe('the WebMCP tool surface', () => {
       editSection: vi.fn(async () => ({
         sectionIndex: 3,
         applied: true,
+        displayed: false,
         editsApplied: 1,
         sanitized: {
           removedElements: {},

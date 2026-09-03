@@ -472,7 +472,7 @@ describe('the agent’s read and write seam', () => {
     expect(rendered().querySelector('img[data-tex]')).not.toBeNull()
   })
 
-  it('can persist an agent rewrite before a browser-controlled frame is allowed to rebuild', async () => {
+  it('keeps the mounted book readable until a person reveals an agent rewrite', async () => {
     const harness = makeStore()
     const { adapter, rendered } = await openAdapter({ rewrites: harness.store })
     let allowFrame!: () => void
@@ -485,13 +485,15 @@ describe('the agent’s read and write seam', () => {
     )
 
     expect(result.applied).toBe(true)
+    expect(result.displayed).toBe(false)
     expect(harness.sections.get(0)?.at(-1)?.html).toContain('Deferred but safe')
     // The tool receipt is no longer held hostage by the nested EPUB frame.
     expect(rendered().querySelector('h1.ctitle')).not.toBeNull()
 
+    const reveal = adapter.showRewritten(true)
     allowFrame()
-    await vi.waitFor(() => expect(rendered().querySelector('article')?.textContent)
-      .toContain('Deferred but safe'))
+    await reveal
+    expect(rendered().querySelector('article')?.textContent).toContain('Deferred but safe')
   })
 
   it('compiles from the section’s source, so the saved version stays portable', async () => {

@@ -159,6 +159,7 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
     summary: 'Set the chapter title as a heading and the derivative as MathML',
   })
   expect(rewrite.isError).toBe(false)
+  expect(rewrite.structured.displayed).toBe(false)
 
   // The sanitizer refused the script and said so, rather than thinning quietly.
   const sanitized = (rewrite.structured as { sanitized?: { removedElements?: Record<string, number> } })
@@ -166,7 +167,12 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
   expect(sanitized?.removedElements?.script).toBe(1)
   expect(rewrite.text).toContain('Removed')
 
-  // 4. The reader is showing the agent's chapter.
+  // 4. The agent call never tears down the mounted book. The person reveals
+  //    the safely saved revision outside the browser-controlled operation.
+  expect(await renderedHtml(page)).toContain('data-tex')
+  const bar = page.locator('.remaster-bar')
+  await expect(bar).toContainText('Rewrite ready')
+  await bar.getByRole('button', { name: 'Rewritten' }).click()
   await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('id="ch3"')
   const after = await renderedHtml(page)
   expect(after).toContain('id="ch3"')
@@ -260,7 +266,6 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
   expect(currentCounts?.imagesWithTex).toBe(0)
 
   // 5. The person's control appeared, and it is not a promise — it works.
-  const bar = page.locator('.remaster-bar')
   await expect(bar).toBeVisible()
   // The agent said what it was doing, and that is what the person is shown.
   await expect(bar).toContainText('Set the chapter title as a heading')
@@ -296,6 +301,9 @@ test('the deterministic shortcut is one call the agent may choose', async ({ pag
   const report = result.structured as { found?: number; restored?: number }
   expect(report.found).toBe(161)
   expect(report.restored).toBe(161)
+
+  expect(await renderedHtml(page)).toContain('data-tex')
+  await page.locator('.remaster-bar').getByRole('button', { name: 'Rewritten' }).click()
 
   await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('<math')
   const after = await renderedHtml(page)
@@ -338,6 +346,7 @@ test('an agent can make a fingerprinted surgical edit that survives reload and u
   })
   expect(edited.isError).toBe(false)
   expect(edited.structured).toMatchObject({ editsApplied: 1, sectionIndex: expect.any(Number) })
+  await page.locator('.remaster-bar').getByRole('button', { name: 'Rewritten' }).click()
   await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('id="surgical-heading"')
   // Content outside the one exact replacement remains: this was not a tiny
   // payload disguising a whole-section rewrite.
@@ -400,6 +409,7 @@ test('a rewrite survives a reload, and Reset survives one too', async ({ page })
     summary: 'Rewrote chapter III',
   })
   expect(rewritten.isError).toBe(false)
+  await page.locator('.remaster-bar').getByRole('button', { name: 'Rewritten' }).click()
   await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('id="kept"')
 
   // The real claim: reload the page, reopen the book, and the chapter is still

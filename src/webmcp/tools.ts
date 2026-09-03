@@ -1016,7 +1016,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             ? ' Some stylesheet rules were removed for reaching off-origin.'
             : ''
           return textResult(
-            `Rewrote section ${result.sectionIndex}: ${result.before.elements} elements became ${result.after.elements}.${refused}${styleRefused}`,
+            `Saved rewrite for section ${result.sectionIndex}: ${result.before.elements} elements became ${result.after.elements}. The readable book stayed mounted; the person can select Rewritten to reveal it.${refused}${styleRefused}`,
             { ...result },
           )
         }),
@@ -1117,7 +1117,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             typeof input.sectionIndex === 'number' ? input.sectionIndex : undefined,
           )
           return textResult(
-            `Compiled ${report.restored} of ${report.found} equation images to MathML${report.residues.length > 0 ? `; ${report.residues.length} need writing by hand` : ''}.`,
+            `Saved native MathML for ${report.restored} of ${report.found} equation images${report.residues.length > 0 ? `; ${report.residues.length} need writing by hand` : ''}. The readable book stayed mounted; the person can select Rewritten to reveal it.`,
             { ...report },
           )
         }),

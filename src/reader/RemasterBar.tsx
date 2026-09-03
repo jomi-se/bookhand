@@ -26,6 +26,7 @@ export function RemasterBar(props: RemasterBarProps) {
     showing: boolean
     summary?: string
     versions: number
+    pending: boolean
   }>()
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export function RemasterBar(props: RemasterBarProps) {
           showing: commands.isShowingRewritten(),
           ...(described?.summary === undefined ? {} : { summary: described.summary }),
           versions: described?.versions ?? 0,
+          pending: described?.pending ?? false,
         })
       } catch {
         // The reader is between books; there is nothing to offer yet.
@@ -77,7 +79,7 @@ export function RemasterBar(props: RemasterBarProps) {
           onClick={() => setCollapsed(false)}
         >
           <ChevronDown size={14} aria-hidden="true" />
-          Agent rewrite · {state.showing ? 'Rewritten' : 'Original'}
+          Agent rewrite · {state.pending ? 'Ready' : state.showing ? 'Rewritten' : 'Original'}
         </button>
       </section>
     )
@@ -100,6 +102,7 @@ export function RemasterBar(props: RemasterBarProps) {
           <span className="remaster-bar-versions"> · {state.versions} revisions</span>
         ) : null}
       </p>
+      {state.pending ? <span className="remaster-ready">Rewrite ready</span> : null}
       <div className="remaster-bar-tools">
         <div className="remaster-switch" role="group" aria-label="Which version of this chapter to show">
           <button
@@ -122,7 +125,9 @@ export function RemasterBar(props: RemasterBarProps) {
           </button>
         </div>
         <span className="remaster-current" aria-live="polite">
-          Showing {state.showing ? 'rewritten' : 'original'}
+          {state.pending
+            ? 'Select Rewritten to show it'
+            : `Showing ${state.showing ? 'rewritten' : 'original'}`}
         </span>
         <button
           type="button"

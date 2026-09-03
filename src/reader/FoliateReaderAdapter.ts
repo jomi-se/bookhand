@@ -172,6 +172,8 @@ export class FoliateReaderAdapter implements ReaderAdapter {
    */
   #rewrites = new Map<number, SectionRewrite>()
   #showRewritten = true
+  /** Revisions saved by an agent which await an explicit human reveal. */
+  #pendingRewriteSections = new Set<number>()
   #rebuilding: Promise<void> = Promise.resolve()
   #remasterMutations: Promise<void> = Promise.resolve()
   /** Which book is open, and where its rewrites are kept between sessions. */
@@ -912,10 +914,11 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       ...(options.css === undefined ? {} : { css: options.css }),
       ...(options.summary === undefined ? {} : { summary: options.summary }),
     })
-    await this.#commit(sectionIndex, prepared.version, options.deferDisplay)
+    const displayed = await this.#commit(sectionIndex, prepared.version, options.deferDisplay)
     return {
       sectionIndex,
       applied: true,
+      displayed,
       sanitized: prepared.sanitized,
       cssModified: prepared.cssModified,
       before,
@@ -1015,6 +1018,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       sectionIndex,
       ...(summary === undefined ? {} : { summary }),
       versions: rewrite.versions.length,
+      ...(this.#pendingRewriteSections.has(sectionIndex) ? { pending: true } : {}),
     }
   }
 
@@ -1028,14 +1032,20 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   }
 
   async #showRewrittenNow(showRewritten: boolean): Promise<number> {
-    if (this.#showRewritten === showRewritten) return 0
+    if (
+      this.#showRewritten === showRewritten &&
+      !(showRewritten && this.#pendingRewriteSections.size > 0)
+    ) return 0
     this.#showRewritten = showRewritten
     // Only what is on screen has to be rebuilt; the rest is served correctly
     // the next time it loads, because the transform consults this flag.
     const rendered = (this.#active?.view.renderer.getContents() ?? [])
       .map((content) => content.index)
       .filter((index) => this.#rewrites.has(index))
-    for (const sectionIndex of rendered) await this.#rebuildSection(sectionIndex)
+    for (const sectionIndex of rendered) {
+      await this.#rebuildSection(sectionIndex)
+      if (showRewritten) this.#pendingRewriteSections.delete(sectionIndex)
+    }
     return rendered.length
   }
 
@@ -1050,6 +1060,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     // come back on the next reload, which is the opposite of what Reset means.
     await this.#persist((store, bookId) => store.reset(bookId, sectionIndex))
     this.#rewrites.delete(sectionIndex)
+    this.#pendingRewriteSections.delete(sectionIndex)
     await this.#rebuildSection(sectionIndex)
     return true
   }
@@ -1066,6 +1077,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     const versions = existing.versions.slice(0, -1)
     if (versions.length === 0) this.#rewrites.delete(sectionIndex)
     else this.#rewrites.set(sectionIndex, { ...existing, versions })
+    this.#pendingRewriteSections.delete(sectionIndex)
     await this.#rebuildSection(sectionIndex)
     return { versions: versions.length }
   }
@@ -1120,7 +1132,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     sectionIndex: number,
     version: SectionVersion,
     deferDisplay = false,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const stored = await this.#persist((store, bookId) =>
       store.append(bookId, sectionIndex, version),
     )
@@ -1132,22 +1144,19 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       // the library can no longer honour.
       versions: stored === undefined ? versions : versions.slice(-stored),
     })
-    this.#showRewritten = true
     if (deferDisplay) {
-      // ChatGPT's browser may refuse a nested blob-frame navigation while a
-      // WebMCP call is still in flight. Rebuilding here used to close the
-      // readable view first and could therefore strand that tab on a blank
-      // paginator. Let the tool receipt cross the WebMCP boundary, then show
-      // the safely persisted revision on the following browser task.
-      globalThis.setTimeout(() => {
-        void this.#rebuildSection(sectionIndex).catch(() => {
-          // The revision is still safe and recoverable through Original/Undo.
-          // A later navigation or fresh open will serve it normally.
-        })
-      }, 0)
-      return
+      // ChatGPT's browser can refuse nested blob-frame navigation throughout
+      // an agent-controlled operation, including timers queued by that call.
+      // Never tear down the readable view here. The saved revision appears as
+      // Ready and the person reveals it with the ordinary Rewritten control.
+      if (!existing) this.#showRewritten = false
+      this.#pendingRewriteSections.add(sectionIndex)
+      return false
     }
+    this.#showRewritten = true
     await this.#rebuildSection(sectionIndex)
+    this.#pendingRewriteSections.delete(sectionIndex)
+    return true
   }
 
   /**
@@ -1405,6 +1414,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     this.#selection = null
     this.#marks = []
     this.#rewrites.clear()
+    this.#pendingRewriteSections.clear()
   }
 }
 

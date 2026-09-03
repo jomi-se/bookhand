@@ -779,6 +779,11 @@
   color: var(--muted);
 }
 
+.remaster-ready {
+  color: var(--accent);
+  font-weight: 650;
+}
+
 .remaster-current {
   color: var(--muted);
   font-size: var(--step--2);
