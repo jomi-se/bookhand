@@ -76,6 +76,24 @@ test('the book gets the whole width of the phone, at every turn', async ({ page 
   expect([...widths]).toEqual([first.host])
 })
 
+test('text zoom stays visible in compact chrome', async ({ page }) => {
+  await openChapter(page)
+
+  const size = page.locator('.reader-zoom output')
+  await expect(page.getByRole('button', { name: 'Decrease text size' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Increase text size' })).toBeVisible()
+  const before = Number.parseInt((await size.textContent()) ?? '0', 10)
+  await page.getByRole('button', { name: 'Increase text size' }).click()
+  await expect(size).toHaveText(`${Math.min(200, before + 10)}%`)
+
+  const geometry = await page.evaluate(() => ({
+    overflow: document.documentElement.scrollWidth - window.innerWidth,
+    chromeHeight: document.querySelector('.reader-chrome')!.getBoundingClientRect().height,
+  }))
+  expect(geometry.overflow).toBe(0)
+  expect(geometry.chromeHeight).toBeLessThan(80)
+})
+
 test('tapping the edges turns the page and tapping the middle recalls the chrome', async ({
   page,
 }) => {

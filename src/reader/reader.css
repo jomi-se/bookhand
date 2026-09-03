@@ -577,8 +577,25 @@
     display: none;
   }
 
-  .reader-zoom {
+  /* Text size is a primary reading control on a phone, not advanced
+     customization. Keep both tap targets in the chrome and reclaim the room
+     from the title, which remains available in Contents and Library. */
+  .reader-chrome {
+    gap: 4px;
+  }
+
+  .reader-identity {
     display: none;
+  }
+
+  .reader-tools {
+    flex: 1;
+    justify-content: flex-end;
+    gap: 2px;
+  }
+
+  .reader-zoom {
+    padding-inline-end: 4px;
   }
 
   /*
