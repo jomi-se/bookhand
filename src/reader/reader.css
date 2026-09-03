@@ -20,19 +20,19 @@
 .search-index-status {
   margin: 0.25rem 0 0;
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: var(--step--1);
   overflow-wrap: anywhere;
 }
 
 .search-form {
   display: grid;
   gap: 0.55rem;
-  margin-bottom: 0.75rem;
+  margin-block-end: 0.75rem;
 }
 
 .search-form label {
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: var(--step--1);
   font-weight: 650;
 }
 
@@ -42,7 +42,7 @@
 }
 
 .search-input-row input {
-  min-width: 0;
+  min-inline-size: 0;
   flex: 1;
   border: 1px solid var(--rule);
   border-radius: 6px;
@@ -58,7 +58,8 @@
 }
 
 .search-limit input {
-  width: 4rem;
+  inline-size: 4rem;
+  min-block-size: var(--tap);
   border: 1px solid var(--rule);
   border-radius: 6px;
   background: var(--raised);
@@ -79,6 +80,10 @@
   gap: 0.5rem;
 }
 
+.search-index-actions .button-text {
+  min-block-size: var(--tap);
+}
+
 .search-results {
   display: grid;
   gap: 0;
@@ -92,13 +97,13 @@
 }
 
 .search-results button {
-  width: 100%;
-  min-height: 44px;
+  inline-size: 100%;
+  min-block-size: var(--tap);
   border: 0;
   background: transparent;
   color: var(--ink);
   padding: 0.9rem 0;
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 }
 
@@ -108,9 +113,9 @@
 
 .search-results span {
   display: block;
-  margin-bottom: 0.35rem;
+  margin-block-end: 0.35rem;
   color: var(--muted);
-  font-size: 0.6875rem;
+  font-size: var(--step--2);
   font-weight: 700;
 }
 
@@ -123,24 +128,7 @@
   -webkit-line-clamp: 4;
 }
 
-.reader[data-reader-theme='sepia'] {
-  --canvas: #f4efe4;
-  --ink: #29231b;
-  --muted: #655c50;
-  --rule: #d8cdbb;
-  --accent: #9b3b21;
-  --accent-quiet: #ead9ca;
-  --raised: #fffaf0;
-}
-
 .reader[data-reader-theme='dark'] {
-  --canvas: #171717;
-  --ink: #f4efe9;
-  --muted: #b8b0a7;
-  --rule: #3b3733;
-  --accent: #ff9a76;
-  --accent-quiet: #3b2922;
-  --raised: #232220;
   color-scheme: dark;
 }
 
@@ -201,7 +189,7 @@
 }
 
 .guidance-actions .button {
-  min-block-size: 36px;
+  min-block-size: var(--tap);
   padding-inline: 10px;
 }
 
@@ -721,16 +709,17 @@
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
   align-items: center;
-  justify-content: space-between;
-  padding-block-start: 0.5rem;
-  border-block-start: 1px solid var(--rule);
-  font-size: 0.85rem;
+  justify-content: flex-start;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--accent-quiet);
+  font-size: var(--step--1);
   min-inline-size: 0;
 }
 
 .remaster-bar-note {
   margin: 0;
-  color: var(--muted);
+  color: var(--ink);
   min-inline-size: 0;
 }
 
@@ -738,6 +727,10 @@
   display: flex;
   gap: 0.75rem;
   align-items: center;
+}
+
+.remaster-bar-tools .button {
+  min-block-size: var(--tap);
 }
 
 /* One control, two states: the segmented pair reads as a switch, not as two
@@ -765,6 +758,12 @@
   color: var(--muted);
 }
 
+.remaster-current {
+  color: var(--muted);
+  font-size: var(--step--2);
+  white-space: nowrap;
+}
+
 .remaster-bar-error {
   flex: 1 0 100%;
   margin: 0;
@@ -782,7 +781,10 @@
   }
 
   .remaster-bar-tools {
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.35rem 0.75rem;
+    justify-content: start;
   }
 
   .remaster-bar-tools > .button-text {

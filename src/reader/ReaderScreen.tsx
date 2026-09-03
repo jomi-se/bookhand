@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ChevronLeft, ChevronRight, Highlighter, LayoutPanelLeft, List, RotateCw, Search, Type } from 'lucide-react'
 
 import type { BookCatalogEntry, BookRange, StudyItemPayload } from '../domain/index.ts'
@@ -24,6 +24,7 @@ import { useReaderChrome } from './useReaderChrome.ts'
 import { useBookIndex } from './useBookIndex.ts'
 import { GuidanceIndicator } from './GuidanceIndicator.tsx'
 import { prepareReaderOptionsForBrowser } from '../runtime/test-control-bridge.ts'
+import { paintedReaderTheme, shellPalette } from './theme.ts'
 
 export type { ReaderPanel }
 
@@ -138,6 +139,36 @@ export function ReaderScreen({
   }, [onCommandsReady, study.commands])
   const { title } = splitTitle(entry.metadata)
   const expanded = study.board?.view === 'expanded' && panel === 'study'
+  const paintedTheme = paintedReaderTheme(reader.style.theme)
+  const palette = shellPalette(reader.style.theme)
+  const themeVariables = {
+    '--canvas': palette.canvas,
+    '--ink': palette.ink,
+    '--muted': palette.muted,
+    '--rule': palette.rule,
+    '--accent': palette.accent,
+    '--accent-quiet': palette.accentQuiet,
+    '--raised': palette.raised,
+  } as CSSProperties
+
+  // The reader covers the viewport, but touch overscroll exposes the document
+  // canvas behind it. Paint that backing surface from the same palette and put
+  // the library's root values back when the reader leaves.
+  useEffect(() => {
+    const root = document.documentElement
+    const properties = Object.entries(themeVariables) as [string, string][]
+    const previous = properties.map(([name]) => [name, root.style.getPropertyValue(name)] as const)
+    const previousScheme = root.style.colorScheme
+    for (const [name, value] of properties) root.style.setProperty(name, value)
+    root.style.colorScheme = paintedTheme === 'dark' ? 'dark' : 'light'
+    return () => {
+      for (const [name, value] of previous) {
+        if (value) root.style.setProperty(name, value)
+        else root.style.removeProperty(name)
+      }
+      root.style.colorScheme = previousScheme
+    }
+  }, [paintedTheme, palette.accent, palette.accentQuiet, palette.canvas, palette.ink, palette.muted, palette.raised, palette.rule])
 
   // What an agent asking for design context should be told is on screen. This
   // writes to a plain store rather than lifting state, so a style change does
@@ -277,7 +308,8 @@ export function ReaderScreen({
       className="reader"
       data-panel={panel ?? 'none'}
       data-board={expanded ? 'expanded' : 'docked'}
-      data-reader-theme={reader.style.theme === 'publisher' ? 'light' : reader.style.theme}
+      data-reader-theme={paintedTheme}
+      style={themeVariables}
       data-chrome={chrome.visible ? 'shown' : 'hidden'}
     >
       <header className="reader-chrome">

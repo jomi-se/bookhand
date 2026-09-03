@@ -193,7 +193,11 @@ describe('the WebMCP tool surface', () => {
     const { tool, commands } = setup()
     const focus = tool('focus_passage')
     expect(focus.inputSchema).toMatchObject({
-      required: ['bookId', 'sectionIndex', 'startCfi', 'endCfi', 'textFingerprint', 'quote'],
+      required: ['bookId', 'quote'],
+      oneOf: [
+        { required: ['range'] },
+        { required: ['sectionIndex', 'startCfi', 'endCfi', 'textFingerprint'] },
+      ],
       additionalProperties: false,
     })
     const output = focus.outputSchema as {
@@ -237,6 +241,30 @@ describe('the WebMCP tool surface', () => {
         guidance: { state: 'guiding', canBack: true, revision: 4 },
       },
     })
+
+    await focus.execute({
+      bookId: 'book-1',
+      range,
+      quote: 'The slope of a curve.',
+    })
+    expect(commands.focusPassage).toHaveBeenLastCalledWith(expect.objectContaining({
+      bookId: 'book-1',
+      sectionIndex: range.sectionIndex,
+      startCfi: range.startCfi,
+      endCfi: range.endCfi,
+      textFingerprint: range.textFingerprint,
+    }))
+
+    const mixed = await focus.execute({
+      bookId: 'book-1',
+      range,
+      sectionIndex: range.sectionIndex,
+      startCfi: range.startCfi,
+      endCfi: range.endCfi,
+      textFingerprint: range.textFingerprint,
+      quote: 'The slope of a curve.',
+    })
+    expect(mixed.isError).toBe(true)
 
     const stopped = await tool('control_guidance').execute({ action: 'stop' })
     expect(stopped.structuredContent).toEqual({
@@ -291,6 +319,32 @@ describe('the WebMCP tool surface', () => {
       ],
       { summary: 'Promoted the heading and corrected one word' },
     )
+  })
+
+  it('does not describe serializer namespace cleanup as rejected agent content', async () => {
+    const { tool } = setup({
+      editSection: vi.fn(async () => ({
+        sectionIndex: 3,
+        applied: true,
+        editsApplied: 1,
+        sanitized: {
+          removedElements: {},
+          removedAttributes: { xmlns: 100, 'xmlns:epub': 2, onclick: 1 },
+          modified: true,
+        },
+        cssModified: false,
+        before: { elements: 10, bytes: 500 },
+        after: { elements: 10, bytes: 492 },
+      })) as unknown as BookhandCommands['editSection'],
+    })
+    const result = await tool('edit_section').execute({
+      sectionIndex: 3,
+      sourceFingerprint: 'fnv1a-12345678',
+      edits: [{ oldText: 'before', newText: 'after' }],
+    })
+
+    expect(result.content[0]?.text).toContain('Removed: 1 onclick.')
+    expect(result.content[0]?.text).not.toContain('xmlns')
   })
 
   it('rejects malformed exact edits before calling the command layer', async () => {
@@ -368,7 +422,36 @@ describe('the WebMCP tool surface', () => {
     const result = await tool('search_book').execute({ query: ' slope ', limit: 1 })
     expect(commands.searchBook).toHaveBeenCalledWith(' slope ', 1)
     expect(commands.navigateBook).not.toHaveBeenCalled()
-    expect(result.structuredContent).toMatchObject({ ok: true, search: { availability: 'ready', outcome: 'results', hits: [{ bookId: 'book-1' }] } })
+    expect(result.structuredContent).toMatchObject({
+      ok: true,
+      search: {
+        availability: 'ready',
+        outcome: 'results',
+        hits: [{
+          bookId: 'book-1',
+          range: {
+            startCfi: range.startCfi,
+            endCfi: range.endCfi,
+            sectionIndex: range.sectionIndex,
+            textFingerprint: range.textFingerprint,
+          },
+        }],
+      },
+    })
+    const hit = (result.structuredContent?.search as {
+      hits: { bookId: string; text: string; range: typeof range }[]
+    }).hits[0]!
+    const focused = await tool('focus_passage').execute({
+      bookId: hit.bookId,
+      range: hit.range,
+      quote: hit.text,
+    })
+    expect(focused.isError).toBeFalsy()
+    expect(commands.focusPassage).toHaveBeenCalledWith(expect.objectContaining({
+      bookId: hit.bookId,
+      ...hit.range,
+      quote: hit.text,
+    }))
   })
 
   it('refuses invalid search bounds before reaching storage', async () => {

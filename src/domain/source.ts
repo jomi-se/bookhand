@@ -4,7 +4,10 @@ import type { BookRange, Passage, PassageSegment } from './reader.ts'
 export const SOURCE_EXTRACTION_VERSION = 1
 export const SOURCE_EXCERPT_MAX_CHARACTERS = 32_000
 export const SOURCE_SEGMENT_MAX_CHARACTERS = 8_000
-export const SOURCE_SEGMENT_MAX_COUNT = 64
+// A two-column technical-book viewport can legitimately contain more than 64
+// alternating text, MathML, and figure segments. Keep the persisted shape
+// bounded, but above the largest range the reader itself hands back for action.
+export const SOURCE_SEGMENT_MAX_COUNT = 128
 
 export type SourceOwnership = 'derived' | 'authored'
 

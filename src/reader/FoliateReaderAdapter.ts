@@ -75,6 +75,7 @@ import {
   passageFromRange,
 } from './text.ts'
 import { buildSectionChunks } from './chunking.ts'
+import { bookPalette, shellPalette } from './theme.ts'
 
 export interface ReaderAdapterEvents {
   /** Return false to reject a retired relocation from the adapter snapshot. */
@@ -393,7 +394,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
   applyStyle(style: ReaderStyle): void {
     this.#style = structuredClone(style)
-    this.#active?.view.renderer.setStyles?.(makeReaderCss(this.#style, this.#shellPalette()))
+    this.#active?.view.renderer.setStyles?.(makeReaderCss(this.#style))
   }
 
   getStyle(): ReaderStyle {
@@ -472,7 +473,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       cleanups.push(this.#listenForRendererRelocations(view))
       this.#toc = mapToc(book.toc ?? [])
       this.#sections = mapSections(book.sections, this.#toc)
-      view.renderer.setStyles?.(makeReaderCss(this.#style, this.#shellPalette()))
+      view.renderer.setStyles?.(makeReaderCss(this.#style))
       await view.init({ showTextStart: true })
       this.#assertCurrent(revision)
       this.#captureRelocation(view.lastLocation)
@@ -647,24 +648,6 @@ export class FoliateReaderAdapter implements ReaderAdapter {
    * thousand. Adding the frame's position in this document converts back to
    * where the finger actually was on screen.
    */
-  /**
-   * The theme the shell is actually painted in, read from the stylesheet.
-   *
-   * The book had its own copy of the three palettes, and they had already
-   * drifted — the shell's sepia was `#f4efe4` and the book's `#f5eddd`, a seam
-   * visible down the edge of every page. Reading the live custom properties
-   * makes the stylesheet the single source, so the book and its surround can
-   * no longer disagree.
-   */
-  #shellPalette(): ThemePalette | undefined {
-    const styles = globalThis.getComputedStyle?.(this.#host)
-    if (!styles) return undefined
-    const background = styles.getPropertyValue('--canvas').trim()
-    const foreground = styles.getPropertyValue('--ink').trim()
-    if (!background || !foreground) return undefined
-    return { background, foreground }
-  }
-
   #hostFraction(doc: Document, clientX: number): number {
     const frame = doc.defaultView?.frameElement
     const host = this.#host.getBoundingClientRect()
@@ -747,7 +730,12 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       const range = content.doc.createRange()
       range.setStart(start.startContainer, start.startOffset)
       range.setEnd(end.endContainer, end.endOffset)
-      const resolved = passageFromRange(
+      // These endpoints are the already-stabilized CFIs minted by Bookhand.
+      // Re-running the selection-oriented semantic anchoring here can widen
+      // them to a surrounding figure or paragraph, making the safety check
+      // disagree with the passage that was verified moments earlier and
+      // silently suppressing the cue.
+      const resolved = passageFromAnchoredRange(
         range,
         target.range.sectionIndex,
         target.chapterBreadcrumb,
@@ -759,7 +747,9 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         normalizeBookText(resolved.text) !== normalizeBookText(target.text)
       ) return
       const renderer: FoliateDrawFunction = (rects, options) => {
-        const element = painter(rects, options)
+        const element = this.#options.tutorOverlayRenderer
+          ? painter(rects, options)
+          : drawTutorCue(rects, { ...options, kind: cueKind })
         element.setAttribute('data-bookhand-tutor-cue', cueKind)
         const reducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
         if (!reducedMotion && 'animate' in element) {
@@ -771,7 +761,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         return element
       }
       content.overlayer.add('bookhand-tutor-overlay', range, renderer, {
-        color: '#c76532',
+        color: shellPalette(this.#style.theme).accent,
         width: 2,
         radius: 3,
         writingMode: content.doc.documentElement.computedStyleMap?.().get('writing-mode')?.toString()
@@ -1201,7 +1191,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       await view.open(previous.book)
       this.#assertCurrent(revision)
       cleanups.push(this.#listenForRendererRelocations(view))
-      view.renderer.setStyles?.(makeReaderCss(this.#style, this.#shellPalette()))
+      view.renderer.setStyles?.(makeReaderCss(this.#style))
       await view.init({ showTextStart: true })
       this.#assertCurrent(revision)
       const resolved = view.resolveNavigation(sectionIndex)
@@ -1330,7 +1320,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       )
       if (revision !== this.#revision || this.#active !== replacement) throw new ReaderClosedError()
       cleanups.push(this.#listenForRendererRelocations(view))
-      view.renderer.setStyles?.(makeReaderCss(this.#style, this.#shellPalette()))
+      view.renderer.setStyles?.(makeReaderCss(this.#style))
       await withDeadline(
         view.init({
           ...(this.#location?.cfi ? { lastLocation: this.#location.cfi } : {}),
@@ -1494,30 +1484,134 @@ function configureForViewport(view: FoliateView): () => void {
   }
 }
 
-interface ThemePalette {
-  readonly background: string
-  readonly foreground: string
+interface TutorCueDrawOptions {
+  readonly color?: string
+  readonly kind?: TutorCue['kind']
+  readonly writingMode?: string
 }
 
-/** Used only when the shell's own tokens cannot be read, as in a unit test. */
-const FALLBACK_THEMES: Record<ReaderStyle['theme'], ThemePalette> = {
-  publisher: { background: 'transparent', foreground: 'inherit' },
-  light: { background: '#fafafa', foreground: '#0f1115' },
-  sepia: { background: '#f4efe4', foreground: '#29231b' },
-  dark: { background: '#171717', foreground: '#f4efe9' },
+interface CueRect {
+  readonly left: number
+  readonly top: number
+  readonly right: number
+  readonly bottom: number
+  readonly width: number
+  readonly height: number
 }
 
-function makeReaderCss(style: ReaderStyle, shell?: ThemePalette): string {
-  // The publisher theme is the book's own design, so it is deliberately not
-  // painted over; every named theme takes the shell's live colours.
-  const theme =
-    style.theme === 'publisher'
-      ? FALLBACK_THEMES.publisher
-      : (shell ?? FALLBACK_THEMES[style.theme])
+function svgElement(tag: string): SVGElement {
+  return document.createElementNS('http://www.w3.org/2000/svg', tag)
+}
+
+function cueBounds(rects: readonly CueRect[]): CueRect {
+  const left = Math.min(...rects.map((rect) => rect.left))
+  const top = Math.min(...rects.map((rect) => rect.top))
+  const right = Math.max(...rects.map((rect) => rect.right))
+  const bottom = Math.max(...rects.map((rect) => rect.bottom))
+  return { left, top, right, bottom, width: right - left, height: bottom - top }
+}
+
+function appendCueRect(
+  group: SVGElement,
+  bounds: CueRect,
+  attributes: Readonly<Record<string, string | number>>,
+): void {
+  const rect = svgElement('rect')
+  rect.setAttribute('x', String(bounds.left))
+  rect.setAttribute('y', String(bounds.top))
+  rect.setAttribute('width', String(bounds.width))
+  rect.setAttribute('height', String(bounds.height))
+  for (const [name, value] of Object.entries(attributes)) rect.setAttribute(name, String(value))
+  group.append(rect)
+}
+
+/**
+ * Turn Foliate's fragment rectangles into one legible teaching gesture.
+ *
+ * Native painters intentionally mark every fragment. That is right for a
+ * durable text highlight and disastrous for a tutor pointing at a whole
+ * paragraph: inline formula images and column fragments become dozens of tiny
+ * boxes. Precise targets receive one composed mark. Broad targets degrade to a
+ * quiet block wash with one accent rule per visible column, never a page full
+ * of outlines.
+ */
+function drawTutorCue(
+  input: readonly DOMRect[],
+  options: TutorCueDrawOptions = {},
+): Element {
+  const color = options.color ?? 'currentColor'
+  const kind = options.kind ?? 'highlight'
+  const vertical = options.writingMode === 'vertical-rl' || options.writingMode === 'vertical-lr'
+  // Foliate passes a DOMRectList in browsers even though its drawing API is
+  // naturally typed as a readonly collection. DOMRectList is iterable but has
+  // no Array methods.
+  const rects = Array.from(input)
+    .filter((rect) => rect.width > 0 && rect.height > 0)
+    .map((rect) => ({
+      left: rect.left,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+    }))
+  const group = svgElement('g')
+  if (rects.length === 0) return group
+
+  const all = cueBounds(rects)
+  const broad = rects.length > 12 || (vertical ? all.width : all.height) > 220
+  group.setAttribute('data-bookhand-tutor-scope', broad ? 'broad' : 'precise')
+
+  if (broad) {
+    const groups: readonly CueRect[][] = !vertical && all.width > 600
+      ? [
+          rects.filter((rect) => (rect.left + rect.right) / 2 < (all.left + all.right) / 2),
+          rects.filter((rect) => (rect.left + rect.right) / 2 >= (all.left + all.right) / 2),
+        ].filter((column) => column.length > 0)
+      : [rects]
+    for (const column of groups) {
+      const bounds = cueBounds(column)
+      appendCueRect(group, bounds, { fill: color, opacity: 0.1, rx: 3 })
+      const rule = svgElement('rect')
+      if (vertical) {
+        rule.setAttribute('x', String(bounds.left))
+        rule.setAttribute('y', String(bounds.top))
+        rule.setAttribute('width', String(bounds.width))
+        rule.setAttribute('height', '3')
+      } else {
+        rule.setAttribute('x', String(bounds.left))
+        rule.setAttribute('y', String(bounds.top))
+        rule.setAttribute('width', '3')
+        rule.setAttribute('height', String(bounds.height))
+      }
+      rule.setAttribute('fill', color)
+      group.append(rule)
+    }
+    return group
+  }
+
+  if (kind === 'underline') {
+    const rule = svgElement('rect')
+    rule.setAttribute('x', String(all.left))
+    rule.setAttribute('y', String(vertical ? all.top : all.bottom - 2))
+    rule.setAttribute('width', String(vertical ? 2 : all.width))
+    rule.setAttribute('height', String(vertical ? all.height : 2))
+    rule.setAttribute('fill', color)
+    group.append(rule)
+  } else if (kind === 'outline') {
+    appendCueRect(group, all, { fill: 'none', stroke: color, 'stroke-width': 2, rx: 3 })
+  } else {
+    appendCueRect(group, all, { fill: color, opacity: 0.16, rx: 3 })
+  }
+  return group
+}
+
+function makeReaderCss(style: ReaderStyle): string {
+  const theme = bookPalette(style.theme)
   const family = style.fontFamily ? JSON.stringify(style.fontFamily) : 'inherit'
   return `
-    :root { color-scheme: ${style.theme === 'dark' ? 'dark' : 'light'}; background: ${theme.background}; color: ${theme.foreground}; }
-    body { background: ${theme.background}; color: ${theme.foreground}; }
+    :root { color-scheme: ${style.theme === 'dark' ? 'dark' : 'light'}; background: ${theme.canvas}; color: ${theme.ink}; }
+    body { background: ${theme.canvas}; color: ${theme.ink}; }
     body { max-width: ${style.measureCh}ch; margin-inline: auto; font-family: ${family}; font-size: ${style.fontSizePercent}%; }
     p, li, blockquote, dd { line-height: ${style.lineHeight}; }
     p { margin-block: ${style.paragraphSpacingEm}em; }

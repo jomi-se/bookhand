@@ -66,7 +66,8 @@ export function RemasterBar(props: RemasterBarProps) {
           to keep a rewrite is better served by what was attempted than by a
           generic notice — and the tool promises this is where it appears. */}
       <p className="remaster-bar-note" role="status">
-        {state.summary ?? 'An agent rewrote this chapter’s markup.'}
+        <strong>An agent rewrote this chapter</strong>
+        {state.summary ? <span> · {state.summary}</span> : null}
         {state.versions > 1 ? (
           <span className="remaster-bar-versions"> · {state.versions} revisions</span>
         ) : null}
@@ -92,6 +93,9 @@ export function RemasterBar(props: RemasterBarProps) {
             Rewritten
           </button>
         </div>
+        <span className="remaster-current" aria-live="polite">
+          Showing {state.showing ? 'rewritten' : 'original'}
+        </span>
         <button
           type="button"
           className="button button-text"

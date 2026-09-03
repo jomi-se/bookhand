@@ -463,7 +463,6 @@
   }
 
   .study-lesson-block[data-kind='question'] {
-    margin-inline: -6px;
     padding: 14px;
   }
 }

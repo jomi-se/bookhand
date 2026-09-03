@@ -436,7 +436,14 @@ describe('FoliateReaderAdapter', () => {
       customCss: 'h1 { letter-spacing: 0.01em; }',
     })
     expect(setStyles.mock.lastCall?.[0]).toContain('font-size: 112%')
+    expect(setStyles.mock.lastCall?.[0]).toContain('background: #f4efe4')
     expect(setStyles.mock.lastCall?.[0]).toContain('h1 { letter-spacing: 0.01em; }')
+    adapter.applyStyle({
+      ...adapter.getStyle(),
+      theme: 'dark',
+    })
+    expect(setStyles.mock.lastCall?.[0]).toContain('background: #171717')
+    expect(setStyles.mock.lastCall?.[0]).toContain('img[data-tex] { filter: invert(1); }')
     adapter.resetStyle()
     expect(setStyles.mock.lastCall?.[0]).toContain('font-size: 100%')
     expect(setStyles.mock.lastCall?.[0]).not.toContain('letter-spacing')
@@ -606,15 +613,15 @@ describe('FoliateReaderAdapter', () => {
     expect(view.overlayRemove).toHaveBeenCalledWith('bookhand-tutor-overlay')
   })
 
-  it('uses Foliate native painters for production tutor cues', async () => {
+  it('composes production tutor cues instead of outlining every inline fragment', async () => {
     const host = document.createElement('div')
     const animate = vi.fn()
     const highlight = vi.fn(() => document.createElementNS('http://www.w3.org/2000/svg', 'g'))
     const underline = vi.fn(() => document.createElementNS('http://www.w3.org/2000/svg', 'g'))
-    const outline = vi.fn(() => {
-      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g')
-      Object.defineProperty(group, 'animate', { value: animate })
-      return group
+    const outline = vi.fn(() => document.createElementNS('http://www.w3.org/2000/svg', 'g'))
+    Object.defineProperty(SVGElement.prototype, 'animate', {
+      configurable: true,
+      value: animate,
     })
     let reducedMotion = false
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
@@ -643,11 +650,26 @@ describe('FoliateReaderAdapter', () => {
     const call = view.overlayAdd.mock.calls.at(-1)
     expect(call?.[0]).toBe('bookhand-tutor-overlay')
     const draw = call?.[2] as ((rects: readonly DOMRect[], options?: Record<string, unknown>) => Element)
-    const element = draw([], call?.[3] as Record<string, unknown>)
-    expect(outline).toHaveBeenCalled()
+    const preciseRects = [
+      new DOMRect(20, 30, 180, 20),
+      new DOMRect(20, 52, 150, 20),
+    ]
+    // Browsers pass DOMRectList here, not an Array. Keep the test collection
+    // iterable while deliberately withholding Array.prototype methods.
+    const browserRects = {
+      0: preciseRects[0],
+      1: preciseRects[1],
+      length: preciseRects.length,
+      item: (index: number) => preciseRects[index] ?? null,
+      *[Symbol.iterator]() { yield* preciseRects },
+    } as unknown as readonly DOMRect[]
+    const element = draw(browserRects, call?.[3] as Record<string, unknown>)
+    expect(outline).not.toHaveBeenCalled()
     expect(highlight).not.toHaveBeenCalled()
     expect(underline).not.toHaveBeenCalled()
     expect(element).toHaveAttribute('data-bookhand-tutor-cue', 'outline')
+    expect(element).toHaveAttribute('data-bookhand-tutor-scope', 'precise')
+    expect(element.children).toHaveLength(1)
     expect(animate).toHaveBeenCalledWith(
       [{ opacity: 0.15 }, { opacity: 1 }],
       { duration: 520, easing: 'ease-out' },
@@ -657,8 +679,14 @@ describe('FoliateReaderAdapter', () => {
     adapter.setTutorTarget(target, { kind: 'outline' })
     await waitFor(() => expect(view.overlayAdd).toHaveBeenCalledTimes(2))
     const reducedMotionDraw = view.overlayAdd.mock.calls.at(-1)?.[2] as FoliateDrawFunction
-    reducedMotionDraw([], {})
+    const broadRects = Array.from({ length: 16 }, (_, index) =>
+      new DOMRect(index < 8 ? 20 : 700, 30 + (index % 8) * 22, 220, 20),
+    )
+    const broad = reducedMotionDraw(broadRects, call?.[3] as Record<string, unknown>)
+    expect(broad).toHaveAttribute('data-bookhand-tutor-scope', 'broad')
+    expect(broad.children.length).toBeLessThanOrEqual(4)
     expect(animate).toHaveBeenCalledTimes(1)
+    Reflect.deleteProperty(SVGElement.prototype, 'animate')
   })
 
   it('keeps one live viewer through the React StrictMode setup and cleanup cycle', async () => {

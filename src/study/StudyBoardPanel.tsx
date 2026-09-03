@@ -92,6 +92,7 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
   const [draft, setDraft] = useState('')
   const expanded = board?.view === 'expanded'
   const heading = useRef<HTMLHeadingElement>(null)
+  const body = useRef<HTMLDivElement>(null)
   const groupedItems = items.reduce<Array<{ key: string; items: StudyItem[] }>>((groups, item) => {
     const actionKey = item.actionGroupId ? `action:${item.actionGroupId}` : `item:${item.id}`
     const previous = groups.at(-1)
@@ -108,6 +109,9 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
   // Focus lands on the heading when the board opens, and again whenever
   // something asks for it — an agent using `focus` to say "look at this".
   useEffect(() => heading.current?.focus(), [props.focusNonce])
+  useEffect(() => {
+    body.current?.scrollTo?.({ top: 0 })
+  }, [expanded, props.focusNonce])
 
   return (
     <aside id="reader-study-panel" className="reader-panel study-panel" aria-label="Study">
@@ -131,7 +135,7 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
         </span>
       </header>
 
-      <div className="panel-body">
+      <div ref={body} className="panel-body">
         {props.agentChangedView && props.onUndoView ? (
           <p className="control-note control-agent" role="status">
             An agent changed this board’s layout.

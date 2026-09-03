@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CornerUpLeft, Square } from 'lucide-react'
+import { CircleStop, CornerUpLeft } from 'lucide-react'
 
 import type { GuidanceController, GuidanceView } from '../app/guidance.ts'
 
@@ -47,7 +47,7 @@ export function GuidanceIndicator({ controller }: { readonly controller: Guidanc
             className="button button-text"
             onClick={() => void controller.stop()}
           >
-            <Square size={14} aria-hidden="true" />
+            <CircleStop size={16} aria-hidden="true" />
             Stop
           </button>
         </div>

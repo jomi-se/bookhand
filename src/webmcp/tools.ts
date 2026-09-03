@@ -57,9 +57,11 @@ function describeRefusals(sanitized: {
   readonly removedElements: Readonly<Record<string, number>>
   readonly removedAttributes: Readonly<Record<string, number>>
 }): string {
+  const visibleAttributes = Object.entries(sanitized.removedAttributes)
+    .filter(([name]) => name !== 'xmlns' && !name.startsWith('xmlns:'))
   const parts = [
     ...Object.entries(sanitized.removedElements).map(([name, count]) => `${count} <${name}>`),
-    ...Object.entries(sanitized.removedAttributes).map(([name, count]) => `${count} ${name}`),
+    ...visibleAttributes.map(([name, count]) => `${count} ${name}`),
   ]
   return parts.join(', ')
 }
@@ -369,20 +371,37 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             : result.availability === 'unavailable'
               ? 'Local search is not ready yet. The person can keep reading while the index prepares.'
               : `No passages found for “${result.query}”.`
-          return textResult(`Availability: ${result.availability}. Outcome: ${result.outcome}.\n\n${summary}`, { search: result })
+          const search = {
+            ...result,
+            hits: result.hits.map((hit) => ({
+              ...hit,
+              // The flat fields remain for navigation and compatibility; the
+              // envelope makes search -> get/focus/save composition a direct
+              // copy rather than a schema-transformation puzzle for an agent.
+              range: {
+                startCfi: hit.startCfi,
+                endCfi: hit.endCfi,
+                sectionIndex: hit.sectionIndex,
+                textFingerprint: hit.textFingerprint,
+              },
+            })),
+          }
+          return textResult(`Availability: ${result.availability}. Outcome: ${result.outcome}.\n\n${summary}`, { search })
         }),
     },
     {
       name: 'focus_passage',
       description:
-        'Temporarily guide the person to an exact passage returned by Bookhand. This verifies the source, moves the visible reader, points at the exact words with a transient highlight, underline, or outline, and shows Back and Stop without creating an annotation, study block, or saved tutor state. Use this to point at the book; use navigate_book for ordinary navigation.',
+        'Temporarily guide the person to an exact passage returned by Bookhand. Pass the returned range object unchanged under `range` (the older flattened range fields remain accepted). This verifies the source, moves the visible reader, points at the exact words with a transient highlight, underline, or outline, and shows Back and Stop without creating an annotation, study block, or saved tutor state. Prefer a focused sentence or paragraph; broad visible ranges receive a calm block cue rather than dozens of fragment outlines. Use this to point at the book; use navigate_book for ordinary navigation.',
       inputSchema: {
         type: 'object',
         properties: {
           bookId: BOOK_ID_SCHEMA,
+          range: RANGE_SCHEMA,
           sectionIndex: { type: 'integer', minimum: 0 },
           startCfi: { type: 'string', minLength: 1 },
           endCfi: { type: 'string', minLength: 1 },
+          cfi: { type: 'string', minLength: 1 },
           textFingerprint: { type: 'string', minLength: 1 },
           quote: {
             type: 'string',
@@ -405,13 +424,10 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             additionalProperties: false,
           },
         },
-        required: [
-          'bookId',
-          'sectionIndex',
-          'startCfi',
-          'endCfi',
-          'textFingerprint',
-          'quote',
+        required: ['bookId', 'quote'],
+        oneOf: [
+          { required: ['range'] },
+          { required: ['sectionIndex', 'startCfi', 'endCfi', 'textFingerprint'] },
         ],
         additionalProperties: false,
       },
@@ -420,6 +436,10 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           const result = (value as ToolResult).structuredContent?.focus as { outcome?: string } | undefined
           return result?.outcome === 'applied' ? 'guided the reader to a passage' : 'could not guide the reader'
         }, async () => {
+          const nestedRange = input.range && typeof input.range === 'object' && !Array.isArray(input.range)
+            ? input.range as Record<string, unknown>
+            : undefined
+          const sourceRange = nestedRange ?? input
           const cue = input.cue
           if (
             cue !== undefined &&
@@ -429,10 +449,10 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           ) return errorResult('cue must contain exactly one kind: highlight, underline, or outline.')
           const result = await commands.focusPassage({
             bookId: String(input.bookId ?? ''),
-            sectionIndex: Number(input.sectionIndex),
-            startCfi: String(input.startCfi ?? ''),
-            endCfi: String(input.endCfi ?? ''),
-            textFingerprint: String(input.textFingerprint ?? ''),
+            sectionIndex: Number(sourceRange.sectionIndex),
+            startCfi: String(sourceRange.startCfi ?? ''),
+            endCfi: String(sourceRange.endCfi ?? ''),
+            textFingerprint: String(sourceRange.textFingerprint ?? ''),
             quote: String(input.quote ?? ''),
             ...(typeof input.indicatorMessage === 'string'
               ? { indicatorMessage: input.indicatorMessage }
@@ -990,9 +1010,8 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             ...(typeof input.summary === 'string' ? { summary: input.summary } : {}),
             ...(typeof input.sectionIndex === 'number' ? { sectionIndex: input.sectionIndex } : {}),
           })
-          const refused = result.sanitized.modified
-            ? ` Removed: ${describeRefusals(result.sanitized)}.`
-            : ''
+          const refusalSummary = describeRefusals(result.sanitized)
+          const refused = refusalSummary ? ` Removed: ${refusalSummary}.` : ''
           const styleRefused = result.cssModified
             ? ' Some stylesheet rules were removed for reaching off-origin.'
             : ''
@@ -1070,9 +1089,8 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             ...(typeof input.css === 'string' ? { css: input.css } : {}),
             ...(typeof input.summary === 'string' ? { summary: input.summary } : {}),
           })
-          const refused = result.sanitized.modified
-            ? ` Removed: ${describeRefusals(result.sanitized)}.`
-            : ''
+          const refusalSummary = describeRefusals(result.sanitized)
+          const refused = refusalSummary ? ` Removed: ${refusalSummary}.` : ''
           const styleRefused = result.cssModified
             ? ' Some stylesheet rules were removed for reaching off-origin.'
             : ''

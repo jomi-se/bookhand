@@ -15,6 +15,11 @@ reload the result.
 The exact morning preflight, intent-only prompts, fallback prompts, and 2:45
 shot order are in `docs/submission/demo-runbook.md`.
 
+The final broad Impeccable review is complete. Its submission-critical findings
+have been implemented locally; after this lands, stop opening new general review
+cycles. Validate the deployed product with the real model, fix only defects that
+the run exposes, then record and submit.
+
 The owner-visible **ChatGPT Desktop smoke** remains required after the next
 deployment. It must confirm the model discovers and uses the shipped tools from
 intent-only prompts; deterministic Playwright evidence proves the application
@@ -86,11 +91,15 @@ This direction is recorded in:
   book as a narrow reference; compact Study is a full surface with an explicit
   route back to the book. Recoverable removal, lesson updates, safe plots, and
   richer per-block source relationships remain open W7 work.
-- `focus_passage` now draws a production transient cue over the exact verified
-  words using Foliate's native highlight, underline, or outline painter. It
-  briefly settles into place, respects reduced motion, coexists with durable
-  marks, and clears through the W6 session lifecycle. Direct Study reveal and a
-  temporary anchored explanation remain open.
+- `focus_passage` now draws a production transient cue over exact verified
+  words. Precise ranges become one composed highlight, underline, or outline;
+  broad ranges become a bounded tonal wash and accent rule instead of dozens of
+  fragment boxes. It briefly settles into place, respects reduced motion,
+  coexists with durable marks, and clears through the W6 session lifecycle.
+  The preferred input accepts Bookhand's returned `range` envelope unchanged,
+  while legacy flattened calls remain valid. Search hits expose the same
+  reusable envelope. Direct Study reveal and a temporary anchored explanation
+  remain open.
 - W5 is implemented locally: canonical Foliate chunks feed a schema-v4,
   worker-owned FTS5 index with transactional batches, truthful lifecycle state,
   cancellation, resume, failure recovery, and book/version isolation. Ordinary
@@ -114,6 +123,13 @@ This direction is recorded in:
   hydrates it before Foliate's first render. Markup, CSS, summary, Undo, and
   Reset survive reload. Reindexing, EPUB export, and annotation re-anchoring do
   not exist and must not be claimed.
+- The final product audit fixes are local: named themes now paint shell, EPUB,
+  overscroll canvas, and mathematical image treatment from one synchronous
+  palette; Search receives focus and meets the 44px target floor; Study opens at
+  the lesson top without mobile question bleed; and remastering is presented as
+  a reader-controlled advisory with truthful sanitizer feedback, visible
+  Original/Rewritten state, and reachable mobile controls. The source audit is
+  `docs/reviews/2026-09-03-full-product-impeccable-audit.md`.
 
 ## Accepted remaining topology
 
@@ -206,11 +222,13 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
   WebMCP browser flow covering targeted rendering, atomic rejection, reload,
   and one-step Undo. It remains local until pushed and checked on the deployed
   origin.
-- The production tutor cue passes typed/schema validation, native Foliate
-  painter selection, exact verified-range rendering, durable-highlight
-  coexistence, transient cleanup, reduced-motion behavior, and the real
-  Chromium guidance flow. The existing reload/style timing guard passed alone
-  after one resource-contended combined run.
+- The production tutor cue passes typed/schema validation, exact verified-range
+  resolution, bounded composed rendering for both browser `DOMRectList` and
+  array-shaped test geometry, durable-highlight coexistence, transient cleanup,
+  reduced-motion behavior, and the real Chromium guidance flow. The actual
+  bundled-book browser surface confirms the broad visible range renders four
+  marks total rather than per-fragment boxes. The existing reload/style timing
+  guard passed alone after one resource-contended combined run.
 - The bundled *Calculus Made Easy* is judging content, not a permanent product
   dependency.
 - Keep embeddings optional and after lexical retrieval.
