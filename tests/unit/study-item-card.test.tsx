@@ -4,7 +4,7 @@ import { render, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { StudyItem } from '../../src/domain/index.ts'
-import { StudyItemCard, StudyPayloadBody } from '../../src/study/StudyItemCard.tsx'
+import { StudyItemCard, StudyPayloadBody, StudyText } from '../../src/study/StudyItemCard.tsx'
 
 function equation(expression: string): StudyItem {
   return {
@@ -78,5 +78,21 @@ describe('Study inline mathematics', () => {
 
     await waitFor(() => expect(view.container.querySelector('[data-fallback="true"]')).not.toBeNull())
     expect(view.getByText('\\(\\unknown{x}\\)')).toBeVisible()
+  })
+
+  it('renders the canonical TeX carried by a saved highlight quotation', async () => {
+    const view = render(
+      <button type="button" className="highlight-quote">
+        <StudyText text={'One reads \\({d x}\\) as “dee-eks,” not \\({d \\times x}\\).'} />
+      </button>,
+    )
+
+    await waitFor(() => expect(view.container.querySelectorAll('button math')).toHaveLength(2))
+    expect(view.container.querySelectorAll('.study-inline-math[data-fallback="false"]')).toHaveLength(2)
+    const visibleTextNodes = Array.from(view.container.querySelector('button')?.childNodes ?? [])
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent)
+      .join('')
+    expect(visibleTextNodes).not.toContain('\\({d x}\\)')
   })
 })

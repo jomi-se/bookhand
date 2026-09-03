@@ -11,7 +11,7 @@ import type {
   StudyExperience,
 } from '../domain/index.ts'
 import { STUDY_ITEM_KINDS } from '../domain/study.ts'
-import { StudyItemCard, StudyPayloadBody } from './StudyItemCard.tsx'
+import { StudyItemCard, StudyPayloadBody, StudyText } from './StudyItemCard.tsx'
 
 const STUDY_ITEM_LABEL: Readonly<Record<StudyItemKind, string>> = {
   prose: 'Note',
@@ -417,7 +417,7 @@ export function StudyBoardPanel(props: StudyBoardPanelProps) {
                     className="highlight-quote"
                     onClick={() => props.onGoToSource(annotation.range)}
                   >
-                    {annotation.quote}
+                    <StudyText text={annotation.quote} />
                   </button>
                   <NoteEditor
                     annotation={annotation}

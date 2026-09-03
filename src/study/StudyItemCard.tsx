@@ -56,8 +56,8 @@ function InlineStudyMath({ expression }: { readonly expression: string }) {
   return <span ref={host} className="study-inline-math" />
 }
 
-/** Render bounded TeX delimiters without interpreting any other lesson markup. */
-function StudyText({ text }: { readonly text: string }) {
+/** Render bounded TeX delimiters without interpreting any other Study markup. */
+export function StudyText({ text }: { readonly text: string }) {
   const parts: ReactNode[] = []
   const delimiters = /\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]/g
   let cursor = 0

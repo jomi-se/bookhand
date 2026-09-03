@@ -87,7 +87,9 @@ This direction is recorded in:
   as lessons through action-group metadata.
 - Study equations compile through the bounded native MathML renderer, with
   unsupported notation kept visibly as code rather than disappearing. Storage
-  type labels no longer outrank the lesson, existing content comes before one
+  delimiters in lesson blocks and saved highlight quotations use the same safe
+  inline MathML path instead of leaking raw TeX. Storage type labels no longer
+  outrank the lesson, existing content comes before one
   progressively disclosed manual-authoring path, and raw Agent Activity is no
   longer part of Study.
 - An initial Study-load failure is visible and retryable without unregistering
