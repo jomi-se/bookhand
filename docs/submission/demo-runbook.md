@@ -155,4 +155,4 @@ as evidence of model judgment.
 - embeddings or semantic search;
 - continuous observation of the learner;
 - anchored temporary explanations or direct Study-item reveal;
-- atomic titled lesson entities, plots, or recoverable deletion.
+- safe plots or recoverable deletion.
