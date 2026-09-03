@@ -214,7 +214,24 @@
 
 .reader-tools {
   display: flex;
+  align-items: center;
   gap: 6px;
+}
+
+.reader-zoom {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-inline-end: 8px;
+  border-inline-end: 1px solid var(--rule);
+}
+
+.reader-zoom output {
+  min-inline-size: 4ch;
+  color: var(--muted);
+  font-size: var(--step--2);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .reader-tools .button,
@@ -557,6 +574,10 @@
   }
 
   .tool-label {
+    display: none;
+  }
+
+  .reader-zoom {
     display: none;
   }
 

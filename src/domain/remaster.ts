@@ -173,15 +173,18 @@ export interface DocumentRemasterPort {
   rewriteSection(
     sectionIndex: number,
     html: string,
-    options?: { readonly css?: string; readonly summary?: string },
+    options?: { readonly css?: string; readonly summary?: string; readonly deferDisplay?: boolean },
   ): Promise<SectionRewriteResult>
   editSection(
     sectionIndex: number,
     sourceFingerprint: string,
     edits: readonly SectionExactEdit[],
-    options?: { readonly css?: string; readonly summary?: string },
+    options?: { readonly css?: string; readonly summary?: string; readonly deferDisplay?: boolean },
   ): Promise<SectionEditResult>
-  compileSectionMath(sectionIndex: number): Promise<RemasterReport>
+  compileSectionMath(
+    sectionIndex: number,
+    options?: { readonly deferDisplay?: boolean },
+  ): Promise<RemasterReport>
   isShowingRewritten(): boolean
   hasRewrite(sectionIndex: number): boolean
   /** What the agent said it did, and how many revisions deep the section is. */

@@ -12,7 +12,8 @@ import type { ToolCallReporter } from './useWebMcpTools.ts'
 export interface LibraryToolOptions {
   readonly books: () => readonly BookCatalogEntry[]
   readonly diagnostics: () => StorageDiagnostics | undefined
-  readonly openBook: (entry: BookCatalogEntry) => void
+  /** Resolves only after the first readable section has loaded. */
+  readonly openBook: (entry: BookCatalogEntry) => Promise<void>
   readonly report: ToolCallReporter
 }
 
@@ -121,7 +122,7 @@ export function createLibraryTools(options: LibraryToolOptions): readonly ToolDe
             ? books.find((candidate) => candidate.id === input.bookId)
             : matches[0]
           if (!entry) throw new Error('No book in the library matches that. Call list_books first.')
-          options.openBook(entry)
+          await options.openBook(entry)
           return textResult(
             `Opened ${splitTitle(entry.metadata).title}. The reading and study tools are now available.`,
             { bookId: entry.id, title: splitTitle(entry.metadata).title },

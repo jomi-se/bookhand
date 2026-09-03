@@ -891,7 +891,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   async rewriteSection(
     sectionIndex: number,
     html: string,
-    options: { readonly css?: string; readonly summary?: string } = {},
+    options: { readonly css?: string; readonly summary?: string; readonly deferDisplay?: boolean } = {},
   ): Promise<RewriteResult> {
     return this.#mutateRemaster(() => this.#rewriteSectionNow(sectionIndex, html, options))
   }
@@ -899,7 +899,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   async #rewriteSectionNow(
     sectionIndex: number,
     html: string,
-    options: { readonly css?: string; readonly summary?: string },
+    options: { readonly css?: string; readonly summary?: string; readonly deferDisplay?: boolean },
     previousHtml?: string,
   ): Promise<RewriteResult> {
     const beforeHtml = previousHtml ?? (await this.getSectionSource(sectionIndex)).html
@@ -912,7 +912,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       ...(options.css === undefined ? {} : { css: options.css }),
       ...(options.summary === undefined ? {} : { summary: options.summary }),
     })
-    await this.#commit(sectionIndex, prepared.version)
+    await this.#commit(sectionIndex, prepared.version, options.deferDisplay)
     return {
       sectionIndex,
       applied: true,
@@ -935,7 +935,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     sectionIndex: number,
     sourceFingerprint: string,
     edits: readonly SectionExactEdit[],
-    options: { readonly css?: string; readonly summary?: string } = {},
+    options: { readonly css?: string; readonly summary?: string; readonly deferDisplay?: boolean } = {},
   ): Promise<SectionEditResult> {
     return this.#mutateRemaster(async () => {
       const source = await this.getSectionSource(sectionIndex)
@@ -954,6 +954,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
             ? existingCss === undefined ? {} : { css: existingCss }
             : { css: options.css }),
           ...(options.summary === undefined ? {} : { summary: options.summary }),
+          ...(options.deferDisplay === undefined ? {} : { deferDisplay: options.deferDisplay }),
         },
         source.html,
       )
@@ -970,11 +971,17 @@ export class FoliateReaderAdapter implements ReaderAdapter {
    * hand, then edit the result like any other markup. It is a power tool the
    * agent chooses, never something that happens to a book on its own.
    */
-  async compileSectionMath(sectionIndex: number): Promise<RemasterReport> {
-    return this.#mutateRemaster(() => this.#compileSectionMathNow(sectionIndex))
+  async compileSectionMath(
+    sectionIndex: number,
+    options: { readonly deferDisplay?: boolean } = {},
+  ): Promise<RemasterReport> {
+    return this.#mutateRemaster(() => this.#compileSectionMathNow(sectionIndex, options.deferDisplay))
   }
 
-  async #compileSectionMathNow(sectionIndex: number): Promise<RemasterReport> {
+  async #compileSectionMathNow(
+    sectionIndex: number,
+    deferDisplay?: boolean,
+  ): Promise<RemasterReport> {
     // From the section's *source*, never the rendered DOM. The rendered copy
     // has had its references replaced with `blob:` URLs that die with the page,
     // so compiling from it would store a version that cannot survive a reload
@@ -987,7 +994,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       ...(existing?.css === undefined ? {} : { css: existing.css }),
       summary: `Compiled ${report.restored} of ${report.found} equation images to MathML`,
       at: Date.now(),
-    })
+    }, deferDisplay)
     return report
   }
 
@@ -1109,7 +1116,11 @@ export class FoliateReaderAdapter implements ReaderAdapter {
    * outcome, because a rewrite the library did not accept is a rewrite that
    * would vanish on reload.
    */
-  async #commit(sectionIndex: number, version: SectionVersion): Promise<void> {
+  async #commit(
+    sectionIndex: number,
+    version: SectionVersion,
+    deferDisplay = false,
+  ): Promise<void> {
     const stored = await this.#persist((store, bookId) =>
       store.append(bookId, sectionIndex, version),
     )
@@ -1122,6 +1133,20 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       versions: stored === undefined ? versions : versions.slice(-stored),
     })
     this.#showRewritten = true
+    if (deferDisplay) {
+      // ChatGPT's browser may refuse a nested blob-frame navigation while a
+      // WebMCP call is still in flight. Rebuilding here used to close the
+      // readable view first and could therefore strand that tab on a blank
+      // paginator. Let the tool receipt cross the WebMCP boundary, then show
+      // the safely persisted revision on the following browser task.
+      globalThis.setTimeout(() => {
+        void this.#rebuildSection(sectionIndex).catch(() => {
+          // The revision is still safe and recoverable through Original/Undo.
+          // A later navigation or fresh open will serve it normally.
+        })
+      }, 0)
+      return
+    }
     await this.#rebuildSection(sectionIndex)
   }
 
@@ -1575,11 +1600,14 @@ function drawTutorCue(
       const rule = svgElement('rect')
       if (vertical) {
         rule.setAttribute('x', String(bounds.left))
-        rule.setAttribute('y', String(bounds.top))
+        rule.setAttribute('y', String(Math.max(0, bounds.top - 7)))
         rule.setAttribute('width', String(bounds.width))
         rule.setAttribute('height', '3')
       } else {
-        rule.setAttribute('x', String(bounds.left))
+        // The rule points from the margin. Drawing it on the range boundary
+        // covers the first stroke of the book's own text, especially at small
+        // sizes and in justified columns.
+        rule.setAttribute('x', String(Math.max(0, bounds.left - 7)))
         rule.setAttribute('y', String(bounds.top))
         rule.setAttribute('width', '3')
         rule.setAttribute('height', String(bounds.height))
@@ -1633,5 +1661,17 @@ function makeReaderCss(style: ReaderStyle): string {
        so the two disagree and lines clip. Pinning it keeps them in step. */
     html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     ${style.customCss ? boundCustomCss(style.customCss).css : ''}
+    /* A repaired chapter may choose its typography, but it may not replace
+       the paginator's viewport with a fixed poster-sized page. These rules
+       come last and preserve flow without flattening the agent's design. */
+    body[data-bookhand-remastered] { inline-size: auto !important; min-inline-size: 0 !important; block-size: auto !important; min-block-size: 0 !important; overflow: visible !important; position: static !important; transform: none !important; }
+    body[data-bookhand-remastered] > article,
+    body[data-bookhand-remastered] > main,
+    body[data-bookhand-remastered] > section { inline-size: auto !important; min-inline-size: 0 !important; max-inline-size: 100% !important; box-sizing: border-box; }
+    body[data-bookhand-remastered] :is(header, h1, h2, h3) { break-inside: avoid; }
+    body[data-bookhand-remastered] :is(h1, h2, h3) { overflow-wrap: normal !important; word-break: normal !important; hyphens: none; text-wrap: balance; }
+    body[data-bookhand-remastered] h1 { font-size: 2rem !important; line-height: 1.15 !important; }
+    body[data-bookhand-remastered] h2 { font-size: 1.55rem !important; line-height: 1.2 !important; }
+    body[data-bookhand-remastered] h3 { font-size: 1.25rem !important; line-height: 1.25 !important; }
   `
 }

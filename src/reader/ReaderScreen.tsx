@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ChevronLeft, ChevronRight, Highlighter, LayoutPanelLeft, List, RotateCw, Search, Type } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Highlighter,
+  LayoutPanelLeft,
+  List,
+  Minus,
+  Plus,
+  RotateCw,
+  Search,
+  Type,
+} from 'lucide-react'
 
 import type { BookCatalogEntry, BookRange, StudyItemPayload } from '../domain/index.ts'
 import { StudyBoardPanel } from '../study/StudyBoardPanel.tsx'
@@ -282,19 +293,24 @@ export function ReaderScreen({
         closePanel()
         return
       }
-      if (event.target instanceof HTMLElement) {
-        if (
-          event.target.closest(
-            'button, a, input, textarea, select, summary, [contenteditable="true"]',
-          )
-        )
-          return
-      }
+      // Arrow keys remain reading shortcuts after somebody clicks a page or
+      // toolbar button. Only controls where the key edits a value or moves a
+      // caret own it themselves.
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest('input, textarea, select, [contenteditable="true"]')
+      ) return
       // A panel has replaced the book on this surface. Arrow keys inside it
       // must not page a book nobody can see.
       if (panel) return
-      if (event.key === 'ArrowRight') void reader.navigate({ kind: 'relative', direction: 'next' })
-      if (event.key === 'ArrowLeft') void reader.navigate({ kind: 'relative', direction: 'previous' })
+      if (event.key === 'ArrowRight' || event.key === 'PageDown') {
+        event.preventDefault()
+        void reader.navigate({ kind: 'relative', direction: 'next' })
+      }
+      if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+        event.preventDefault()
+        void reader.navigate({ kind: 'relative', direction: 'previous' })
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -327,6 +343,37 @@ export function ReaderScreen({
           ) : null}
         </p>
         <div className="reader-tools">
+          <div className="reader-zoom" role="group" aria-label="Text size">
+            <button
+              type="button"
+              className="button button-quiet button-icon"
+              aria-label="Decrease text size"
+              disabled={reader.style.fontSizePercent <= 70}
+              onClick={() => {
+                void presentation.commit(
+                  { fontSizePercent: Math.max(70, reader.style.fontSizePercent - 10) },
+                  'user',
+                )
+              }}
+            >
+              <Minus size={15} aria-hidden="true" />
+            </button>
+            <output aria-live="polite">{reader.style.fontSizePercent}%</output>
+            <button
+              type="button"
+              className="button button-quiet button-icon"
+              aria-label="Increase text size"
+              disabled={reader.style.fontSizePercent >= 200}
+              onClick={() => {
+                void presentation.commit(
+                  { fontSizePercent: Math.min(200, reader.style.fontSizePercent + 10) },
+                  'user',
+                )
+              }}
+            >
+              <Plus size={15} aria-hidden="true" />
+            </button>
+          </div>
           <button
             type="button"
             className="button button-quiet"

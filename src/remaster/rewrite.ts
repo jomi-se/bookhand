@@ -197,6 +197,7 @@ export function applyVersion(
   const body = document_.body ?? document_.documentElement
   if (!body) return
   replaceBody(document_, body, version.html)
+  body.setAttribute('data-bookhand-remastered', '')
   translateResources(document_, resources)
   applyStyle(document_, version.css ? translateCss(version.css, resources) : undefined)
 }

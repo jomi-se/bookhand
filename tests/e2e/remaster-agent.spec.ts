@@ -153,7 +153,9 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
       '<figure role="figure" aria-label="A right triangle with a 30 degree base angle">' +
       `<img src="${figureSrc}" alt="Fig. 4"><figcaption>Fig. 4</figcaption></figure>` +
       '<script>fetch("https://evil.example")</script>',
-    css: '.remastered-note { color: rebeccapurple; }',
+    css:
+      'html, body { width: 1400px !important; height: 1200px !important; overflow: hidden !important; }' +
+      '.remastered-note { color: rebeccapurple; }',
     summary: 'Set the chapter title as a heading and the derivative as MathML',
   })
   expect(rewrite.isError).toBe(false)
@@ -165,6 +167,7 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
   expect(rewrite.text).toContain('Removed')
 
   // 4. The reader is showing the agent's chapter.
+  await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('id="ch3"')
   const after = await renderedHtml(page)
   expect(after).toContain('id="ch3"')
   expect(after).toContain('Chapter III — On relative growings')
@@ -204,6 +207,29 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
   expect(styled).toContain('rebeccapurple')
   expect(after).not.toContain('<script')
   expect(after).not.toContain('evil.example')
+
+  // A model may think in print-page dimensions. Its visual choices survive,
+  // but it cannot replace Foliate's responsive viewport or trap page turns.
+  const flow = await page.evaluate(() => {
+    const view = document.querySelector('foliate-view') as unknown as {
+      renderer?: { getContents?: () => { doc: Document }[] }
+    }
+    const doc = view?.renderer?.getContents?.()[0]?.doc
+    const style = doc?.body ? doc.defaultView?.getComputedStyle(doc.body) : undefined
+    return { width: style?.width, height: style?.height, overflow: style?.overflow }
+  })
+  expect(flow.width).not.toBe('1400px')
+  expect(flow.height).not.toBe('1200px')
+  expect(flow.overflow).toBe('visible')
+  const heading = await page.evaluate(() => {
+    const view = document.querySelector('foliate-view') as unknown as {
+      renderer?: { getContents?: () => { doc: Document }[] }
+    }
+    const doc = view?.renderer?.getContents?.()[0]?.doc
+    const h2 = doc?.querySelector('h2')
+    return h2 && doc?.defaultView ? doc.defaultView.getComputedStyle(h2).fontSize : ''
+  })
+  expect(Number.parseFloat(heading)).toBeLessThanOrEqual(32)
 
   // Native MathML, not an image: the mathematics is selectable text now.
   const mathText = await page.evaluate(() => {
@@ -265,6 +291,7 @@ test('the deterministic shortcut is one call the agent may choose', async ({ pag
   expect(report.found).toBe(161)
   expect(report.restored).toBe(161)
 
+  await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('<math')
   const after = await renderedHtml(page)
   expect(after).toContain('<math')
   expect(after).not.toContain('data-tex="')

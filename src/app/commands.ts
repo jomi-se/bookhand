@@ -343,6 +343,7 @@ export class BookhandCommands {
     const result = await this.#remaster().rewriteSection(index, html, {
       ...(options.css === undefined ? {} : { css: options.css }),
       ...(options.summary === undefined ? {} : { summary: options.summary }),
+      deferDisplay: true,
     })
     this.#changed()
     return result
@@ -357,6 +358,7 @@ export class BookhandCommands {
     const result = await this.#remaster().editSection(sectionIndex, sourceFingerprint, edits, {
       ...(options.css === undefined ? {} : { css: options.css }),
       ...(options.summary === undefined ? {} : { summary: options.summary }),
+      deferDisplay: true,
     })
     this.#changed()
     return result
@@ -364,7 +366,7 @@ export class BookhandCommands {
 
   async compileSectionMath(sectionIndex?: number) {
     const index = await this.#resolveSection(sectionIndex)
-    const report = await this.#remaster().compileSectionMath(index)
+    const report = await this.#remaster().compileSectionMath(index, { deferDisplay: true })
     this.#changed()
     return { sectionIndex: index, ...report }
   }

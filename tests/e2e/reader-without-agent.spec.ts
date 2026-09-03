@@ -26,3 +26,35 @@ test('the reader is unchanged when no agent runtime exists', async ({ page }) =>
     'Agent activity',
   )
 })
+
+test('desktop reading controls stay visible and keyboard paging survives focused chrome', async ({
+  page,
+}) => {
+  await openBook(page)
+
+  const size = page.locator('.reader-zoom output')
+  const beforeSize = Number.parseInt((await size.textContent()) ?? '', 10)
+  await page.getByRole('button', { name: 'Increase text size' }).click()
+  await expect(size).toHaveText(`${Math.min(200, beforeSize + 10)}%`)
+
+  const fraction = () =>
+    page.evaluate(
+      () =>
+        (document.querySelector('foliate-view') as unknown as {
+          lastLocation?: { fraction?: number }
+        })?.lastLocation?.fraction ?? -1,
+    )
+  const next = page.getByRole('button', { name: 'Next page' })
+  await next.click()
+  const afterClick = await fraction()
+
+  // The click leaves focus on the page button. ArrowRight must still work;
+  // this is the ordinary keyboard sequence, not a body-focus test shortcut.
+  await page.keyboard.press('ArrowRight')
+  await expect.poll(fraction).toBeGreaterThan(afterClick)
+  await page.waitForTimeout(500)
+  const afterArrow = await fraction()
+
+  await page.keyboard.press('ArrowLeft')
+  await expect.poll(fraction).toBeLessThan(afterArrow)
+})

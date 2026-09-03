@@ -19,7 +19,7 @@ const books: readonly BookCatalogEntry[] = [
 ]
 
 function setup() {
-  const openBook = vi.fn()
+  const openBook = vi.fn().mockResolvedValue(undefined)
   const reports: { name: string; summary: string; failed?: boolean }[] = []
   const tools = createLibraryTools({
     books: () => books,
@@ -66,6 +66,24 @@ describe('library WebMCP contracts', () => {
       title: 'Calculus Made Easy',
     })
     expect(openBook).toHaveBeenCalledWith(books[0])
+  })
+
+  it('does not report the book open before the reading surface is ready', async () => {
+    let ready!: () => void
+    const openBook = vi.fn(() => new Promise<void>((resolve) => { ready = resolve }))
+    const tools = createLibraryTools({
+      books: () => books,
+      diagnostics: () => undefined,
+      openBook,
+      report: vi.fn(),
+    })
+    const pending = tools.find((tool) => tool.name === 'open_book')!.execute({ bookId: 'calculus-a' })
+    let settled = false
+    void pending.then(() => { settled = true })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    ready()
+    expect((await pending).isError).toBeFalsy()
   })
 
   it('rejects unknown fields and records the failed boundary call', async () => {

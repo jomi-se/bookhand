@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { BookCatalogEntry } from './domain/index.ts'
 import './library/library.css'
@@ -36,9 +36,69 @@ function App() {
   const library = useLibrary({ client: runtime.client, ports: runtime.ports })
   const [reading, setReading] = useState<BookCatalogEntry>()
   const [readerCommands, setReaderCommands] = useState<BookhandCommands>()
+  const readingRef = useRef(reading)
+  const agentOpenPending = useRef(false)
+  const pendingReaderCommands = useRef<BookhandCommands | undefined>(undefined)
+  readingRef.current = reading
 
   const books = library.books
   const diagnostics = library.diagnostics
+
+  const publishReaderCommands = useCallback((commands: BookhandCommands | undefined) => {
+    if (agentOpenPending.current) {
+      pendingReaderCommands.current = commands
+      return
+    }
+    setReaderCommands(commands)
+  }, [])
+
+  const openBookForAgent = useCallback(async (entry: BookCatalogEntry) => {
+    const previous = runtime.reader.adapter
+    const alreadySelected = readingRef.current?.id === entry.id
+    if (alreadySelected && previous) {
+      try {
+        previous.getLocation()
+        return
+      } catch {
+        // The visible reader is still opening; wait on the same readiness
+        // condition below instead of claiming success from React state alone.
+      }
+    } else if (!alreadySelected) setReading(entry)
+
+    agentOpenPending.current = true
+    pendingReaderCommands.current = undefined
+
+    const deadline = Date.now() + 10_500
+    while (Date.now() < deadline) {
+      const adapter = runtime.reader.adapter
+      // Switching books must wait for the old adapter to detach. React state
+      // names the requested book before that happens, so identity—not the
+      // selected row—is the readiness proof here.
+      if (adapter && (alreadySelected || adapter !== previous)) {
+        try {
+          adapter.getLocation()
+          // Changing the registered tool set while Chromium is still awaiting
+          // `open_book` aborts the call that caused the change. Publish the
+          // book tools on the following task, after this result has crossed
+          // the WebMCP boundary.
+          globalThis.setTimeout(() => {
+            agentOpenPending.current = false
+            setReaderCommands(pendingReaderCommands.current)
+          }, 0)
+          return
+        } catch {
+          // Foliate has mounted but its first section is not readable yet.
+        }
+      }
+      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 50))
+    }
+    globalThis.setTimeout(() => {
+      agentOpenPending.current = false
+      pendingReaderCommands.current = undefined
+      setReaderCommands(undefined)
+    }, 0)
+    throw new Error('The book did not become readable. Try opening it again or use a new browser tab.')
+  }, [runtime.reader])
 
   // The design context and library tools are offered from first load, so an
   // agent arriving at the library can see what is here, open something, and
@@ -78,13 +138,13 @@ function App() {
         ...createLibraryTools({
           books: () => books,
           diagnostics: () => diagnostics,
-          openBook: setReading,
+          openBook: openBookForAgent,
           report,
         }),
         ...bookTools,
       ]
     },
-    [books, designState, diagnostics, readerCommands, runtime.presentation],
+    [books, designState, diagnostics, openBookForAgent, readerCommands, runtime.presentation],
   )
 
   const agent = useWebMcpTools({ createTools })
@@ -106,7 +166,7 @@ function App() {
         ports={runtime.ports}
         bridge={runtime.reader}
         onExit={exitReader}
-        onCommandsReady={setReaderCommands}
+        onCommandsReady={publishReaderCommands}
         designState={designState}
         presentation={runtime.presentation}
         surface={runtime.surface}

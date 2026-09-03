@@ -23,6 +23,8 @@ import type {
  */
 const SECTION = `<h1 class="ctitle">CHAPTER III</h1><p class="para">The ratio <img alt="d y by d x" data-tex="\\({\\dfrac{dy}{dx}}\\)" src="images/eq-1.svg" /> is what we hunt.</p><figure><img src="images/fig4.svg" alt="Fig. 4" /><figcaption>Fig. 4</figcaption></figure>`
 
+let nextInitGate: Promise<void> | undefined
+
 describe('exact section edits', () => {
   it('fingerprints raw source bytes and binds them to the book and section', () => {
     const base = { bookId: 'book-1', sectionIndex: 3, html: '<p>x</p>', css: 'p { color: red; }' }
@@ -120,6 +122,9 @@ class FakeView extends HTMLElement implements FoliateView {
   }
 
   async init() {
+    const gate = nextInitGate
+    nextInitGate = undefined
+    await gate
     await this.renderer.goTo({ index: 0 })
   }
 
@@ -310,6 +315,7 @@ describe('the agent’s read and write seam', () => {
 
     expect(result.applied).toBe(true)
     expect(rendered().querySelector('h2')?.textContent).toBe('Chapter III')
+    expect(rendered().body.hasAttribute('data-bookhand-remastered')).toBe(true)
     expect(rendered().querySelector('math')).not.toBeNull()
     expect(rendered().querySelector('img')).toBeNull()
   })
@@ -464,6 +470,28 @@ describe('the agent’s read and write seam', () => {
     // And it is still just a rewrite: the same undo puts the images back.
     await adapter.undoSection(0)
     expect(rendered().querySelector('img[data-tex]')).not.toBeNull()
+  })
+
+  it('can persist an agent rewrite before a browser-controlled frame is allowed to rebuild', async () => {
+    const harness = makeStore()
+    const { adapter, rendered } = await openAdapter({ rewrites: harness.store })
+    let allowFrame!: () => void
+    nextInitGate = new Promise<void>((resolve) => { allowFrame = resolve })
+
+    const result = await adapter.rewriteSection(
+      0,
+      '<article><h2>Deferred but safe</h2><p>The whole chapter.</p></article>',
+      { deferDisplay: true },
+    )
+
+    expect(result.applied).toBe(true)
+    expect(harness.sections.get(0)?.at(-1)?.html).toContain('Deferred but safe')
+    // The tool receipt is no longer held hostage by the nested EPUB frame.
+    expect(rendered().querySelector('h1.ctitle')).not.toBeNull()
+
+    allowFrame()
+    await vi.waitFor(() => expect(rendered().querySelector('article')?.textContent)
+      .toContain('Deferred but safe'))
   })
 
   it('compiles from the section’s source, so the saved version stays portable', async () => {

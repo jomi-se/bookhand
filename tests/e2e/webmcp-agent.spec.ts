@@ -284,6 +284,11 @@ test('an agent arriving at the library can see it and open a book itself', async
 
   const opened = await agentCall(page, 'open_book', { title: 'calculus' })
   expect(opened.isError).toBe(false)
+  // The success receipt is a readiness claim: the book tools and first
+  // readable location must work immediately, without a second UI wait.
+  const immediateContext = await agentCall(page, 'get_reading_context')
+  expect(immediateContext.isError).toBe(false)
+  expect(immediateContext.text).toContain('Calculus Made Easy')
   await expect(page.locator('.reader-identity')).toContainText('Calculus Made Easy')
 
   // Opening the book adds its reading tools to the ones already offered.

@@ -46,6 +46,11 @@ ordinary ebook reader.
 
 ## Commands
 
+During the final submission day, follow
+`docs/plan/deadline-operating-mode.md`: use focused regression checks and batch
+broad verification at commit boundaries. Retire that temporary mode after the
+submission.
+
 Use npm from the repository root:
 
 ```sh

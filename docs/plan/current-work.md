@@ -229,6 +229,14 @@ The WebMCP Challenge closes 2026-09-03T20:00Z.
   bundled-book browser surface confirms the broad visible range renders four
   marks total rather than per-fragment boxes. The existing reload/style timing
   guard passed alone after one resource-contended combined run.
+- Final live-demo blockers now have focused regressions: `open_book` waits for
+  the first readable section before returning success; WebMCP remaster writes
+  persist before their Foliate frame rebuild is deferred past the active tool
+  call; remastered documents cannot impose fixed page geometry, hidden
+  overflow, mid-word display breaks, or poster-sized headings; desktop text
+  size controls are visible; and Left/Right plus PageUp/PageDown page the book
+  even after reader chrome receives focus. The focused remaster and ordinary
+  desktop browser flows pass against the production build.
 - The bundled *Calculus Made Easy* is judging content, not a permanent product
   dependency.
 - Keep embeddings optional and after lexical retrieval.
