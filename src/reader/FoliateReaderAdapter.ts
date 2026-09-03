@@ -1281,9 +1281,22 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         translateResources(content.doc, resources)
       }
 
-      active.view.renderer.render?.()
       const resolved = active.view.resolveNavigation(sectionIndex)
-      if (resolved) await active.view.renderer.goTo({ ...resolved, anchor: 0 })
+      const settleAtStart = async () => {
+        active.view.renderer.render?.()
+        if (resolved) await active.view.renderer.goTo({ ...resolved, anchor: 0 })
+      }
+      await settleAtStart()
+
+      // Replacing the body fires Foliate's ResizeObserver after the first
+      // synchronous pagination pass. In Chromium that late pass can restore
+      // the old chapter's now-out-of-range scroll offset, leaving a blank page
+      // until the person presses Previous or Next. Let layout and the observer
+      // settle, then make the rewritten chapter's first page authoritative.
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      })
+      await settleAtStart()
     } finally {
       this.#suppressRelocations = Math.max(0, this.#suppressRelocations - 1)
     }

@@ -238,7 +238,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
 
         {bootstrapping ? (
           <p className="state-line" role="status">
-            Adding the bundled book…
+            Adding bundled books…
           </p>
         ) : null}
       </main>

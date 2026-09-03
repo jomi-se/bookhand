@@ -38,7 +38,8 @@ agents from reopening settled choices during the short build.
 - Stable native blocks for common content, plus explicitly created generated
   labs for richer diagrams and interactive explanations. Keep generated work
   bounded to its study-board surface; do not let it silently rewrite the reader.
-- A calculus textbook is the placeholder demo book, not a permanent commitment.
+- Public-domain technical books are temporary judging fixtures, not permanent
+  product commitments.
 
 Favor a convincing vertical slice over a generalized platform. The immediate
 question is whether WebMCP enables a materially better study experience than an

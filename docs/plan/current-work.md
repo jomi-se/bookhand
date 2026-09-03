@@ -25,6 +25,12 @@ deployment. It must confirm the model discovers and uses the shipped tools from
 intent-only prompts; deterministic Playwright evidence proves the application
 contract, not model-authored behavior.
 
+The judging build now seeds three checksum-pinned public-domain restoration
+corpora through the ordinary library path: *Calculus Made Easy* for the primary
+tutor/remaster story, Einstein's *Relativity* for pervasive image-based math,
+and *Flatland* for legacy document structure and illustrations. All are marked
+for removal after judging.
+
 ## Active product direction
 
 Bookhand is a local-first EPUB reader and page-owned WebMCP study environment.
@@ -118,7 +124,9 @@ This direction is recorded in:
   or optionally compiles publisher-supplied `data-tex` to MathML. Exact-edit
   batches are serialized, all-or-nothing revisions and preserve the existing
   agent stylesheet when omitted. Publisher bytes remain immutable;
-  Original/Rewritten, Undo, and Reset are visible.
+  Original/Rewritten, Undo, and Reset are visible. In-place replacement now
+  performs a second post-observer pagination pass, preventing a saved rewrite
+  from displaying as a blank page until the person pages away and back.
 - Schema v5 persists bounded sanitized rewrite history before it is shown and
   hydrates it before Foliate's first render. Markup, CSS, summary, Undo, and
   Reset survive reload. Reindexing, EPUB export, and annotation re-anchoring do

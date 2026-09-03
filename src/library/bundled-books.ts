@@ -22,4 +22,20 @@ export const BUNDLED_BOOKS: readonly BundledBookRegistration[] = [
     retrievedAt: '2026-09-01T00:00:00.000Z',
     removeAfterJudging: true,
   },
+  {
+    path: 'books/relativity.epub',
+    sha256: 'bf06a8a83e08889277667c34b1d914fcd37d734646cbb44bb4da028bcbe65a39',
+    byteLength: 1_091_398,
+    sourceUrl: 'https://www.gutenberg.org/ebooks/36114',
+    retrievedAt: '2026-09-03T00:00:00.000Z',
+    removeAfterJudging: true,
+  },
+  {
+    path: 'books/flatland.epub',
+    sha256: '56348c6910e42b672cf4c6a550033fdac361e652298c1ec5bf0403db9d396089',
+    byteLength: 300_202,
+    sourceUrl: 'https://www.gutenberg.org/ebooks/201',
+    retrievedAt: '2026-09-03T00:00:00.000Z',
+    removeAfterJudging: true,
+  },
 ]

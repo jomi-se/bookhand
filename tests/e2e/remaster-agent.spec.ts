@@ -55,6 +55,35 @@ const renderedHtml = (page: Page) =>
     return view?.renderer?.getContents?.()[0]?.doc?.body?.innerHTML ?? ''
   })
 
+/** The mounted document can contain the rewrite while Foliate is scrolled onto a blank page. */
+const hasVisibleBookText = (page: Page) =>
+  page.evaluate(() => {
+    const view = document.querySelector('foliate-view') as unknown as {
+      getBoundingClientRect(): DOMRect
+      renderer?: { getContents?: () => { doc: Document }[] }
+    }
+    const doc = view?.renderer?.getContents?.()[0]?.doc
+    const frame = doc?.defaultView?.frameElement
+    if (!(frame instanceof HTMLElement) || !doc?.body) return false
+    const frameRect = frame.getBoundingClientRect()
+    const readerRect = view.getBoundingClientRect()
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.textContent?.trim()) continue
+      const range = doc.createRange()
+      range.selectNodeContents(node)
+      for (const rect of range.getClientRects()) {
+        const left = frameRect.left + rect.left
+        const top = frameRect.top + rect.top
+        if (
+          left < readerRect.right && left + rect.width > readerRect.left &&
+          top < readerRect.bottom && top + rect.height > readerRect.top
+        ) return true
+      }
+    }
+    return false
+  })
+
 async function openChapter(page: Page) {
   await page.goto('/')
   const row = page.locator('.book-open', { hasText: 'Calculus Made Easy' })
@@ -180,6 +209,7 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
   await bar.getByRole('button', { name: 'Rewritten' }).click()
   await expect(page.locator('foliate-view')).toHaveAttribute('data-test-stable-view', '')
   await expect.poll(() => renderedHtml(page), { timeout: 15_000 }).toContain('id="ch3"')
+  await expect.poll(() => hasVisibleBookText(page), { timeout: 15_000 }).toBe(true)
   const after = await renderedHtml(page)
   expect(after).toContain('id="ch3"')
   expect(after).toContain('Chapter III — On relative growings')
