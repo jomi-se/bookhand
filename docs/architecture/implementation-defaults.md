@@ -335,5 +335,7 @@ The following require evidence recorded in `current-work.md`:
 - OCR or image embeddings: only if the chosen hero passage cannot be extracted.
 - multiple embedding models: only after committing to multilingual scope.
 - custom Foliate.js fork: only after upstream APIs demonstrably block the hero
-  flow.
+  flow. ADR 0005 records that threshold being met for post-load `blob:` iframe
+  navigation in the judged embedded browser and bounds the compatibility
+  transform that replaces it.
 - Agent Connect: only after the judgeable browser-native WebMCP path is complete.

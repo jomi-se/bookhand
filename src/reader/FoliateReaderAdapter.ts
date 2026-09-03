@@ -70,7 +70,6 @@ import { boundCustomCss } from './custom-css.ts'
 import { isInteractiveTarget, tapZone, type TapZone } from './tap-intent.ts'
 import { localized, mapMetadata } from './metadata.ts'
 import {
-  extractDocumentText,
   fingerprintText,
   normalizeBookText,
   passageFromAnchoredRange,
@@ -301,20 +300,21 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   async getSectionSnapshot(sectionIndex: number): Promise<BookSectionSnapshot> {
     const { view } = this.#requireActive()
     const document = await this.#createSectionDocument(sectionIndex)
-    const text = extractDocumentText(document)
     const body = document.body ?? document.documentElement
     const range = document.createRange()
     range.selectNodeContents(body)
-    const start = range.cloneRange()
-    start.collapse(true)
-    const end = range.cloneRange()
-    end.collapse(false)
+    const passage = passageFromRange(
+      range,
+      sectionIndex,
+      this.#chapterBreadcrumb(sectionIndex),
+      (value) => view.getCFI(sectionIndex, value),
+    )
     return {
       sectionIndex,
-      text,
-      chapterBreadcrumb: this.#chapterBreadcrumb(sectionIndex),
-      startCfi: view.getCFI(sectionIndex, start),
-      endCfi: view.getCFI(sectionIndex, end),
+      text: passage.text,
+      chapterBreadcrumb: passage.chapterBreadcrumb,
+      startCfi: passage.range.startCfi,
+      endCfi: passage.range.endCfi,
     }
   }
 
@@ -1317,10 +1317,18 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   async #recoverStalledView(stalled: ActiveReader, revision: number): Promise<void> {
     if (revision !== this.#revision || this.#active !== stalled) return
     const { book } = stalled
-    this.#active = undefined
-    this.#dispose(stalled, false)
 
     const view = document.createElement('foliate-view') as FoliateView
+    // The replacement must be connected and have geometry for Foliate to
+    // paginate, but it does not become the reader until it is fully ready.
+    // Keeping the previous view and adapter session alive prevents a failed
+    // recovery from turning a navigation error into "No book is open."
+    Object.assign(view.style, {
+      position: 'fixed',
+      inset: '0',
+      visibility: 'hidden',
+      pointerEvents: 'none',
+    })
     const cleanups = [...this.#listen(view), configureForViewport(view, () => this.#style.pageLayout ?? 'auto')]
     const replacement: ActiveReader = {
       book,
@@ -1328,8 +1336,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       cleanups,
       ...(stalled.transformCleanup ? { transformCleanup: stalled.transformCleanup } : {}),
     }
-    this.#active = replacement
-    this.#host.replaceChildren(view)
+    this.#host.append(view)
     this.#suppressRelocations += 1
     try {
       await withDeadline(
@@ -1337,7 +1344,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         this.#options.openDeadlineMs ?? BOOK_OPEN_DEADLINE_MS,
         this.#options.clock ?? systemClock,
       )
-      if (revision !== this.#revision || this.#active !== replacement) throw new ReaderClosedError()
+      if (revision !== this.#revision || this.#active !== stalled) throw new ReaderClosedError()
       cleanups.push(this.#listenForRendererRelocations(view))
       view.renderer.setStyles?.(makeReaderCss(this.#style))
       await withDeadline(
@@ -1348,15 +1355,20 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         this.#options.openDeadlineMs ?? BOOK_OPEN_DEADLINE_MS,
         this.#options.clock ?? systemClock,
       )
-      if (revision !== this.#revision || this.#active !== replacement) throw new ReaderClosedError()
+      if (revision !== this.#revision || this.#active !== stalled) throw new ReaderClosedError()
+      this.#active = replacement
+      Object.assign(view.style, {
+        position: '',
+        inset: '',
+        visibility: '',
+        pointerEvents: '',
+      })
+      this.#host.replaceChildren(view)
+      this.#dispose(stalled, false)
       this.renderAnnotations(this.#marks)
       if (this.#tutorTarget) void this.#renderTutorOverlay(this.#tutorGeneration)
     } catch (error) {
-      if (this.#active === replacement) {
-        this.#active = undefined
-        this.#dispose(replacement)
-        this.#host.replaceChildren()
-      }
+      this.#dispose(replacement, false)
       throw error
     } finally {
       this.#suppressRelocations = Math.max(0, this.#suppressRelocations - 1)
