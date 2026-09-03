@@ -1261,6 +1261,12 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     const content = active.view.renderer.getContents().find((candidate) => candidate.index === sectionIndex)
     if (!content) return
 
+    // A spine section is not necessarily a chapter. Flatland, for example,
+    // puts most of the book in one XHTML file with TOC fragment anchors. Keep
+    // the nearest logical heading so comparing versions does not fling the
+    // person to the start of that enormous file.
+    const logicalHref = active.view.lastLocation?.tocItem?.href
+
     const body = content.doc.body ?? content.doc.documentElement
     if (!body) throw new ReaderSectionLoadError(sectionIndex, this.#sectionLabel(sectionIndex))
     const resources = this.#sectionResourceMaps.get(sectionIndex) ?? new Map<string, string>()
@@ -1281,12 +1287,17 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         translateResources(content.doc, resources)
       }
 
-      const resolved = active.view.resolveNavigation(sectionIndex)
-      const settleAtStart = async () => {
+      const logicalTarget = logicalHref
+        ? active.view.resolveNavigation(logicalHref)
+        : undefined
+      const resolved = logicalTarget?.index === sectionIndex
+        ? logicalTarget
+        : active.view.resolveNavigation(sectionIndex)
+      const settleAtPosition = async () => {
         active.view.renderer.render?.()
-        if (resolved) await active.view.renderer.goTo({ ...resolved, anchor: 0 })
+        if (resolved) await active.view.renderer.goTo(resolved)
       }
-      await settleAtStart()
+      await settleAtPosition()
 
       // Replacing the body fires Foliate's ResizeObserver after the first
       // synchronous pagination pass. In Chromium that late pass can restore
@@ -1296,7 +1307,28 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
       })
-      await settleAtStart()
+      await settleAtPosition()
+
+      // Publisher and agent documents can have very different image/font
+      // geometry. Give local assets one short bounded chance to report their
+      // intrinsic sizes, then paginate once more so a late load cannot strand
+      // the selected heading outside the visible canvas.
+      const imagesReady = Promise.all(
+        Array.from(content.doc.images).map((image) =>
+          image.complete
+            ? Promise.resolve()
+            : new Promise<void>((resolve) => {
+                image.addEventListener('load', () => resolve(), { once: true })
+                image.addEventListener('error', () => resolve(), { once: true })
+              }),
+        ),
+      )
+      const fontsReady = content.doc.fonts?.ready ?? Promise.resolve()
+      await Promise.race([
+        Promise.all([imagesReady, fontsReady]),
+        new Promise<void>((resolve) => setTimeout(resolve, 1_500)),
+      ])
+      await settleAtPosition()
     } finally {
       this.#suppressRelocations = Math.max(0, this.#suppressRelocations - 1)
     }

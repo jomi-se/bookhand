@@ -350,6 +350,63 @@ test('an agent reads a broken chapter, rewrites it, and the person keeps control
   await expect(bar).toBeHidden()
 })
 
+test('a remaster toggle keeps the logical chapter inside a monolithic spine section', async ({
+  page,
+}) => {
+  await page.goto('/')
+  const row = page.locator('.book-open', { hasText: 'Flatland' })
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  await row.click()
+
+  await page.getByRole('button', { name: 'Contents' }).click()
+  await page.locator('.toc-item', { hasText: 'Section 1. Of the Nature of Flatland' }).click()
+  await page.getByRole('button', { name: 'Close contents' }).click()
+
+  const tocLabel = () =>
+    page.evaluate(() => {
+      const view = document.querySelector('foliate-view') as unknown as {
+        lastLocation?: { tocItem?: { label?: string | Record<string, string> } }
+      }
+      const label = view?.lastLocation?.tocItem?.label
+      return typeof label === 'string' ? label : JSON.stringify(label ?? '')
+    })
+  await expect.poll(tocLabel).toContain('Section 1.')
+  const beforeLabel = await tocLabel()
+
+  const source = await agentCall(page, 'get_section_source')
+  const sourceData = source.structured as {
+    html?: string
+    sectionIndex?: number
+    sourceFingerprint?: string
+  }
+  const oldHeading = sourceData.html?.match(/Section 1\.\s+Of the Nature of Flatland/)?.[0]
+  expect(oldHeading).toBeTruthy()
+
+  const edit = await agentCall(page, 'edit_section', {
+    sectionIndex: sourceData.sectionIndex,
+    sourceFingerprint: sourceData.sourceFingerprint,
+    edits: [{
+      oldText: oldHeading,
+      newText: '<span class="restored-heading">Section 1. Of the Nature of Flatland</span>',
+    }],
+    summary: 'Restored the first section heading without changing the rest of the book',
+  })
+  expect(edit.isError).toBe(false)
+
+  const bar = page.locator('.remaster-bar')
+  for (let cycle = 0; cycle < 2; cycle += 1) {
+    await bar.getByRole('button', { name: 'Rewritten' }).click()
+    await expect.poll(() => renderedHtml(page)).toContain('restored-heading')
+    await expect.poll(() => hasVisibleBookText(page)).toBe(true)
+    await expect.poll(tocLabel).toBe(beforeLabel)
+
+    await bar.getByRole('button', { name: 'Original' }).click()
+    await expect.poll(() => renderedHtml(page)).not.toContain('restored-heading')
+    await expect.poll(() => hasVisibleBookText(page)).toBe(true)
+    await expect.poll(tocLabel).toBe(beforeLabel)
+  }
+})
+
 test('the deterministic shortcut is one call the agent may choose', async ({ page }) => {
   await openChapter(page)
   await expect

@@ -126,8 +126,9 @@ This direction is recorded in:
   agent stylesheet when omitted. Publisher bytes remain immutable;
   Original/Rewritten, Undo, and Reset are visible. The persistent-frame build
   patch rebinds Foliate's private body measurement range before each pagination
-  pass, preventing either version from displaying as a blank page after an
-  in-place toggle.
+  pass. Version toggles retain the nearest logical TOC fragment inside
+  monolithic spine files and perform one final pagination after bounded local
+  image/font settling, preventing blank pages and jumps to an unrelated start.
 - Schema v5 persists bounded sanitized rewrite history before it is shown and
   hydrates it before Foliate's first render. Markup, CSS, summary, Undo, and
   Reset survive reload. Reindexing, EPUB export, and annotation re-anchoring do
