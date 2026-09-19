@@ -32,7 +32,12 @@ test('an imported book cannot script, exfiltrate, or reach the application', asy
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
 
-  await page.locator('input[type=file]').setInputFiles('tests/fixtures/epub/malicious-book.epub')
+  const fileInput = page.locator('input[type=file]')
+  // setInputFiles() can assign a file to a disabled input, unlike the person
+  // using Open EPUB. Wait for storage initialization to enable the real
+  // import affordance before driving it.
+  await expect(fileInput).toBeEnabled({ timeout: 20_000 })
+  await fileInput.setInputFiles('tests/fixtures/epub/malicious-book.epub')
 
   const row = page.locator('.book-open', { hasText: 'Bookhand Malicious Sentinel Corpus' })
   await expect(row).toBeVisible({ timeout: 20_000 })
