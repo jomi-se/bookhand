@@ -100,17 +100,51 @@ an open coding harness, not a fixed catalogue of repair operations. The model's
 judgement is the capability being demonstrated.
 
 The freedom belongs beside strong recovery rather than behind a weaker edit
-language. Publisher bytes remain immutable, every accepted revision is visible,
-and the person can compare, Undo, or Reset. Agent-authored markup is still
-untrusted input, so Bookhand strips executable or exfiltrating content and
-reports every refusal. Render, extraction, citation, and search must ultimately
-observe the same accepted document; a remaster that only paints the iframe is
-not complete.
+language. Publisher bytes remain immutable, while accepted repairs become the
+reader's current **personal copy**. Bookhand keeps linear recovery history out
+of the ordinary reading path but provides Undo, Redo, Restore, and Reset when
+something goes wrong. It should feel like a reader with an escape hatch, not a
+version-control interface or professional EPUB editor.
+
+Agent-authored markup is still untrusted input, so Bookhand refuses executable
+or exfiltrating content and reports actionable detail to the agent. Render,
+extraction, citation, search, and Book Health must ultimately observe the same
+personal copy; a repair that only paints the iframe is not complete.
 
 A deterministic repair may exist as an optional accelerator when a publisher
 already supplied machine-readable ground truth—for example compiling thousands
 of `data-tex` images to MathML. It is not the architecture and must not cap what
 the agent may improve.
+
+### Make book problems understandable and repairable
+
+Bookhand is not a deterministic universal book fixer. It should render common
+EPUBs as well as it safely can, apply general compatibility handling where one
+behavior benefits many books, and expose book-specific problems through
+**Book Health**. The reader sees a short explanation of the likely effect on
+reading, navigation, or accessibility. A connected agent receives the precise
+source locations and diagnostic evidence needed to investigate and propose a
+repair.
+
+Book Health is a quiet helper, not an inbox, score, or maintenance workflow.
+It may say that a book looks good, that issues were found, or that a check was
+incomplete. Automatically detected issues and concerns deliberately raised by
+the reader or their AI belong in the same overview. When the reader accepts a
+repair, the addressed issue disappears from normal view; Bookhand does not keep
+a celebratory list of resolved defects.
+
+The normal repair decision is experiential: preview the repaired reading
+experience, read a succinct explanation for subtle navigation, structure,
+mathematics, or accessibility changes, and decide whether it is better. Raw
+markup and technical evidence remain available without becoming the default
+UI. The reader's acceptance—not a deterministic checker pretending to
+understand meaning—is the final quality judgment.
+
+Repairs should be durable enough that a person does not repeatedly spend time
+or tokens fixing the same book. A standalone EPUB export of the personal copy
+is the preferred first portability direction. Cross-device synchronization or
+community repair sharing may come later, but neither should turn ordinary
+reading into an account-dependent service.
 
 ### Work with the reader's knowledge
 
@@ -216,9 +250,15 @@ to its gateway or to Codex.
   locations and the user can return easily.
 - **Persistent effects are visible and reversible.** Notes, styles, and study
   material belong to the user.
+- **Book Health serves reading, not maintenance.** Explain known problems in
+  plain language, keep technical evidence easy for agents to reach, and never
+  turn a book into a queue of chores.
 - **Document repair is source editing, not a skin.** Give the model the real
-  section and a whole-document write path; preserve the publisher original and
-  put revision control in the learner's hands.
+  section and a whole-document write path; preserve the publisher original,
+  keep the personal copy recoverable, and let the reader judge proposals by
+  the resulting experience.
+- **Fix once.** A repair the reader keeps becomes durable, and Bookhand should
+  move toward exporting that personal copy as a standalone EPUB.
 - **Attention remains under learner control.** Tutor cues are temporary,
   clearly attributed, easy to stop, and never silently persisted.
 - **Guidance enables creative freedom.** Browser agents receive the semantic

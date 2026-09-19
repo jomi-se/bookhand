@@ -9,7 +9,8 @@ implementation by coherent ownership without changing assertion granularity.
 
 Targets: `VAL-TEST-CONTROL-INTEGRITY`.
 
-- Pin official Foliate.js commit and official SQLite/font/icon/test packages.
+- Pin the exact MIT owner Foliate fork commit accepted by ADR 0008 and the
+  official SQLite/font/icon/test packages.
 - Add deterministic, malicious, corrupt, unsupported, long-metadata, and
   missing-cover fixtures with provenance.
 - Add production CSP, test/build commands, test-only dependency-injection seam,
@@ -94,4 +95,3 @@ Target: `VAL-DEVICE-PIXEL7`.
 - Physical-device lane: `VAL-DEVICE-PIXEL7` only, best effort under ADR 0003.
 - Slice 1 gate closes only after every contract has independent evidence or an
   explicit accepted blocked/remaining-device decision.
-

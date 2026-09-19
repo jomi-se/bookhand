@@ -1,12 +1,19 @@
 # Reader-engine behavior specifications
 
-Status: research-derived, implementation-neutral specification set.
+Status: active battle-scar and behavior guide for the adopted Foliate fork.
 
 These documents turn the Readest/Foliate source study into Bookhand-owned
-behavioral requirements. They do not approve a renderer change, modify a
-dependency, create implementation work, or supersede accepted architecture.
-Bookhand still uses the exact official Foliate pin named in
-`VAL-READER-ENGINE` and the persistent same-origin frame from ADR 0005.
+behavioral requirements. Readest is a quality baseline and a source of
+hard-earned lessons, not an application to copy. Bookhand now uses the exact
+MIT owner-fork pin accepted by ADR 0008 behind `ReaderAdapter`, while preserving
+the controlled-browser and persistent same-origin frame boundary from ADR
+0005.
+
+Use this set with the [reading-quality baseline](../reading-quality-baseline.md)
+before reader work. Select the relevant journeys and footguns, then add the
+smallest serious evidence needed for the chosen mission. These documents do not
+authorize every capability they describe or require a giant up-front regression
+corpus.
 
 ## How to read this set
 
@@ -52,8 +59,9 @@ a different licensing decision.
 
 The evidence narrative and exact history landmarks remain in
 [`2026-09-17-readest-navigation-pagination-scrolling.md`](../../research/2026-09-17-readest-navigation-pagination-scrolling.md).
-The accepted Bookhand contracts remain authoritative until a separately
-approved planning pass changes them.
+The accepted Bookhand contracts and decisions remain authoritative. Historical
+research language that predates the fork adoption is evidence of what was known
+then, not current dependency state.
 
 Prioritized future choices and the three-candidate selection workflow live in
 the [reader-engine candidate backlog](../../plan/reader-engine-candidate-backlog.md).
@@ -76,8 +84,9 @@ Every future reader-engine change must preserve:
 
 ## Residual unknowns
 
-The Readest application and its tests were inspected but not executed. No
-Bookhand compatibility spike has run. Physical Android/iOS selection, native
-assistive technology, long-session memory, vertical-writing corpus breadth,
-and the feasibility of reconciling continuous multi-section rendering with one
-persistent iframe remain unproven.
+The Readest application and its tests were inspected but not executed. RE-001
+proved the adopted fork against Bookhand's deterministic suite and the genuine
+Windows in-app browser, but physical Android/iOS selection, native assistive
+technology, long-session memory, vertical-writing breadth, and continuous
+multi-section rendering remain unproven. The scrolling architecture and exact
+experience must be prototyped rather than inferred from source alone.

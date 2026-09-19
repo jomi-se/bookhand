@@ -27,8 +27,9 @@ Each identifier maps to the named validation contract under
   deterministic identity, deduplication, and recoverable failures.
 - `S1-LIBRARY-CATALOG` -> `VAL-LIBRARY-CATALOG`: truthful ruled rows,
   continue-reading state, loading/recovery, and local-storage status.
-- `S1-READER-ENGINE` -> `VAL-READER-ENGINE`: commit-pinned upstream Foliate.js
-  behind `ReaderAdapter`, rendering real EPUB content and resources.
+- `S1-READER-ENGINE` -> `VAL-READER-ENGINE`: exact commit-pinned MIT owner
+  Foliate fork behind `ReaderAdapter`, rendering real EPUB content and
+  resources under ADR 0008.
 - `S1-READER-ADAPTER` -> `VAL-READER-ADAPTER-CONTRACT`: serializable metadata,
   TOC, location, passage, section, and selection snapshots without viewer DOM
   leakage.

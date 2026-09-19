@@ -26,11 +26,11 @@ the behavior or architecture.
 | Keyboard focus, iframe naming, off-screen accessibility | MIT renderer | Adopt with real AT validation | [Selection](selection-annotations-and-accessibility.md) |
 | Publisher CSS, fonts, media, tables, full-bleed covers | MIT renderer | Adopt compatible hardening | [Presentation](presentation-and-format-boundaries.md) |
 | Bookhand style and custom CSS lifecycle | Bookhand constraint | Preserve independently | [Presentation](presentation-and-format-boundaries.md) |
-| Fixed-layout EPUB | MIT renderer | Defer as separate scope | [Presentation](presentation-and-format-boundaries.md) |
+| Fixed-layout EPUB | MIT renderer | Detect and explain current limitations; defer full experience as separate scope | [Presentation](presentation-and-format-boundaries.md) |
 | PDF and comics/CBZ | MIT renderer plus app/native assumptions | Defer; reject bundled expansion | [Presentation](presentation-and-format-boundaries.md) |
 | TTS and media overlays | Mixed | Defer as separate accessible-media scope | [Presentation](presentation-and-format-boundaries.md) |
 | Autoscroll | Mixed | Defer separately; retain progress lesson | [Presentation](presentation-and-format-boundaries.md) |
-| Page-turn animation | Mixed | Reject from correctness upgrade; possible later scope | [Presentation](presentation-and-format-boundaries.md) |
+| Page-turn animation | Mixed | Basic cross-spine continuity adopted with retained-frame and reduced-motion guards; advanced effects remain separate | [Presentation](presentation-and-format-boundaries.md) |
 | Memory bounds, preload limits, concurrent loads | MIT renderer | Adopt explicit budgets and cancellation | [Security/performance](security-performance-and-async-integrity.md) |
 | Async races, stale results, background/unmount flush | Mixed | Implement independently where application-owned | [Security/performance](security-performance-and-async-integrity.md) |
 | CSP, script blocking, remote resources, native bridges | Bookhand conflict | Preserve Bookhand policy; reject Readest permissiveness | [Security/performance](security-performance-and-async-integrity.md) |
@@ -59,6 +59,12 @@ contracts, ADR 0005, and active-work truth.
 
 ## Current Bookhand evidence and remaining gaps
 
+RE-001 and ADR 0008 supersede the pre-adoption state assumed by the original
+research pass. Bookhand now runs the exact owner-fork pin behind its retained
+same-origin frame, including controlled-browser validation of fragment targets,
+remaster round trips, search, and continuously painted cross-spine turns. The
+table below remains a gap map for behavior not established by that adoption.
+
 | Area | Current evidence inspected | Gap exposed by this study |
 | --- | --- | --- |
 | Adapter and lifecycle | `tests/unit/reader-adapter.test.ts`, `VAL-READER-ADAPTER-CONTRACT`, `VAL-READER-LIFECYCLE` | Long-session resource accounting, adjacent-view ownership, and broader malformed-package races |
@@ -75,12 +81,14 @@ tests remain authoritative only for the behavior they actually exercise.
 ## Known gaps
 
 - No Readest suite or application runtime was executed.
-- No source-to-target differential harness exists yet.
+- No general source-to-target differential harness exists yet; focused
+  fragment and range round trips cover only the adopted scenarios.
 - No EPUB corpus coverage measure establishes how representative the inspected
   Readest fixtures are.
 - Browser-extension compatibility, Safari/iOS behavior, and native WebView
   integrations are source claims, not Bookhand evidence.
-- Fixed-layout, PDF, comics, TTS, autoscroll, and animation were inventoried
-  but not specified as current product commitments.
+- Fixed-layout, PDF, comics, TTS, autoscroll, and advanced animation were
+  inventoried but are not current product commitments. Fixed-layout books
+  should be detected and explained plainly even while full support is deferred.
 - The one-frame versus multi-view continuous-scroll architecture remains the
   largest unresolved compatibility question.

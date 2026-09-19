@@ -5,7 +5,7 @@ useful if later layers slip. Do not build all infrastructure first.
 
 ## Slice 1: the book is usable
 
-- Add upstream Foliate.js behind `ReaderAdapter`.
+- Add the exact pinned MIT owner Foliate fork behind `ReaderAdapter`.
 - Bundle one legally redistributable technical EPUB fixture.
 - Render it, navigate the TOC, restore position after reload, and expose a text
   selection with a stable CFI range.

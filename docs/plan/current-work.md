@@ -2,6 +2,38 @@
 
 Documentation triage updated: 2026-09-19.
 
+## Decision checkpoint: post-adoption reading quality and Book Health
+
+The post-RE-001 design review is complete. Readest is now an active quality
+baseline and source of battle scars, not a product or UI to copy. Future reader
+missions use the two-layer
+[reading-quality baseline](../specs/reading-quality-baseline.md), consult the
+relevant distilled renderer specifications, and add only targeted fixtures and
+observability for the chosen risk. A gigantic speculative regression corpus is
+not a prerequisite to improving the reader.
+
+The review also established the
+[Book Health and repair model](../specs/book-health-and-repair.md). Bookhand
+renders as well as it safely can, explains known issues in ordinary language,
+gives connected agents precise technical evidence, and lets the reader judge a
+coherent repair by the resulting experience. Accepted repairs form the current
+personal copy; recovery remains available but out of the ordinary reading
+path. A standalone repaired-EPUB export is the preferred first portability
+direction.
+
+[ADR 0009](../decisions/0009-stage-book-repairs-outside-the-personal-copy.md)
+fixes the architectural boundary for future repair work: one staged
+source-changing workspace per book, ordinary reading remains available, the
+visible personal copy does not change before acceptance, versions increase
+monotonically, and recovery is linear. Exact proposal-finalization tools, live
+draft viewing, and visual design remain evidence-gated.
+
+No reader capability was implemented by this design pass. The recommended next
+selection slate is RE-003 continuous-versus-section-stream scrolling, RE-011
+content-anchor stability, and RE-010 lifecycle/stale-work cancellation. RE-002
+is now ongoing mission-bounded baseline evidence rather than a standalone
+corpus project.
+
 ## Completed: RE-001 owner-fork adoption
 
 The compatibility spike completed with a `compatible with bounded Bookhand

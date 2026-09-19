@@ -29,9 +29,12 @@ reflowable correctness upgrade.
 - **Bookhand requirement:** Remastered markup stays in ordinary EPUB flow,
   preserves semantics and alternatives, and cannot impose fixed viewport
   geometry, hidden overflow, nested columns, or remote/executable content.
-- **Deferred fixed-layout scope:** If accepted later, specify spread policy,
-  cover side, fit modes, page/intra-page anchor preservation, panning/pinch,
-  bounded virtualization, RTL placement, seams, selection limits, and a new
+- **Current fixed-layout boundary:** Detect the standard
+  [fixed-layout declaration](https://www.w3.org/TR/epub-34/#sec-fixed-layouts)
+  and explain plainly that Bookhand currently focuses on reflowable books.
+  Full support, if accepted later, must specify spread policy, cover side, fit
+  modes, page/intra-page anchor preservation, panning/pinch, bounded
+  virtualization, RTL placement, seams, selection limits, and a new
   persistent-frame/CSP decision.
 - **Deferred PDF/comics scope:** Treat PDF workers/assets, range concurrency,
   text layers, page labels, direction, canvas memory, annotation overlays, and
@@ -41,9 +44,13 @@ reflowable correctness upgrade.
   cancellation, audio focus, caching, and accessibility separately.
 - **Deferred autoscroll scope:** Define subpixel motion, pause/control, input
   ownership, periodic relocation, reduced motion, and battery/performance.
-- **Rejected from correctness upgrades:** Slide/curl/snapshot transitions,
-  native GPU paths, e-ink refresh, stylus controls, and hardware page turners.
-  They require explicit future approval and may never weaken reduced motion.
+- **Adopted basic transition:** A normal turn across a spine boundary keeps
+  painted book content visible and respects reduced motion without making
+  navigation depend on animation support.
+- **Rejected from unrelated correctness upgrades:** Page curls, richer
+  transitions, native GPU paths, e-ink refresh, stylus controls, and hardware
+  page turners require explicit future approval and may never weaken reduced
+  motion.
 
 ## Edge cases and failure modes
 
@@ -67,7 +74,7 @@ comic filenames.
 
 Current product scope is reflowable EPUB. Custom CSS must pass the existing
 resource-policy corpus. Rendering, extraction, citation, indexing, annotations,
-and remasters must agree on the accepted document. Generated study labs remain
+and repairs must agree on the personal copy. Generated study labs remain
 separate from EPUB presentation. Reduced motion and accessible source meaning
 outweigh animation fidelity.
 
@@ -93,6 +100,8 @@ real-surface suite, and product decision.
 
 ## Adoption disposition
 
-Adopt compatible MIT reflow and publisher-content hardening. Preserve Bookhand's
-style/remaster lifecycle independently. Defer fixed layout, PDF, comics, TTS,
-autoscroll, animation, and native input as separate scopes.
+Adopt compatible MIT reflow and publisher-content hardening. Preserve
+Bookhand's style/repair lifecycle independently. Detect and explain fixed
+layout while deferring its full experience. Basic cross-spine animation is
+adopted; advanced animation, PDF, comics, TTS, autoscroll, and native input
+remain separate scopes.

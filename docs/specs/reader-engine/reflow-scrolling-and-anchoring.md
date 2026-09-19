@@ -61,12 +61,14 @@ flow. Mature reading behavior preserves a content anchor and recomputes layout.
 
 ## Bookhand constraints and conflicts
 
-The fork's continuous strip is multi-iframe; Bookhand currently requires one
-persistent frame. Continuous scrolling is therefore an evaluation target, not
-an approved capability. Any alternative must preserve CSP, selection, overlays,
-remaster switching, exact extraction, and frame identity. Bookhand's existing
-style-before-location restore and one-final-pagination remaster behavior are
-minimum compatibility requirements.
+The fork's continuous strip is multi-iframe; Bookhand's currently proven answer
+to the controlled ChatGPT browser is one persistent frame. Continuous scrolling
+is therefore an evaluation target, not an approved capability. Prototype both
+true continuous multi-section scrolling and a section-stream handoff that may
+retain one section at a time. Any alternative must preserve CSP, selection,
+overlays, repair switching, exact extraction, and controlled-browser WebMCP
+continuity. Bookhand's existing style-before-location restore and
+one-final-pagination repair behavior are minimum compatibility requirements.
 
 ## Provenance and source pointers
 

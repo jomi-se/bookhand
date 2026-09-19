@@ -7,10 +7,11 @@ the hero flow is blocked, and record the reason in `docs/plan/current-work.md`.
 
 ## One-sentence architecture
 
-A Vite/React client loads an EPUB with upstream Foliate.js, persists reader and
-study state in official SQLite WASM over OPFS, runs SQLite and Transformers.js
-in separate dedicated workers, exposes domain operations as WebMCP tools, and
-renders agent artifacts as native study blocks or explicit sandboxed labs.
+A Vite/React client loads an EPUB with the pinned MIT owner Foliate fork,
+persists reader and study state in official SQLite WASM over OPFS, runs SQLite
+and Transformers.js in separate dedicated workers, exposes domain operations
+as WebMCP tools, and renders agent artifacts as native study blocks or explicit
+sandboxed labs.
 
 ## Dependency defaults
 

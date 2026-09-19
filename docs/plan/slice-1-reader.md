@@ -22,9 +22,9 @@ generated labs.
 - The approved visual system and responsive behavior live in `DESIGN.md`.
 - Study is visible as a quiet shell/affordance, but study content belongs to
   Slice 2.
-- Use a full-commit-pinned official Foliate.js source dependency behind
-  `ReaderAdapter`; do not depend on the unrelated npm release with the same
-  name.
+- Use the exact full-commit-pinned MIT owner Foliate fork accepted by ADR 0008
+  behind `ReaderAdapter`; do not depend on the unrelated npm release with the
+  same name.
 - SQLite WASM remains the sole persistent application store. Slice 1 implements
   the minimum `books` and `readingState` path instead of using `localStorage`.
 - Imported EPUBs are untrusted. A script-blocking CSP and a malicious-book
