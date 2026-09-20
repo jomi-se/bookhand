@@ -1,5 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import type { ReaderPageLayout, ReaderStyle, ReaderTheme } from '../domain/reader.ts'
+import type {
+  ReaderFlow,
+  ReaderPageLayout,
+  ReaderStyle,
+  ReaderTheme,
+} from '../domain/reader.ts'
 import type { PresentationView, StylePatch } from '../app/presentation.ts'
 
 export interface TextPanelProps {
@@ -25,6 +30,11 @@ const PAGE_LAYOUTS: readonly { value: ReaderPageLayout; label: string }[] = [
   { value: 'auto', label: 'Auto' },
   { value: 'single', label: 'Single' },
   { value: 'spread', label: 'Spread' },
+]
+
+const READING_FLOWS: readonly { value: ReaderFlow; label: string }[] = [
+  { value: 'paginated', label: 'Pages' },
+  { value: 'scrolled', label: 'Scroll' },
 ]
 
 function Slider({
@@ -196,21 +206,41 @@ export function TextPanel({
         </fieldset>
 
         <fieldset className="control control-themes">
-          <legend>Page layout</legend>
+          <legend>Reading flow</legend>
           <div className="theme-row">
-            {PAGE_LAYOUTS.map((layout) => (
+            {READING_FLOWS.map((flow) => (
               <button
-                key={layout.value}
+                key={flow.value}
                 type="button"
                 className="button button-quiet"
-                aria-pressed={(shown.pageLayout ?? 'auto') === layout.value}
-                onClick={() => change({ pageLayout: layout.value })}
+                aria-pressed={(shown.readingFlow ?? 'paginated') === flow.value}
+                onClick={() => change({ readingFlow: flow.value })}
               >
-                {layout.label}
+                {flow.label}
               </button>
             ))}
           </div>
+          <p className="control-note">Scroll flows naturally between chapters.</p>
         </fieldset>
+
+        {(shown.readingFlow ?? 'paginated') === 'paginated' ? (
+          <fieldset className="control control-themes">
+            <legend>Page layout</legend>
+            <div className="theme-row">
+              {PAGE_LAYOUTS.map((layout) => (
+                <button
+                  key={layout.value}
+                  type="button"
+                  className="button button-quiet"
+                  aria-pressed={(shown.pageLayout ?? 'auto') === layout.value}
+                  onClick={() => change({ pageLayout: layout.value })}
+                >
+                  {layout.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
 
         <div className="control">
           <label htmlFor={cssId}>Book CSS</label>

@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted on 2026-09-03 for the judged ChatGPT browser surface.
+Accepted on 2026-09-03 for the judged ChatGPT browser surface. Amended by ADR
+0010 on 2026-09-20: the one-frame invariant applies to Pages mode; bounded
+same-origin multi-view rendering is allowed in Scroll mode.
 
 ## Context
 
@@ -23,6 +25,10 @@ local section blob in the parent, parses it using its declared HTML or XHTML
 MIME type, and replaces the existing frame's document element. Chapter changes
 reuse the same iframe and Window; neither `blob:`, `data:`, nor `srcdoc`
 navigation occurs.
+
+ADR 0010 adds a separate Scroll-mode path. It uses multiple instances of the
+same same-origin frame shell and never restores `blob:`, `data:`, or `srcdoc`
+frame navigation.
 
 The CSP permits Bookhand to frame only its own origin with
 `frame-ancestors 'self'`. Packaged scripts remain blocked, and imported content

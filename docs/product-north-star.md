@@ -44,6 +44,8 @@ The reader should support:
 - table-of-contents navigation and precise locations;
 - selection, highlighting, notes, and revisiting annotations;
 - readable typography, themes, spacing, width, and book-level CSS overrides;
+- a per-book choice between polished pages and continuous scrolling across
+  reflowable EPUB sections;
 - focused reading on desktop and mobile;
 - local persistence without an account or server.
 

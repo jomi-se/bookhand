@@ -6,8 +6,9 @@ These documents turn the Readest/Foliate source study into Bookhand-owned
 behavioral requirements. Readest is a quality baseline and a source of
 hard-earned lessons, not an application to copy. Bookhand now uses the exact
 MIT owner-fork pin accepted by ADR 0008 behind `ReaderAdapter`, while preserving
-the controlled-browser and persistent same-origin frame boundary from ADR
-0005.
+the controlled-browser same-origin frame boundary from ADR 0005. ADR 0010
+extends that boundary to a bounded adjacent-frame window in Scroll while Pages
+retains the single persistent frame.
 
 Use this set with the [reading-quality baseline](../reading-quality-baseline.md)
 before reader work. Select the relevant journeys and footguns, then add the
@@ -72,7 +73,8 @@ Every future reader-engine change must preserve:
 
 - the serializable `ReaderAdapter`; no renderer DOM, iframe, `Range`, event, or
   opaque handle crosses into UI, storage, or WebMCP;
-- the one persistent same-origin frame unless ADR 0005 is explicitly replaced;
+- same-origin Bookhand-owned reader frames: one persistent frame in Pages and
+  no more than eight adjacent frames in Scroll under ADR 0010;
 - strict blocking of packaged scripts, remote fetches, forms, nested browsing,
   and privileged bridge access;
 - durable exact CFIs plus section and text evidence, not pixel offsets or
@@ -87,6 +89,7 @@ Every future reader-engine change must preserve:
 The Readest application and its tests were inspected but not executed. RE-001
 proved the adopted fork against Bookhand's deterministic suite and the genuine
 Windows in-app browser, but physical Android/iOS selection, native assistive
-technology, long-session memory, vertical-writing breadth, and continuous
-multi-section rendering remain unproven. The scrolling architecture and exact
-experience must be prototyped rather than inferred from source alone.
+technology, long-session memory, and vertical-writing breadth remain unproven.
+Continuous multi-section rendering is adopted under ADR 0010, but still needs
+the exact-asset Windows evidence recorded by its production mission before the
+implementation may merge.

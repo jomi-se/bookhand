@@ -21,6 +21,10 @@ describe('RE-001 candidate persistent-frame transform', () => {
     expect(transformed?.code).toContain('const current = this.#views.entries().next().value')
     expect(transformed?.code).toContain('if (directionChanged && this.noContinuousScroll)')
     expect(transformed?.code).toContain('if (this.#primaryView === view)')
+    expect(transformed?.code).toContain("this.hasAttribute('bookhand-continuous-scroll')")
+    expect(transformed?.code).toContain('const maxViews = 8')
+    expect(transformed?.code).toContain('const targetStart = Math.max(0, startBefore - removedSize)')
+    expect(transformed?.code).toContain('const visibleCenter = this.#renderedStart + this.size / 2')
     expect(transformed?.code).toContain('this.#documentInputController?.abort()')
     expect(transformed?.code).toContain('{ ...opts, signal }')
     expect(transformed?.code).toContain('if (signal.aborted || doc !== this.#primaryView?.document) return')
@@ -46,11 +50,12 @@ describe('RE-001 candidate persistent-frame transform', () => {
     const source = readFileSync(viewPath, 'utf8')
     const transformed = foliatePersistentFrame().transform(source, viewPath)
 
-    expect(transformed?.code).toContain('this.#documentEventController?.abort()')
+    expect(transformed?.code).toContain('this.#documentEventControllers.get(doc)?.abort()')
+    expect(transformed?.code).toContain('this.#documentEventControllers.clear()')
     expect(transformed?.code).toContain('this.#handleLinks(doc, index, signal)')
     expect(transformed?.code).toContain('}, { signal })')
-    expect(transformed?.code).toContain('{ signal: this.#documentEventController.signal }')
-    expect(transformed?.code).toContain('this.#documentEventController = null')
+    expect(transformed?.code).toContain('{ signal: this.#documentEventControllers.get(doc)?.signal }')
+    expect(transformed?.code).toContain("this.#emit('unload', e.detail)")
   })
 
   it('fails closed when the pinned view source drifts', () => {

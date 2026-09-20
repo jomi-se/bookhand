@@ -196,6 +196,7 @@ function summarizeStyle(style: ReaderStyle | undefined): string {
     `measure ${style.measureCh}ch`,
     `paragraph spacing ${style.paragraphSpacingEm}em`,
     `page layout ${style.pageLayout ?? 'auto'}`,
+    `reading flow ${style.readingFlow ?? 'paginated'}`,
     style.customCss ? `${style.customCss.length} characters of book CSS` : 'no book CSS',
   ].join(', ')
 }
@@ -583,7 +584,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
     {
       name: 'set_reading_style',
       description:
-        'Change how the book is presented: text size, line height, measure, paragraph spacing, page layout (auto, single, or spread), theme, or custom book CSS. Send only the fields you mean to change — anything you restate would overwrite a change the person made a moment ago. Spread remains one column on compact/coarse-pointer devices. Every change is reversible by the person with one action. Picking a shipped theme or adjusting size needs nothing else; custom CSS additionally requires designContextVersion from get_design_context, which explains the semantic roles, contrast floors, and what this CSS can and cannot reach.' +
+        'Change how the book is presented: Pages or Scroll reading flow, text size, line height, measure, paragraph spacing, page layout (auto, single, or spread), theme, or custom book CSS. Send only the fields you mean to change — anything you restate would overwrite a change the person made a moment ago. Spread remains one column on compact/coarse-pointer devices. Every change is reversible by the person with one action. Picking a shipped theme or adjusting size needs nothing else; custom CSS additionally requires designContextVersion from get_design_context, which explains the semantic roles, contrast floors, and what this CSS can and cannot reach.' +
         " Choose one operation: one or more style fields, undo:true alone, or reset:true alone. Omit unused fields entirely, including undo/reset; false or empty placeholders are not valid substitutes. Minimal JSON examples: {\"fontSizePercent\":120}, {\"undo\":true}, {\"reset\":true}. customCss must be accompanied by the current designContextVersion.",
       inputSchema: {
         type: 'object',
@@ -599,6 +600,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
                 { required: ['measureCh'] },
                 { required: ['paragraphSpacingEm'] },
                 { required: ['pageLayout'] },
+                { required: ['readingFlow'] },
                 { required: ['theme'] },
                 { required: ['customCss'] },
               ],
@@ -615,6 +617,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
                 { required: ['measureCh'] },
                 { required: ['paragraphSpacingEm'] },
                 { required: ['pageLayout'] },
+                { required: ['readingFlow'] },
                 { required: ['theme'] },
                 { required: ['customCss'] },
               ],
@@ -627,6 +630,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               { required: ['measureCh'] },
               { required: ['paragraphSpacingEm'] },
               { required: ['pageLayout'] },
+              { required: ['readingFlow'] },
               { required: ['theme'] },
               { required: ['customCss'] },
             ],
@@ -639,6 +643,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
           measureCh: { type: 'number', minimum: 40, maximum: 110 },
           paragraphSpacingEm: { type: 'number', minimum: 0, maximum: 2 },
           pageLayout: { type: 'string', enum: ['auto', 'single', 'spread'] },
+          readingFlow: { type: 'string', enum: ['paginated', 'scrolled'] },
           theme: { type: 'string', enum: ['publisher', 'light', 'sepia', 'dark'] },
           customCss: {
             type: 'string',
@@ -669,6 +674,7 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
             'measureCh',
             'paragraphSpacingEm',
             'pageLayout',
+            'readingFlow',
             'theme',
             'customCss',
           ]
@@ -707,6 +713,9 @@ export function createBookhandTools(options: ToolHostOptions): readonly ToolDefi
               : {}),
             ...(typeof input.pageLayout === 'string'
               ? { pageLayout: input.pageLayout as NonNullable<ReaderStyle['pageLayout']> }
+              : {}),
+            ...(typeof input.readingFlow === 'string'
+              ? { readingFlow: input.readingFlow as NonNullable<ReaderStyle['readingFlow']> }
               : {}),
             ...(typeof input.theme === 'string'
               ? { theme: input.theme as ReaderStyle['theme'] }

@@ -12,7 +12,7 @@ the behavior or architecture.
 | EPUB package parsing, metadata, covers, hrefs, XML/XHTML fallback | MIT renderer | Adopt after hostile/malformed corpus proof | [Lifecycle](lifecycle-loading-and-recovery.md) |
 | Resource/object-URL lifetime across concurrent views | MIT renderer | Adopt concept; adapt to persistent frame | [Lifecycle](lifecycle-loading-and-recovery.md) |
 | Paginated reflow and spread calculation | MIT renderer | Adopt after parity proof | [Reflow](reflow-scrolling-and-anchoring.md) |
-| Scrolled reflow, adjacent-section preload and eviction | MIT renderer | Defer adoption pending frame decision; spike only | [Reflow](reflow-scrolling-and-anchoring.md) |
+| Scrolled reflow, adjacent-section preload and eviction | MIT renderer plus Bookhand bound | Adopted by ADR 0010; exact-host validation required | [Reflow](reflow-scrolling-and-anchoring.md) |
 | Resize, style, font, image, and flow-switch anchoring | MIT renderer | Adopt | [Reflow](reflow-scrolling-and-anchoring.md) |
 | CFI, href, TOC, page-list, fraction, section, and result targets | MIT renderer | Adopt unified semantics; reject estimates as canonical | [Navigation](navigation-progress-and-input.md) |
 | Relocation, progress projection, restoration, and history | Mixed | Adopt renderer facts; implement persistence independently | [Navigation](navigation-progress-and-input.md) |
@@ -90,5 +90,6 @@ tests remain authoritative only for the behavior they actually exercise.
 - Fixed-layout, PDF, comics, TTS, autoscroll, and advanced animation were
   inventoried but are not current product commitments. Fixed-layout books
   should be detected and explained plainly even while full support is deferred.
-- The one-frame versus multi-view continuous-scroll architecture remains the
-  largest unresolved compatibility question.
+- ADR 0010 resolves the one-frame versus multi-view question: Pages retains one
+  frame and Scroll owns a hard eight-frame bidirectional window. Exact-host
+  validation remains mandatory for changes to either transport.

@@ -138,6 +138,7 @@ export const DEFAULT_READER_STYLE: ReaderStyle = {
   paragraphSpacingEm: 0.75,
   theme: 'publisher',
   pageLayout: 'auto',
+  readingFlow: 'paginated',
 }
 
 export class FoliateReaderAdapter implements ReaderAdapter {
@@ -255,7 +256,9 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
   async getVisibleContext(): Promise<Passage> {
     const { view } = this.#requireActive()
-    const content = view.renderer.getContents()[0]
+    const contents = view.renderer.getContents()
+    const visibleSection = view.lastLocation?.section?.current
+    const content = contents.find(({ index }) => index === visibleSection) ?? contents[0]
     if (!content) throw new ReaderNotOpenError()
     const visibleRange = view.lastLocation?.range
     if (visibleRange) {
@@ -453,10 +456,20 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   }
 
   applyStyle(style: ReaderStyle): void {
+    const previousFlow = this.#style.readingFlow ?? 'paginated'
     this.#style = structuredClone(style)
     const view = this.#active?.view
+    if (view) applyReaderLayout(view, this.#style)
     view?.renderer.setStyles?.(makeReaderCss(this.#style))
-    if (view) applyPageLayout(view, this.#style.pageLayout ?? 'auto')
+    const nextFlow = this.#style.readingFlow ?? 'paginated'
+    if (view && previousFlow !== nextFlow && this.#location?.cfi) {
+      const target = view.resolveNavigation(this.#location.cfi)
+      // Foliate's flow attribute reflows the mounted section immediately; a
+      // same-location goTo then runs its adjacent-section fill/trim lifecycle.
+      // ReaderStyle is synchronous, so this remains best-effort and location
+      // events provide the observable completion just like other reflows.
+      if (target) void view.renderer.goTo(target).catch(noop)
+    }
   }
 
   getStyle(): ReaderStyle {
@@ -537,7 +550,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     try {
       await view.open(book)
       this.#assertCurrent(revision)
-      cleanups.push(configureForViewport(view, () => this.#style.pageLayout ?? 'auto'))
+      cleanups.push(configureForViewport(view, () => this.#style))
       cleanups.push(this.#listenForRendererRelocations(view))
       this.#toc = mapToc(book.toc ?? [])
       this.#sections = mapSections(book.sections, this.#toc)
@@ -554,7 +567,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
   }
 
   #listen(view: FoliateView): readonly (() => void)[] {
-    const sectionCleanups: (() => void)[] = []
+    const sectionCleanups = new Map<Document, (() => void)[]>()
     const onRelocate = (event: Event) => {
       // Relocation is not deselection. The paginator relocates whenever its box
       // changes, so clearing here would drop the reader's selection every time
@@ -563,21 +576,29 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       this.#captureRelocation((event as CustomEvent<FoliateRelocation>).detail)
     }
     const onLoad = (event: Event) => {
-      while (sectionCleanups.length) sectionCleanups.pop()?.()
       const detail = (event as CustomEvent<{ doc: Document; index: number }>).detail
+      const previous = sectionCleanups.get(detail.doc) ?? []
+      while (previous.length) previous.pop()?.()
       // The document that arrives here has already been through the section
       // transform, so it is whatever the reader asked to see. Nothing is
       // rewritten at this point; the publisher's own markup is only recorded
       // the first time, while it is still the only thing there is.
       const onSelectionChange = () => this.#captureSelection(view, detail.doc, detail.index)
       detail.doc.addEventListener('selectionchange', onSelectionChange)
-      sectionCleanups.push(() =>
+      const cleanups = [() =>
         detail.doc.removeEventListener('selectionchange', onSelectionChange),
-      )
+      ]
       // Taps have to be caught inside the section document: Foliate binds its
       // own touch handling there, and events in the book's iframe never reach
       // the host element.
-      sectionCleanups.push(...this.#listenForTaps(detail.doc))
+      cleanups.push(...this.#listenForTaps(detail.doc))
+      sectionCleanups.set(detail.doc, cleanups)
+    }
+    const onUnload = (event: Event) => {
+      const { doc } = (event as CustomEvent<{ doc: Document }>).detail
+      const cleanups = sectionCleanups.get(doc) ?? []
+      while (cleanups.length) cleanups.pop()?.()
+      sectionCleanups.delete(doc)
     }
     const onDrawAnnotation = (event: Event) => {
       const detail = (event as CustomEvent<FoliateDrawDetail>).detail
@@ -611,6 +632,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
 
     view.addEventListener('relocate', onRelocate)
     view.addEventListener('load', onLoad)
+    view.addEventListener('unload', onUnload)
     view.addEventListener('draw-annotation', onDrawAnnotation)
     view.addEventListener('show-annotation', onShowAnnotation)
     view.addEventListener('create-overlay', onCreateOverlay)
@@ -618,12 +640,16 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     return [
       () => view.removeEventListener('relocate', onRelocate),
       () => view.removeEventListener('load', onLoad),
+      () => view.removeEventListener('unload', onUnload),
       () => view.removeEventListener('draw-annotation', onDrawAnnotation),
       () => view.removeEventListener('show-annotation', onShowAnnotation),
       () => view.removeEventListener('create-overlay', onCreateOverlay),
       () => view.removeEventListener('link', onLink),
       () => {
-        while (sectionCleanups.length) sectionCleanups.pop()?.()
+        for (const cleanups of sectionCleanups.values()) {
+          while (cleanups.length) cleanups.pop()?.()
+        }
+        sectionCleanups.clear()
       },
     ]
   }
@@ -1493,7 +1519,7 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         this.#options.clock ?? systemClock,
       )
       if (revision !== this.#revision || this.#active !== stalled) throw new ReaderClosedError()
-      cleanups.push(configureForViewport(view, () => this.#style.pageLayout ?? 'auto'))
+      cleanups.push(configureForViewport(view, () => this.#style))
       cleanups.push(this.#listenForRendererRelocations(view))
       view.renderer.setStyles?.(makeReaderCss(this.#style))
       await withDeadline(
@@ -1654,6 +1680,27 @@ function applyPageLayout(
   }
 }
 
+function applyReaderLayout(view: FoliateView, style: ReaderStyle): void {
+  const scrolled = style.readingFlow === 'scrolled' && !view.isFixedLayout
+  for (const target of readerConfigurationTargets(view)) {
+    if (scrolled) {
+      target.setAttribute('bookhand-continuous-scroll', '')
+      target.removeAttribute('no-preload')
+      target.removeAttribute('no-continuous-scroll')
+      target.setAttribute('flow', 'scrolled')
+    } else {
+      // Collapse adjacent views before returning to pagination. Keeping the
+      // discrete flag in place while flow changes preserves the accepted
+      // one-frame transport and its controlled-browser behavior.
+      target.setAttribute('no-preload', '')
+      target.setAttribute('no-continuous-scroll', '')
+      target.removeAttribute('flow')
+      target.removeAttribute('bookhand-continuous-scroll')
+    }
+  }
+  applyPageLayout(view, style.pageLayout ?? 'auto')
+}
+
 function readerConfigurationTargets(view: FoliateView): HTMLElement[] {
   const element = view as unknown as HTMLElement
   const renderer = (view as FoliateView & { renderer?: unknown }).renderer
@@ -1662,7 +1709,7 @@ function readerConfigurationTargets(view: FoliateView): HTMLElement[] {
 
 function configureForViewport(
   view: FoliateView,
-  pageLayout: () => NonNullable<ReaderStyle['pageLayout']>,
+  style: () => ReaderStyle,
 ): () => void {
   const compact = globalThis.matchMedia?.(COMPACT_QUERY)
   const reduced = globalThis.matchMedia?.(REDUCED_MOTION_QUERY)
@@ -1676,16 +1723,10 @@ function configureForViewport(
         target.setAttribute(`margin-${side}`, margin)
       }
       target.setAttribute('gap', isCompact ? '5%' : '7%')
-      // Bookhand owns one active section and one stable content frame. The
-      // candidate defaults to adjacent-section preloading; opt out at the
-      // adapter boundary so renderer internals do not make getContents()
-      // multi-valued during navigation.
-      target.setAttribute('no-preload', '')
-      target.setAttribute('no-continuous-scroll', '')
       if (reduced?.matches) target.removeAttribute('animated')
       else target.setAttribute('animated', '')
     }
-    applyPageLayout(view, pageLayout())
+    applyReaderLayout(view, style())
   }
 
   apply()
@@ -1703,6 +1744,7 @@ function crossesSectionBoundary(
 ): boolean {
   const renderer = view.renderer
   if (
+    renderer.getAttribute('flow') === 'scrolled' ||
     !renderer.hasAttribute('animated')
     || renderer.hasAttribute('eink')
     || typeof document.startViewTransition !== 'function'

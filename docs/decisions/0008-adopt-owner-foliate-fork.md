@@ -32,8 +32,10 @@ Continue to own the following compatibility behavior in Bookhand:
 - a best-effort page-turn animation at spine boundaries that never makes
   navigation depend on animation support and respects reduced motion.
 
-PDF, continuous multi-section scrolling, and other unadopted fork capabilities
-remain outside Bookhand's current product surface.
+PDF and other unadopted fork capabilities remain outside Bookhand's current
+product surface. ADR 0010 separately adopts bounded continuous multi-section
+scrolling after RE-003 validation; it does not broaden the rest of this fork
+decision.
 
 ## Consequences
 

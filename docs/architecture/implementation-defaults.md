@@ -42,8 +42,10 @@ must not reach through it to arbitrary viewer internals. Its initial surface is:
 
 The judged ChatGPT browser rejects Foliate's generated `blob:` section iframe
 navigations. ADR 0005 therefore keeps one same-origin frame and replaces its
-parsed document in place. Do not restore `blob:`, `data:`, or `srcdoc` frame
-navigation without testing inside the controlled browser.
+parsed document in place for Pages. ADR 0010 permits at most eight adjacent
+same-origin frame shells for Scroll. Neither mode may restore `blob:`, `data:`,
+or `srcdoc` frame navigation. Updating either transport requires testing inside
+the controlled browser.
 
 ```ts
 interface ReaderAdapter {

@@ -2,6 +2,39 @@
 
 Documentation triage updated: 2026-09-19.
 
+## In progress: RE-003 production continuous scrolling
+
+Bookhand now has a production candidate for a per-book **Pages / Scroll**
+choice. Pages remains the polished default and keeps the persistent single
+same-origin reader frame. Scroll uses a globally bounded window of at most
+eight adjacent same-origin frame shells so wheel and touch input can cross EPUB
+section boundaries naturally without restoring forbidden `blob:`, `data:`, or
+`srcdoc` frame navigation.
+
+The candidate preserves the `ReaderAdapter` boundary, exact CFI and visible
+text grounding, annotations, remaster switching, hostile-book containment, and
+the existing paginated behavior. Eviction measures the browser's actual
+post-removal geometry and corrects only the residual displacement, avoiding a
+double compensation when native scroll anchoring already kept the passage in
+place. Fixed-layout EPUB remains out of scope and is never forced into this
+reflow path.
+
+The focused deterministic gates are green: long bidirectional traversal never
+exceeds eight unique frames; forward and backward eviction preserve the exact
+visible WebMCP passage; annotation fingerprints and tamper rejection remain
+correct; publisher-original and rewritten remaster views remain grounded; the
+malicious EPUB stays contained in Scroll; the RE-001 compatibility suite and
+Pixel reader suite still pass. Full repository verification is green on an
+isolated browser port: lint, typecheck, 578 unit tests, production build,
+bundle, SDK packaging, CSP, the complete built-browser suite, and setup checks
+all pass. Genuine Windows in-app-browser validation of the exact candidate is
+the remaining merge gate. Local `main` must not move until it is green.
+
+[ADR 0010](../decisions/0010-bounded-multi-view-continuous-scroll.md) records
+the accepted architecture and
+[the RE-003 production mission](re-003-continuous-scroll-production.md) owns
+the remaining evidence.
+
 ## Decision checkpoint: post-adoption reading quality and Book Health
 
 The post-RE-001 design review is complete. Readest is now an active quality

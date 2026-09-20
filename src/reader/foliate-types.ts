@@ -106,6 +106,7 @@ export interface FoliateDrawDetail {
 
 export interface FoliateView extends HTMLElement {
   book: FoliateBook
+  isFixedLayout?: boolean
   renderer: FoliateRenderer
   history: { pushState(target: unknown): void }
   lastLocation?: FoliateRelocation

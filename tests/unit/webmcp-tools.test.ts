@@ -546,6 +546,15 @@ describe('the WebMCP tool surface', () => {
     })
   })
 
+  it('offers Pages or Scroll as a bounded per-book reading flow', async () => {
+    const { tool, commands } = setup()
+    await tool('set_reading_style').execute({ readingFlow: 'scrolled' })
+    expect(commands.setReadingStyle).toHaveBeenCalledWith({
+      patch: { readingFlow: 'scrolled' },
+      origin: 'agent',
+    })
+  })
+
   it('refuses a call that names no presentation field', async () => {
     const { tool, commands } = setup()
     const result = await tool('set_reading_style').execute({})
@@ -570,6 +579,7 @@ describe('the WebMCP tool surface', () => {
       { measureCh: 12 },
       { paragraphSpacingEm: -1 },
       { pageLayout: 'poster' },
+      { readingFlow: 'continuous' },
       { theme: 'bogus' },
       { customCss: 'x'.repeat(20_001), designContextVersion: 'sha256:test' },
     ]) {

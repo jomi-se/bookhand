@@ -61,14 +61,12 @@ flow. Mature reading behavior preserves a content anchor and recomputes layout.
 
 ## Bookhand constraints and conflicts
 
-The fork's continuous strip is multi-iframe; Bookhand's currently proven answer
-to the controlled ChatGPT browser is one persistent frame. Continuous scrolling
-is therefore an evaluation target, not an approved capability. Prototype both
-true continuous multi-section scrolling and a section-stream handoff that may
-retain one section at a time. Any alternative must preserve CSP, selection,
-overlays, repair switching, exact extraction, and controlled-browser WebMCP
-continuity. Bookhand's existing style-before-location restore and
-one-final-pagination repair behavior are minimum compatibility requirements.
+The fork's continuous strip is multi-iframe. ADR 0010 permits that shape only
+for Scroll, with same-origin frame shells and a hard global eight-frame window;
+Pages retains ADR 0005's persistent single frame. Both modes preserve CSP,
+selection, overlays, repair switching, exact extraction, and controlled-browser
+WebMCP continuity. Bookhand's existing style-before-location restore and
+one-final-pagination repair behavior remain minimum compatibility requirements.
 
 ## Provenance and source pointers
 
@@ -93,6 +91,7 @@ layout shifts, and scroll compensation during a long session.
 
 ## Adoption disposition
 
-Adopt MIT pagination hardening and content-anchor restoration. Evaluate
-continuous multi-section scroll only in the explicit compatibility spike;
-defer production adoption until the persistent-frame conflict is resolved.
+Adopt MIT pagination hardening and content-anchor restoration. Adopt bounded
+continuous multi-section scrolling under ADR 0010 after its production contract
+and exact-host merge gate pass. Do not revive the one-frame section-stream
+prototype.

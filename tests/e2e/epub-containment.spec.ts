@@ -54,6 +54,22 @@ test('an imported book cannot script, exfiltrate, or reach the application', asy
     })
   await expect.poll(bookText, { timeout: 15_000 }).toContain('blocked attacks did not erase')
 
+  // Re-run the same content through the production multi-view transport. The
+  // fixture has one linear spine item, so this specifically proves that Scroll
+  // does not create a script/network exception even when no adjacent frame is
+  // available to preload.
+  await page.getByRole('button', { name: 'Text settings' }).click()
+  await page.getByRole('button', { name: 'Scroll', exact: true }).click()
+  await page.getByRole('button', { name: 'Apply' }).click()
+  await page.getByRole('button', { name: 'Close text settings' }).click()
+  await expect.poll(() => page.evaluate(() => {
+    const view = document.querySelector('foliate-view') as unknown as {
+      renderer?: HTMLElement
+    }
+    return view.renderer?.getAttribute('flow')
+  })).toBe('scrolled')
+  await expect.poll(bookText).toContain('blocked attacks did not erase')
+
   // Neither the packaged script nor the inline script reached the application.
   expect(
     await page.evaluate(() => document.documentElement.dataset.bookhandParentMutation),

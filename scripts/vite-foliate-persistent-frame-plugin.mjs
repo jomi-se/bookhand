@@ -2,14 +2,15 @@ import { createHash } from 'node:crypto'
 import { dirname, resolve as resolvePath } from 'node:path'
 
 /**
- * Keep Foliate's paginator on one same-origin iframe.
+ * Keep Foliate's paginator on Bookhand-owned same-origin frame shells.
  *
  * Browser-controlled ChatGPT tabs reject post-load `blob:` subframe
  * navigations. Foliate normally destroys its current iframe and points a new
  * one at a generated section blob on every chapter change. This compatibility
- * patch instead loads a same-origin empty frame once, fetches Foliate's local
- * blob in the parent, parses it with its declared MIME type, and replaces the
- * existing frame document in place.
+ * patch instead loads same-origin empty frames, fetches Foliate's local blobs
+ * in the parent, parses them with their declared MIME types, and replaces the
+ * frame documents in place. Pages retains one frame; continuous scrolling owns
+ * a bounded adjacent-section window.
  *
  * The dependency is pinned. Exact source matches make an upstream change fail
  * the build instead of silently restoring the blocked transport.
@@ -46,9 +47,10 @@ export function foliatePersistentFrame() {
         const persistentOnLoad = `    #onLoad({ doc, index }) {
         // The persistent-frame transport reuses one Document. Retire every
         // handler owned by the previous section before binding the new one.
-        this.#documentEventController?.abort()
-        this.#documentEventController = new AbortController()
-        const { signal } = this.#documentEventController
+        this.#documentEventControllers.get(doc)?.abort()
+        const controller = new AbortController()
+        this.#documentEventControllers.set(doc, controller)
+        const { signal } = controller
 
         // set language and dir if not already set
         doc.documentElement.lang ||= this.language.canonical ?? ''
@@ -70,7 +72,7 @@ export function foliatePersistentFrame() {
         const originalOverlayClickEnd = `        }, false)
 
         let lastHitTestTime = 0`
-        const persistentOverlayClickEnd = `        }, { signal: this.#documentEventController.signal })
+        const persistentOverlayClickEnd = `        }, { signal: this.#documentEventControllers.get(doc)?.signal })
 
         let lastHitTestTime = 0`
         const originalOverlayMouseEnd = `            }
@@ -78,15 +80,23 @@ export function foliatePersistentFrame() {
 
         const list = this.#searchResults.get(index)`
         const persistentOverlayMouseEnd = `            }
-        }, { signal: this.#documentEventController.signal })
+        }, { signal: this.#documentEventControllers.get(doc)?.signal })
 
         const list = this.#searchResults.get(index)`
         const originalCloseStart = `    close() {
         this.renderer?.destroy()`
         const persistentCloseStart = `    close() {
-        this.#documentEventController?.abort()
-        this.#documentEventController = null
+        for (const controller of this.#documentEventControllers.values()) controller.abort()
+        this.#documentEventControllers.clear()
         this.renderer?.destroy()`
+        const originalRendererLoad = `        this.renderer.addEventListener('load', e => this.#onLoad(e.detail))`
+        const persistentRendererLoad = `${originalRendererLoad}
+        this.renderer.addEventListener('bookhand-unload-document', e => {
+            const { doc } = e.detail
+            this.#documentEventControllers.get(doc)?.abort()
+            this.#documentEventControllers.delete(doc)
+            this.#emit('unload', e.detail)
+        })`
         const needles = [
           searchResultsField,
           originalOnLoad,
@@ -94,6 +104,7 @@ export function foliatePersistentFrame() {
           originalOverlayClickEnd,
           originalOverlayMouseEnd,
           originalCloseStart,
+          originalRendererLoad,
         ]
         if (
           candidateViewDigest !== '2ec37eb49afdad6e319554feb088f19cfca3697544da0f0b81096573f617c72b' ||
@@ -105,13 +116,14 @@ export function foliatePersistentFrame() {
           code: code
             .replace(
               searchResultsField,
-              `${searchResultsField}\n    #documentEventController = null`,
+              `${searchResultsField}\n    #documentEventControllers = new Map()`,
             )
             .replace(originalOnLoad, persistentOnLoad)
             .replace(originalLinkEnd, persistentLinkEnd)
             .replace(originalOverlayClickEnd, persistentOverlayClickEnd)
             .replace(originalOverlayMouseEnd, persistentOverlayMouseEnd)
-            .replace(originalCloseStart, persistentCloseStart),
+            .replace(originalCloseStart, persistentCloseStart)
+            .replace(originalRendererLoad, persistentRendererLoad),
           map: null,
         }
       }
@@ -147,9 +159,15 @@ export function foliatePersistentFrame() {
             doc.addEventListener('touchcancel', this.#onTouchCancel.bind(this))
         })`
       const persistentDocumentTouchListeners = `        this.addEventListener('load', ({ detail: { doc } }) => {
-            this.#documentInputController?.abort()
-            this.#documentInputController = new AbortController()
-            const { signal } = this.#documentInputController
+            let controller
+            if (this.hasAttribute('bookhand-continuous-scroll')) {
+                controller = new AbortController()
+                this.#documentInputControllers.set(doc, controller)
+            } else {
+                this.#documentInputController?.abort()
+                controller = this.#documentInputController = new AbortController()
+            }
+            const { signal } = controller
             doc.addEventListener('touchstart', this.#onTouchStart.bind(this), { ...opts, signal })
             doc.addEventListener('touchmove', this.#onTouchMove.bind(this), { ...opts, signal })
             doc.addEventListener('touchend', this.#onTouchEnd.bind(this), { signal })
@@ -187,7 +205,10 @@ export function foliatePersistentFrame() {
             })
         })`
       const persistentDocumentSelectionListeners = `        this.addEventListener('load', ({ detail: { doc } }) => {
-            const { signal } = this.#documentInputController
+            const controller = this.hasAttribute('bookhand-continuous-scroll')
+                ? this.#documentInputControllers.get(doc)
+                : this.#documentInputController
+            const { signal } = controller
             let isPointerSelecting = false
             doc.addEventListener('pointerdown', () => isPointerSelecting = true, { signal })
             doc.addEventListener('pointerup', () => isPointerSelecting = false, { signal })
@@ -272,6 +293,26 @@ ${candidateLoadBody}
         return view
     }`
       const persistentCreateView = `    #createView(index) {
+        if (this.hasAttribute('bookhand-continuous-scroll')) {
+            const existing = this.#views.get(index)
+            if (existing) this.#destroyView(index)
+            const view = new View({
+                container: this,
+                onExpand: () => {
+                    if (this.#filling || this.#stabilizing || this.scrolled) return
+                    if (this.#primaryIndex === index)
+                        this.#scrollToAnchor(this.#anchor)
+                },
+            })
+            this.#views.set(index, view)
+            const sorted = this.#sortedViews
+            const myPos = sorted.findIndex(([i]) => i === index)
+            const nextEntry = sorted[myPos + 1]
+            if (nextEntry) this.#container.insertBefore(view.element, nextEntry[1].element)
+            else this.#container.append(view.element)
+            this.#syncA11y()
+            return view
+        }
         const current = this.#views.entries().next().value
         if (current) {
             const [currentIndex, view] = current
@@ -352,7 +393,131 @@ ${candidateLoadBody}
       const persistentDestroyDocumentInput = `        this.#observer.unobserve(this)
         this.#documentInputController?.abort()
         this.#documentInputController = null
+        for (const controller of this.#documentInputControllers.values()) controller.abort()
+        this.#documentInputControllers.clear()
         this.#destroyAllViews()`
+
+      const originalDestroyView = `    #destroyView(index) {
+        const view = this.#views.get(index)
+        if (!view) return
+        view.destroy()
+        this.#container.removeChild(view.element)
+        this.#views.delete(index)
+        this.sections[index]?.unload?.()
+    }`
+      const originalScrollListener = `        this.#container.addEventListener('scroll', () => {
+            if (!this.#isAnimating) this.dispatchEvent(new Event('scroll'))`
+      const boundedScrollListener = `        this.#container.addEventListener('scroll', () => {
+            if (this.scrolled && !this.#filling && !this.#stabilizing) {
+                const position = this.#renderedStart
+                const delta = position - this.#lastWindowPosition
+                if (Math.abs(delta) > 0.5) this.#windowDirection = delta > 0 ? 1 : -1
+                this.#lastWindowPosition = position
+            }
+            if (!this.#isAnimating) this.dispatchEvent(new Event('scroll'))`
+      const originalForwardPreload = `            if (!this.noPreload && !this.noContinuousScroll && !this.#filling
+                && !this.#stabilizing && !this.#touchScrolled) {`
+      const boundedForwardPreload = `            if (!this.noPreload && !this.noContinuousScroll && !this.#filling
+                && !this.#stabilizing && !this.#touchScrolled && this.#windowDirection >= 0) {`
+      const originalBackwardPreload = `            if (this.scrolled && !this.noPreload && !this.noContinuousScroll
+                && !this.#filling && !this.#stabilizing) {`
+      const boundedBackwardPreload = `            if (this.scrolled && !this.noPreload && !this.noContinuousScroll
+                && !this.#filling && !this.#stabilizing && this.#windowDirection <= 0) {`
+      const originalPreloadNext = `    async #preloadNext() {
+        if (this.noPreload || this.noContinuousScroll) return`
+      const boundedPreloadNext = `    async #preloadNext() {
+        if (this.noPreload || this.noContinuousScroll || this.#windowDirection < 0) return`
+      const originalAdjacentCreate = `            const data = await section.loadContent?.()
+            const view = this.#createView(index)`
+      const boundedAdjacentCreate = `            const data = await section.loadContent?.()
+            if (!this.#makeRoomFor(index)) return
+            const view = this.#createView(index)`
+      const windowOwner = `    #makeRoomFor(index) {
+        if (!this.hasAttribute('bookhand-continuous-scroll')) return true
+        const maxViews = 8
+        while (this.#views.size >= maxViews && !this.#views.has(index)) {
+            const sorted = this.#sortedViews
+            const firstIndex = sorted[0]?.[0]
+            const lastIndex = sorted[sorted.length - 1]?.[0]
+            const forward = lastIndex == null || index > lastIndex
+            const candidates = forward ? sorted : [...sorted].reverse()
+            const center = this.#renderedStart + this.size / 2
+            const entry = candidates.find(([candidateIndex, view]) => {
+                if (candidateIndex === this.#primaryIndex) return false
+                const offset = this.#getViewOffset(candidateIndex)
+                const viewSize = view.element.getBoundingClientRect()[this.sideProp]
+                return center < offset || center >= offset + viewSize
+            })
+            if (!entry) return false
+            const [candidateIndex, view] = entry
+            const offset = this.#getViewOffset(candidateIndex)
+            const removedSize = view.element.getBoundingClientRect()[this.sideProp]
+            const startBefore = this.#renderedStart
+            const beforeViewport = offset + removedSize <= startBefore + 0.5
+            this.#destroyView(candidateIndex)
+            if (beforeViewport) {
+                const targetStart = Math.max(0, startBefore - removedSize)
+                const correction = targetStart - this.#renderedStart
+                if (Math.abs(correction) > 0.5)
+                    this.containerPosition += (this.#vertical ? -1 : 1) * correction
+                this.#lastWindowPosition = this.#renderedStart
+            }
+        }
+        return true
+    }
+`
+      const originalDetectPrimary = `    #detectPrimaryView() {
+        if (this.#views.size <= 1) return
+        const visibleStart = this.#renderedStart
+        let offset = 0
+        for (const [index, view] of this.#sortedViews) {
+            const viewSize = view.element.getBoundingClientRect()[this.sideProp]
+            if (visibleStart < offset + viewSize - 1) {
+                if (index !== this.#primaryIndex) {
+                    this.#primaryIndex = index
+                    this.#syncA11y()
+                    this.#trimDistantViews()
+                    this.#replaceBackground()
+                    this.#fillPromise = this.#preloadNext()
+                }
+                return
+            }
+            offset += viewSize
+        }
+    }`
+      const centeredDetectPrimary = `    #detectPrimaryView() {
+        if (this.#views.size <= 1) return
+        const visibleCenter = this.#renderedStart + this.size / 2
+        let offset = 0
+        for (const [index, view] of this.#sortedViews) {
+            const viewSize = view.element.getBoundingClientRect()[this.sideProp]
+            if (visibleCenter < offset + viewSize) {
+                if (index !== this.#primaryIndex) {
+                    this.#primaryIndex = index
+                    this.#syncA11y()
+                    this.#trimDistantViews()
+                    this.#replaceBackground()
+                    this.#fillPromise = this.#preloadNext()
+                }
+                return
+            }
+            offset += viewSize
+        }
+    }`
+      const boundedDestroyView = `    #destroyView(index) {
+        const view = this.#views.get(index)
+        if (!view) return
+        const doc = view.document
+        this.#documentInputControllers.get(doc)?.abort()
+        this.#documentInputControllers.delete(doc)
+        this.dispatchEvent(new CustomEvent('bookhand-unload-document', {
+            detail: { doc, index },
+        }))
+        view.destroy()
+        this.#container.removeChild(view.element)
+        this.#views.delete(index)
+        this.sections[index]?.unload?.()
+    }`
 
       const originalRender = `    render(layout) {
         if (!layout || !this.document?.documentElement) return
@@ -439,6 +604,13 @@ ${candidateLoadBody}
         originalDocumentTouchListeners,
         originalDocumentSelectionListeners,
         originalDestroyDocumentInput,
+        originalDestroyView,
+        originalScrollListener,
+        originalForwardPreload,
+        originalBackwardPreload,
+        originalPreloadNext,
+        originalAdjacentCreate,
+        originalDetectPrimary,
       ]
       if (needles.some((needle) => !code.includes(needle))) {
         throw new Error('Pinned Foliate paginator changed; persistent-frame patch was not applied')
@@ -462,9 +634,16 @@ ${candidateLoadBody}
           .replace(originalDocumentTouchListeners, persistentDocumentTouchListeners)
           .replace(originalDocumentSelectionListeners, persistentDocumentSelectionListeners)
           .replace(originalDestroyDocumentInput, persistentDestroyDocumentInput)
+          .replace(originalDestroyView, `${windowOwner}${boundedDestroyView}`)
+          .replace(originalScrollListener, boundedScrollListener)
+          .replace(originalForwardPreload, boundedForwardPreload)
+          .replace(originalBackwardPreload, boundedBackwardPreload)
+          .replace(originalPreloadNext, boundedPreloadNext)
+          .replace(originalAdjacentCreate, boundedAdjacentCreate)
+          .replace(originalDetectPrimary, centeredDetectPrimary)
           .replace(
             "    #primaryIndex = -1\n",
-            "    #primaryIndex = -1\n    #documentInputController = null\n",
+            "    #primaryIndex = -1\n    #documentInputController = null\n    #documentInputControllers = new Map()\n    #windowDirection = 0\n    #lastWindowPosition = 0\n",
           ),
         map: null,
       }

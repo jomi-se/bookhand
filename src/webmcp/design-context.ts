@@ -35,6 +35,7 @@ export interface PresentationSummary {
   readonly measureCh: number
   readonly paragraphSpacingEm: number
   readonly pageLayout: NonNullable<ReaderStyle['pageLayout']>
+  readonly readingFlow: NonNullable<ReaderStyle['readingFlow']>
   /** Whether custom book CSS is in force. The CSS itself is never returned. */
   readonly hasCustomCss: boolean
 }
@@ -171,7 +172,7 @@ function describePresentation(state: DesignContextState): readonly string[] {
   }
   const p = state.presentation
   return [
-    `Reading presentation: ${p.theme} theme, ${p.fontSizePercent}% text, line height ${p.lineHeight}, measure ${p.measureCh}ch, paragraph spacing ${p.paragraphSpacingEm}em, ${p.pageLayout} page layout, custom book CSS ${
+    `Reading presentation: ${p.theme} theme, ${p.fontSizePercent}% text, line height ${p.lineHeight}, measure ${p.measureCh}ch, paragraph spacing ${p.paragraphSpacingEm}em, ${p.readingFlow === 'scrolled' ? 'Scroll' : 'Pages'} reading flow, ${p.pageLayout} page layout, custom book CSS ${
       p.hasCustomCss ? 'in force (its text is never returned here)' : 'not in use'
     }.`,
     `Study board: ${state.boardView ?? 'unavailable — the board has not been read yet'}.`,
@@ -286,6 +287,7 @@ export function summarizePresentation(style: ReaderStyle): PresentationSummary {
     measureCh: style.measureCh,
     paragraphSpacingEm: style.paragraphSpacingEm,
     pageLayout: style.pageLayout ?? 'auto',
+    readingFlow: style.readingFlow ?? 'paginated',
     hasCustomCss: typeof style.customCss === 'string' && style.customCss.trim().length > 0,
   }
 }
