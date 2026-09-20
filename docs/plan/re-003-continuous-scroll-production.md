@@ -1,6 +1,7 @@
 # RE-003 production continuous scrolling
 
-Status: accepted for implementation on `feat/continuous-scroll`.
+Status: completed on 2026-09-20; exact implementation candidate accepted for
+local adoption.
 
 ## Mission
 
@@ -74,3 +75,19 @@ keeps tightly coupled architectural judgement out of delegated workers.
 Do not merge until focused red-green coverage, full repository verification,
 source/diff scrutiny, and genuine Windows exact-asset validation are green.
 Merge locally to `main` only; do not push.
+
+## Accepted evidence
+
+Implementation commit `844a581` passed the full repository verification and
+the focused RE-003, hostile-EPUB, RE-001 compatibility, and Pixel reader suites.
+The genuine Windows in-app browser loaded JavaScript asset
+`index-BDRWv4f6.js` and CSS asset `index-D7-rRr33.css` from that exact commit.
+
+Native wheel traversal crossed many spine boundaries in both directions. The
+mounted window rose to eight frames, remained at eight under paced and
+aggressive input, and moved back to the book's opening sections without a blank
+gap, visible jump, oscillation, dead end, focus loss, or scroll trap. Genuine
+WebMCP reading context and passage resolution matched exactly, annotation
+saving succeeded, original/rewritten view commands remained functional, and
+returning to Pages restored one retained frame with working native navigation.
+The Windows console had no warnings or errors.

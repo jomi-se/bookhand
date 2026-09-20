@@ -2,7 +2,7 @@
 
 Documentation triage updated: 2026-09-19.
 
-## In progress: RE-003 production continuous scrolling
+## Completed: RE-003 production continuous scrolling
 
 Bookhand now has a production candidate for a per-book **Pages / Scroll**
 choice. Pages remains the polished default and keeps the persistent single
@@ -27,13 +27,22 @@ malicious EPUB stays contained in Scroll; the RE-001 compatibility suite and
 Pixel reader suite still pass. Full repository verification is green on an
 isolated browser port: lint, typecheck, 578 unit tests, production build,
 bundle, SDK packaging, CSP, the complete built-browser suite, and setup checks
-all pass. Genuine Windows in-app-browser validation of the exact candidate is
-the remaining merge gate. Local `main` must not move until it is green.
+all pass.
+
+Genuine Windows in-app-browser validation passed on exact implementation
+commit `844a581`, JavaScript asset `index-BDRWv4f6.js`, and CSS asset
+`index-D7-rRr33.css`. Native wheel input traversed the book in both directions;
+the window grew to eight frames and stayed bounded while its section range
+moved forward and back, with no blank gap, visible jump, oscillation, dead end,
+focus loss, or scroll trap. Genuine WebMCP context and passage calls agreed on
+the visible text and range, annotation saving succeeded, view switching
+remained functional, and returning to Pages restored exactly one retained frame
+with working native navigation. The Windows console had no warnings or errors.
 
 [ADR 0010](../decisions/0010-bounded-multi-view-continuous-scroll.md) records
 the accepted architecture and
 [the RE-003 production mission](re-003-continuous-scroll-production.md) owns
-the remaining evidence.
+the completed evidence.
 
 ## Decision checkpoint: post-adoption reading quality and Book Health
 
@@ -61,11 +70,11 @@ visible personal copy does not change before acceptance, versions increase
 monotonically, and recovery is linear. Exact proposal-finalization tools, live
 draft viewing, and visual design remain evidence-gated.
 
-No reader capability was implemented by this design pass. The recommended next
-selection slate is RE-003 continuous-versus-section-stream scrolling, RE-011
-content-anchor stability, and RE-010 lifecycle/stale-work cancellation. RE-002
-is now ongoing mission-bounded baseline evidence rather than a standalone
-corpus project.
+The design pass itself implemented no reader capability. RE-003 has since
+shipped the selected continuous-scrolling direction. The remaining eligible
+reader work includes RE-011 content-anchor stability and RE-010 lifecycle and
+stale-work cancellation. RE-002 is ongoing mission-bounded baseline evidence
+rather than a standalone corpus project.
 
 ## Completed: RE-001 owner-fork adoption
 

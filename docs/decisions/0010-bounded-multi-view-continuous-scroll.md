@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted on 2026-09-20 for reflowable EPUBs, subject to exact-asset Windows
-validation before the implementation merges.
+Accepted on 2026-09-20 for reflowable EPUBs. Exact-asset Windows validation
+passed before the implementation merged.
 
 ## Context
 
@@ -56,5 +56,5 @@ book falls back to its renderer's ordinary layout rather than forcing reflow.
 - Updating the Foliate pin must re-derive the exact-source transform and prove
   the global frame cap, bidirectional anchoring, listener cleanup, containment,
   Pages compatibility, and genuine Windows Site Tool continuity.
-- Continuous scrolling is production behavior only after the exact served
-  candidate passes the merge gate in the RE-003 production plan.
+- The exact served implementation candidate passed the RE-003 production merge
+  gate in the genuine Windows in-app browser before local adoption.
