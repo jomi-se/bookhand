@@ -18,7 +18,7 @@ import { createDesignContextTool } from './webmcp/design-context-tool.ts'
 import { createLibraryTools } from './webmcp/library-tools.ts'
 import { createBookhandTools } from './webmcp/tools.ts'
 import { useWebMcpTools, type ToolCallReporter } from './webmcp/useWebMcpTools.ts'
-import { AiConnectionStore } from './ai/connection.ts'
+import { AiConnectionController } from './ai/connection-controller.ts'
 import {
   inspectPendingAiReturn,
   type PendingAiReturnStatus,
@@ -38,7 +38,7 @@ const DESIGN_BEARING_TOOLS = new Set([
 
 function App() {
   const runtime = useMemo(() => createAppRuntime(), [])
-  const aiConnection = useMemo(() => new AiConnectionStore(), [])
+  const aiConnection = useMemo(() => new AiConnectionController(), [])
   const library = useLibrary({ client: runtime.client, ports: runtime.ports })
   const [reading, setReading] = useState<BookCatalogEntry>()
   const [readerCommands, setReaderCommands] = useState<BookhandCommands>()

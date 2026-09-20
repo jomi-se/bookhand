@@ -5,6 +5,9 @@
 .tutor-connect h3, .tutor-connect p, .tutor-message h3, .tutor-message p { margin: 0; }
 .tutor-connect h3 { font-size: 1.125rem; font-weight: 600; }
 .tutor-hint { color: var(--muted); font-size: .8125rem; line-height: 1.5; }
+.tutor-direct-notice { display: grid; gap: 6px; padding: 10px; border-radius: 8px; background: var(--accent-quiet); font-size: .8125rem; line-height: 1.5; }
+.tutor-direct-notice p { color: var(--ink); }
+.tutor-direct-notice a { display: inline-flex; align-items: center; inline-size: fit-content; min-block-size: 44px; color: var(--accent); font-weight: 600; text-underline-offset: 3px; }
 .tutor-actions, .tutor-connection-line { display: flex; align-items: center; gap: 10px; }
 .tutor-connection-line { justify-content: space-between; flex-wrap: wrap; font-size: .8125rem; color: var(--muted); }
 .tutor-connection-line span { min-inline-size: 0; overflow-wrap: anywhere; }

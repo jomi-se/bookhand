@@ -12,8 +12,8 @@ vi.mock('../../src/ai/pending-intent.ts', () => ({
   inspectPendingAiReturn: () => testState.pending,
 }))
 
-vi.mock('../../src/ai/connection.ts', () => ({
-  AiConnectionStore: class {
+vi.mock('../../src/ai/connection-controller.ts', () => ({
+  AiConnectionController: class {
     dismissPendingAuthorization = testState.dismissPending
   },
 }))

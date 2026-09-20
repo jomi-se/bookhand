@@ -2,10 +2,13 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type {
-  AiConnectionSnapshot,
-  AiConnectionStore,
   AuthorizeAiConnectionOptions,
 } from '../../src/ai/connection.ts'
+import type {
+  AiConnectionController,
+  BookhandAiConnectionSnapshot,
+  ConnectDirectOptions,
+} from '../../src/ai/connection-controller.ts'
 import type { AiFeatureIntent } from '../../src/ai/pending-intent.ts'
 import type {
   ConversationDescriptor,
@@ -32,26 +35,38 @@ const tools = [withOutputSchema({
 })]
 
 class FakeConnection {
-  snapshot: AiConnectionSnapshot
+  snapshot: BookhandAiConnectionSnapshot
   historyDescriptors: readonly ConversationDescriptor[] = []
   historyResponse: ExecutionHistory | undefined
   readonly listeners = new Set<() => void>()
   readonly authorize = vi.fn(async (_options: AuthorizeAiConnectionOptions) => undefined)
+  readonly connectDirect = vi.fn(async (_options: ConnectDirectOptions) => undefined)
   readonly finishAuthorization = vi.fn(async (): Promise<AiFeatureIntent | undefined> => undefined)
   readonly disconnect = vi.fn(async () => {
     this.setSnapshot({
+      ...this.snapshot,
       phase: 'disconnected',
-      providerUrl: this.snapshot.providerUrl,
-      experience: this.snapshot.experience,
+      generation: undefined,
+      historyAvailable: false,
     })
   })
 
-  constructor(snapshot: AiConnectionSnapshot = {
-    phase: 'disconnected',
-    providerUrl: '',
-    experience: 'tailscale',
-  }) {
-    this.snapshot = snapshot
+  constructor(snapshot: Partial<BookhandAiConnectionSnapshot> = {}) {
+    const next: BookhandAiConnectionSnapshot = {
+      method: 'agent-connect',
+      phase: 'disconnected',
+      providerUrl: '',
+      experience: 'tailscale',
+      directEndpoint: '',
+      directModel: '',
+      historyAvailable: false,
+      ...snapshot,
+    }
+    this.snapshot = {
+      ...next,
+      historyAvailable: snapshot.historyAvailable
+        ?? (next.method === 'agent-connect' && next.phase === 'connected'),
+    }
   }
 
   readonly getSnapshot = () => this.snapshot
@@ -61,15 +76,37 @@ class FakeConnection {
   }
 
   setProviderUrl = (providerUrl: string) => this.setSnapshot({
+    ...this.snapshot,
     phase: 'disconnected',
     providerUrl,
-    experience: this.snapshot.experience,
+    generation: undefined,
+    historyAvailable: false,
   })
 
   setExperience = (experience: 'tailscale' | 'https') => this.setSnapshot({
-    phase: 'disconnected',
-    providerUrl: this.snapshot.providerUrl,
+    ...this.snapshot,
     experience,
+  })
+
+  setMethod = (method: 'agent-connect' | 'direct') => this.setSnapshot({
+    ...this.snapshot,
+    method,
+    phase: 'disconnected',
+    generation: undefined,
+    error: undefined,
+    historyAvailable: false,
+  })
+
+  setDirectEndpoint = (directEndpoint: string) => this.setSnapshot({
+    ...this.snapshot,
+    phase: 'disconnected',
+    directEndpoint,
+  })
+
+  setDirectModel = (directModel: string) => this.setSnapshot({
+    ...this.snapshot,
+    phase: 'disconnected',
+    directModel,
   })
 
   getExecution = () => ({ generation: this.snapshot.generation ?? 'generation-1', model: {} as never })
@@ -86,14 +123,19 @@ class FakeConnection {
   }))
   dismissPendingAuthorization = vi.fn()
 
-  setSnapshot(snapshot: AiConnectionSnapshot) {
-    this.snapshot = snapshot
+  setSnapshot(snapshot: Partial<BookhandAiConnectionSnapshot>) {
+    const next = { ...this.snapshot, ...snapshot }
+    this.snapshot = {
+      ...next,
+      historyAvailable: snapshot.historyAvailable
+        ?? (next.method === 'agent-connect' && next.phase === 'connected'),
+    }
     for (const listener of this.listeners) listener()
   }
 }
 
-function asStore(connection: FakeConnection): AiConnectionStore {
-  return connection as unknown as AiConnectionStore
+function asStore(connection: FakeConnection): AiConnectionController {
+  return connection as unknown as AiConnectionController
 }
 
 function props(connection = new FakeConnection()) {
@@ -161,6 +203,36 @@ function deferred<T>() {
 }
 
 describe('Tutor panel lifetime and connection UI', () => {
+  it('offers Agent Connect first and a provider-neutral direct Open Responses fallback', async () => {
+    const connection = new FakeConnection()
+    render(<TutorPanel {...props(connection)} />)
+
+    expect(await screen.findByLabelText('Connection method')).toHaveValue('agent-connect')
+    expect(screen.getByText(/Use an existing AI subscription when your provider supports it/)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Connection method'), { target: { value: 'direct' } })
+    expect(screen.getByLabelText('Open Responses endpoint')).toBeInTheDocument()
+    expect(screen.getByLabelText('Model')).toBeInTheDocument()
+    expect(screen.getByLabelText('Bearer token')).toHaveAttribute('type', 'password')
+    expect(screen.getByText(/provider’s API rates and limits apply/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Ask about your book')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Learn about Agent Connect' }))
+      .toHaveAttribute('href', 'https://github.com/jomi-se/agent-connect')
+
+    fireEvent.change(screen.getByLabelText('Open Responses endpoint'), {
+      target: { value: 'https://inference.example/v1/responses' },
+    })
+    fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'reader-model' } })
+    fireEvent.change(screen.getByLabelText('Bearer token'), { target: { value: 'secret-key' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Use direct API' }))
+
+    await waitFor(() => expect(connection.connectDirect).toHaveBeenCalledWith({
+      tools: expect.arrayContaining([expect.objectContaining({ name: 'read' })]),
+      bearerToken: 'secret-key',
+    }))
+    expect(screen.getByLabelText('Bearer token')).toHaveValue('')
+  })
+
   it('stays mounted while book tools are preparing', () => {
     const connection = new FakeConnection()
     render(<TutorPanel {...props(connection)} tools={undefined} />)
@@ -169,7 +241,12 @@ describe('Tutor panel lifetime and connection UI', () => {
   })
 
   it('preserves the draft across same-book tool refresh and panel close/reopen', async () => {
-    const connection = new FakeConnection()
+    const connection = new FakeConnection({
+      phase: 'connected',
+      providerUrl: 'https://openclaw.example',
+      experience: 'tailscale',
+      generation: 'generation-1',
+    })
     const initial = props(connection)
     const { container, rerender } = render(<TutorPanel {...initial} />)
     const question = await screen.findByLabelText('Ask about your book')
@@ -180,7 +257,7 @@ describe('Tutor panel lifetime and connection UI', () => {
 
     rerender(<TutorPanel {...initial} tools={tools.map((tool) => ({ ...tool }))} />)
     expect(screen.getByLabelText('Ask about your book')).toHaveValue('Keep this question')
-    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
   })
 
   it('starts a fresh book conversation while preserving the shared connection', async () => {
@@ -203,33 +280,50 @@ describe('Tutor panel lifetime and connection UI', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
     await waitFor(() => expect(connection.disconnect).toHaveBeenCalledTimes(1))
-    expect(await screen.findByRole('button', { name: 'Connect your AI' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Connect with Agent Connect' })).toBeInTheDocument()
     expect(screen.getByText(/Your provider owns Tutor history/)).toBeInTheDocument()
   })
 
-  it('validates the address and authorizes with the captured draft and full tools', async () => {
+  it('does not ask a direct Open Responses provider for non-standard history', async () => {
+    installAvailableConversationLocks()
+    saveRestoredAssociation()
+    const connection = new FakeConnection({
+      method: 'direct',
+      phase: 'connected',
+      directEndpoint: 'https://inference.example/v1/responses',
+      directModel: 'reader-model',
+      generation: 'direct-generation',
+      historyAvailable: false,
+    })
+    render(<TutorPanel {...props(connection)} />)
+
+    expect(await screen.findByText('Direct API ready in this tab')).toBeInTheDocument()
+    await act(async () => undefined)
+    expect(connection.getHistoryAccess).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Restoring last conversation/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Disconnect removes the bearer token/)).toBeInTheDocument()
+  })
+
+  it('validates the address and authorizes with the full book tool set', async () => {
     const connection = new FakeConnection()
     const beforeRedirect = vi.fn(async () => undefined)
     render(<TutorPanel {...props(connection)} beforeRedirect={beforeRedirect} />)
     const address = await screen.findByLabelText('AI address')
 
     fireEvent.change(address, { target: { value: 'http://not-secure.example' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect your AI' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Connect with Agent Connect' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('complete HTTPS address')
     expect(connection.authorize).not.toHaveBeenCalled()
 
     fireEvent.change(address, { target: { value: 'https://openclaw.example' } })
-    fireEvent.change(screen.getByLabelText('Ask about your book'), {
-      target: { value: 'Explain this chapter' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect your AI' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Connect with Agent Connect' }))
     await waitFor(() => expect(connection.authorize).toHaveBeenCalledTimes(1))
     expect(connection.authorize).toHaveBeenCalledWith(expect.objectContaining({
       tools: expect.arrayContaining([expect.objectContaining({ name: 'read' })]),
       intent: expect.objectContaining({
         feature: 'tutor',
         bookId: 'book-1',
-        draft: 'Explain this chapter',
+        draft: '',
       }),
       beforeRedirect: expect.any(Function),
     }))
@@ -256,7 +350,15 @@ describe('Tutor panel lifetime and connection UI', () => {
         },
       },
     }
-    connection.finishAuthorization.mockResolvedValue(pending)
+    connection.finishAuthorization.mockImplementation(async () => {
+      connection.setSnapshot({
+        phase: 'connected',
+        providerUrl: 'https://openclaw.example',
+        generation: 'generation-1',
+        historyAvailable: true,
+      })
+      return pending
+    })
     const finished = vi.fn()
     const initial = props(connection)
     const { rerender } = render(
@@ -271,7 +373,7 @@ describe('Tutor panel lifetime and connection UI', () => {
     rerender(<TutorPanel {...initial} pendingIntent={pending} onAuthorizationFinished={finished} />)
     await act(async () => undefined)
     expect(connection.finishAuthorization).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
   })
 
   it('renders the store error instead of claiming a connection succeeded', async () => {

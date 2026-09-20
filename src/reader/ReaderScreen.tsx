@@ -40,7 +40,7 @@ import { paintedReaderTheme, shellPalette } from './theme.ts'
 import { TutorPanel } from '../tutor/TutorPanel.tsx'
 import type { TutorAttachment } from '../tutor/conversation.ts'
 import type { ToolDefinition } from '../webmcp/model-context.ts'
-import type { AiConnectionStore } from '../ai/connection.ts'
+import type { AiConnectionController } from '../ai/connection-controller.ts'
 import type { AiFeatureIntent } from '../ai/pending-intent.ts'
 
 export type { ReaderPanel }
@@ -70,7 +70,7 @@ export interface ReaderScreenProps {
   readonly surface: SurfaceStore
   readonly guidance: GuidanceController
   readonly tutorTools?: readonly ToolDefinition[]
-  readonly aiConnection: AiConnectionStore
+  readonly aiConnection: AiConnectionController
   readonly pendingAiIntent?: AiFeatureIntent
   readonly onAiAuthorizationFinished: () => void
 }

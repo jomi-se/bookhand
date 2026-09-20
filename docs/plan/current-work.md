@@ -1,6 +1,38 @@
 # Current work
 
-Documentation triage updated: 2026-09-19.
+Documentation triage updated: 2026-09-20.
+
+## Completed: provider-neutral direct Open Responses connection
+
+The Tutor now offers an advanced direct connection alongside the recommended
+Agent Connect flow. A person can supply an exact HTTPS Open
+Responses endpoint, model ID, and bearer token. Endpoint and model are ordinary
+local preferences; the token is page-memory only and disappears on disconnect
+or reload. Direct mode uses the same fixed Bookhand tool snapshot and native
+Open Responses continuation path, but deliberately has no OAuth, refresh,
+provider discovery, or provider-history restoration.
+
+Deterministic coverage proves that the bearer token never enters Bookhand
+persistence or observable state, a changed tool declaration invalidates
+execution, disconnect retires the token getter, unsafe endpoints fail closed,
+and direct mode never guesses at a non-standard provider-history API. The
+production browser flow proves that endpoint and model survive reload while the
+token does not, at both desktop and phone widths. A finishing review accepted
+the setup hierarchy, ordinary-language compatibility guidance, inline errors,
+and coarse-pointer link target.
+
+Full verification is green: lint, typecheck, 584 unit tests, production build,
+bundle, published-SDK packaging, CSP, setup verification, and the complete
+built-browser suite (57 passed and 3 intentionally skipped). One unrelated
+keyboard-paging assertion first stopped at an exact floating-point boundary in
+the parallel browser run; its focused rerun and the complete browser rerun both
+passed. No real provider key appears in fixtures, screenshots, logs, or
+repository files. Live compatibility with any particular provider remains a
+user-supplied endpoint, key, model, CORS, and protocol concern; the first real
+Tutor request is intentionally the end-to-end compatibility check.
+
+[ADR 0011](../decisions/0011-optional-direct-open-responses.md) records the
+security, protocol, persistence, and product-language boundaries.
 
 ## Completed: RE-003 production continuous scrolling
 
