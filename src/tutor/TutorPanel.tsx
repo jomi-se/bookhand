@@ -363,7 +363,7 @@ function TutorPanelContent({
                 >
                   {!readerReady ? 'Waiting for the book…' : busy ? 'Connecting…' : 'Use direct API'}
                 </button>
-                <p className="tutor-hint">Direct connections start fresh after a reload. The first Tutor request checks whether this provider works with Bookhand. If it fails, check the endpoint, token, model, and whether the provider allows browser connections.</p>
+                <p className="tutor-hint">Direct connections resend this tab’s Tutor conversation with each request, so API usage grows as the conversation gets longer. Reloading or choosing New conversation starts fresh. The first Tutor request checks whether this provider works with Bookhand. If it fails, check the endpoint, token, model, and whether the provider allows browser connections.</p>
               </>
             )}
             {problem ? <p className="tutor-error" role="alert">{problem}</p> : null}

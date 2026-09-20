@@ -17,6 +17,7 @@ import type { ToolDefinition } from '../webmcp/model-context.ts'
 export const DIRECT_CONNECTION_PREFERENCES_KEY = 'bookhand.ai.direct.preferences.v1'
 
 export type AiConnectionMethod = 'agent-connect' | 'direct'
+export type AiContinuationMode = 'native' | 'replay'
 
 export interface BookhandAiConnectionSnapshot {
   readonly method: AiConnectionMethod
@@ -240,8 +241,14 @@ export class AiConnectionController {
     this.#publish()
   }
 
-  getExecution(tools: readonly ToolDefinition[]): { generation: string; model: LanguageModel } {
-    if (this.#method === 'agent-connect') return this.#agentConnect.getExecution(tools)
+  getExecution(tools: readonly ToolDefinition[]): {
+    generation: string
+    model: LanguageModel
+    continuation: AiContinuationMode
+  } {
+    if (this.#method === 'agent-connect') {
+      return { ...this.#agentConnect.getExecution(tools), continuation: 'native' }
+    }
     const current = this.#directConnection
     if (!current || this.#directPhase !== 'connected') {
       throw new Error('Connect your AI before starting this request')
@@ -249,7 +256,7 @@ export class AiConnectionController {
     if (!sameToolDeclarations(current.approvedTools, tools)) {
       throw new Error('Bookhand tools changed after connecting; connect the direct API again')
     }
-    return { generation: current.generation, model: current.model }
+    return { generation: current.generation, model: current.model, continuation: 'replay' }
   }
 
   getHistoryAccess(tools: readonly ToolDefinition[]): TutorHistoryAccess {

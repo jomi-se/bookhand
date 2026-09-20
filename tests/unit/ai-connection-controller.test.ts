@@ -101,7 +101,10 @@ describe('AI connection coordinator', () => {
       historyAvailable: true,
       generation: 'agent-connect-generation',
     })
-    expect(controller.getExecution(tools)).toMatchObject({ generation: 'agent-connect-generation' })
+    expect(controller.getExecution(tools)).toMatchObject({
+      generation: 'agent-connect-generation',
+      continuation: 'native',
+    })
     expect(controller.getHistoryAccess(tools)).toMatchObject({ scopeId: 'agent-connect-scope' })
     expect(agentConnect.getExecution).toHaveBeenCalledWith(tools)
     expect(agentConnect.getHistoryAccess).toHaveBeenCalledWith(tools)
@@ -142,6 +145,7 @@ describe('AI connection coordinator', () => {
     expect(controller.getExecution(tools)).toEqual({
       generation: 'direct-generation',
       model,
+      continuation: 'replay',
     })
     await expect(modelOptions[0]!.getAccessToken()).resolves.toBe('secret-direct-token')
 

@@ -3,7 +3,14 @@ import {
   createAiSdkOpenResponsesGenerationOptions,
   selectAiSdkOpenResponsesCheckpoint,
 } from '@open-agent-connect/web'
-import { stepCountIs, streamText, type LanguageModel, type TextStreamPart, type ToolSet } from 'ai'
+import {
+  stepCountIs,
+  streamText,
+  type LanguageModel,
+  type ModelMessage,
+  type TextStreamPart,
+  type ToolSet,
+} from 'ai'
 import type { ReaderSelection } from '../domain/reader.ts'
 import {
   ConversationHistoryUnavailableError,
@@ -66,6 +73,7 @@ interface AiConnectionSnapshot {
 interface AiConnectionExecution {
   readonly generation: string
   readonly model: LanguageModel
+  readonly continuation?: 'native' | 'replay'
 }
 
 /** Structural subset of AiConnectionStore used by a book-scoped conversation. */
@@ -94,8 +102,9 @@ interface ActiveTurn {
 
 /**
  * One book owns one explicit provider conversation. The visible transcript is
- * presentation state only: continuation is always the provider checkpoint and
- * every top-level request contains only the newly submitted learner input.
+ * presentation state only. Agent Connect continues from its provider-owned
+ * checkpoint; direct providers receive the completed in-memory message history
+ * because portable Open Responses endpoints need not retain response state.
  */
 export class TutorConversation {
   readonly #bookId: string
@@ -110,6 +119,7 @@ export class TutorConversation {
   #turnSequence = 0
   #messageSequence = 0
   #checkpoint: string | undefined
+  #replayMessages: readonly ModelMessage[] = Object.freeze([])
   #conversationGeneration: string | undefined
   #disposed = false
   #failureCause: unknown
@@ -196,7 +206,10 @@ export class TutorConversation {
 
     let execution: AiConnectionExecution
     let tools: ToolSet
-    let generationOptions: ReturnType<typeof createAiSdkOpenResponsesGenerationOptions>
+    let continuation: 'native' | 'replay'
+    let generationOptions:
+      | ReturnType<typeof createAiSdkOpenResponsesGenerationOptions>
+      | { readonly maxRetries: 0 }
     try {
       execution = this.#connection.getExecution(this.#toolDefinitions)
       const currentConnection = this.#connection.getSnapshot()
@@ -219,7 +232,10 @@ export class TutorConversation {
       tools = createAiSdkApplicationTools(this.#lentTools, {
         connectionId: execution.generation,
       })
-      generationOptions = createAiSdkOpenResponsesGenerationOptions(this.#checkpoint)
+      continuation = execution.continuation ?? 'native'
+      generationOptions = continuation === 'native'
+        ? createAiSdkOpenResponsesGenerationOptions(this.#checkpoint)
+        : Object.freeze({ maxRetries: 0 as const })
 
       if (this.#lastConversation.storageAvailable) {
         // Once any request can be admitted, no older saved head for this book
@@ -261,7 +277,14 @@ export class TutorConversation {
         model: execution.model,
         tools,
         instructions: TUTOR_INSTRUCTIONS,
-        prompt: outboundPrompt,
+        ...(continuation === 'replay'
+          ? {
+              messages: [
+                ...this.#replayMessages,
+                { role: 'user' as const, content: outboundPrompt },
+              ],
+            }
+          : { prompt: outboundPrompt }),
         abortSignal: controller.signal,
         stopWhen: stepCountIs(MAX_TUTOR_STEPS),
         // AI SDK's default handler logs the raw provider error object, which can
@@ -304,7 +327,8 @@ export class TutorConversation {
       if (!this.#owns(activeTurn)) return
       if (streamFailure !== undefined) throw streamFailure
 
-      const finalStep = await result.finalStep
+      const steps = continuation === 'replay' ? await result.steps : undefined
+      const finalStep = steps?.at(-1) ?? await result.finalStep
       if (!this.#owns(activeTurn)) return
       const finalText = finalStep.text
       const responseId = finalStep.response.id
@@ -317,15 +341,24 @@ export class TutorConversation {
         throw new TutorPolicyError(incompleteTurnMessage(finalStep.finishReason))
       }
 
-      const checkpoint = selectAiSdkOpenResponsesCheckpoint(this.#checkpoint, {
-        finishReason: finalStep.finishReason,
-        response: { id: responseId },
-        text: finalText,
-      })
+      const checkpoint = continuation === 'native'
+        ? selectAiSdkOpenResponsesCheckpoint(this.#checkpoint, {
+            finishReason: finalStep.finishReason,
+            response: { id: responseId },
+            text: finalText,
+          })
+        : responseId
       if (!checkpoint || (checkpoint === this.#checkpoint && responseId !== this.#checkpoint)) {
         throw new TutorPolicyError('The tutor response did not produce a safe continuation checkpoint.')
       }
       this.#checkpoint = checkpoint
+      if (continuation === 'replay' && steps) {
+        this.#replayMessages = Object.freeze([
+          ...this.#replayMessages,
+          { role: 'user' as const, content: outboundPrompt },
+          ...steps.flatMap((step) => step.response.messages),
+        ])
+      }
       this.#replaceAssistant(activeTurn.assistantMessageId, {
         text: finalText,
         status: 'complete',
@@ -368,6 +401,7 @@ export class TutorConversation {
     this.#activeTurn = undefined
     activeTurn?.controller.abort(new Error('A new conversation was started'))
     this.#checkpoint = undefined
+    this.#replayMessages = Object.freeze([])
     this.#conversationGeneration = undefined
     this.#failureCause = undefined
     this.#setState({
@@ -391,6 +425,7 @@ export class TutorConversation {
     this.#lifetime.abort(new Error('The book was closed'))
     this.#cancelRestore(new Error('The book was closed'))
     this.#failureCause = undefined
+    this.#replayMessages = Object.freeze([])
     this.#disposed = true
     this.#unsubscribe?.()
     this.#unsubscribe = undefined
@@ -435,6 +470,7 @@ export class TutorConversation {
       this.#cancelRestore(cause)
       this.#clearSavedScope()
       this.#releaseLease()
+      this.#replayMessages = Object.freeze([])
       this.#fail(cause, 'interruption', activeTurn?.toolCallSeen ?? false,
         'Your AI connection changed. Start a new conversation before sending again.',
       )

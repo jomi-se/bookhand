@@ -39,10 +39,16 @@ class FixtureConnection implements TutorAiConnection {
   }
   readonly catalogs: (readonly ToolDefinition[])[] = []
   model: LanguageModel
+  continuation: 'native' | 'replay'
   getHistoryAccess?: TutorAiConnection['getHistoryAccess']
 
-  constructor(model: LanguageModel, historyAccess?: TutorHistoryAccess) {
+  constructor(
+    model: LanguageModel,
+    historyAccess?: TutorHistoryAccess,
+    continuation: 'native' | 'replay' = 'native',
+  ) {
     this.model = model
+    this.continuation = continuation
     if (historyAccess) {
       this.getHistoryAccess = (tools) => {
         this.catalogs.push(tools)
@@ -61,7 +67,11 @@ class FixtureConnection implements TutorAiConnection {
     if (this.#snapshot.phase !== 'connected' || !this.#snapshot.generation) {
       throw new Error('Connect your AI before sending.')
     }
-    return { generation: this.#snapshot.generation, model: this.model }
+    return {
+      generation: this.#snapshot.generation,
+      model: this.model,
+      continuation: this.continuation,
+    }
   }
   setSnapshot(snapshot: ReturnType<TutorAiConnection['getSnapshot']>) {
     this.#snapshot = snapshot
@@ -507,6 +517,70 @@ describe('TutorConversation through the real AI SDK stream/tool loop', () => {
     expect(JSON.stringify(bodies[3]?.input)).toContain('Why does that follow?')
     expect(JSON.stringify(bodies[3]?.input)).not.toContain('Explain this and use both actions.')
     expect(connection.catalogs).toHaveLength(2)
+    conversation.dispose()
+  })
+
+  it('replays complete direct Open Responses turns without provider-owned response state', async () => {
+    const bodies: JsonObject[] = []
+    const model = fixtureModel(async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as JsonObject)
+      const response = [
+        toolCallEvents('resp-tool', 'call-read', 'read_source'),
+        textEvents('resp-answer', 'The visible passage explains a small change.'),
+        textEvents('resp-followup', 'It follows from the earlier passage.'),
+        textEvents('resp-fresh', 'This is a fresh conversation.'),
+      ][bodies.length - 1]
+      if (!response) throw new Error('Unexpected fixture request')
+      return eventStream(response)
+    })
+    const execute = vi.fn(async () => textResult('The exact visible source.'))
+    const conversation = new TutorConversation({
+      bookId: 'book-1',
+      tools: [tool('read_source', execute)],
+      connection: new FixtureConnection(model, undefined, 'replay'),
+    })
+
+    conversation.setDraft('Read the visible passage before answering.')
+    await conversation.send()
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(bodies).toHaveLength(2)
+    expect(bodies.every((body) => !Object.hasOwn(body, 'previous_response_id'))).toBe(true)
+    expect(bodies[1]?.input).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'message', role: 'user' }),
+      expect.objectContaining({
+        type: 'function_call',
+        call_id: 'call-read',
+        name: 'read_source',
+      }),
+      expect.objectContaining({ type: 'function_call_output', call_id: 'call-read' }),
+    ]))
+    expect(JSON.stringify(bodies[1]?.input)).toContain('Read the visible passage before answering.')
+
+    conversation.setDraft('Why does that follow?')
+    await conversation.send()
+
+    expect(bodies).toHaveLength(3)
+    expect(bodies[2]).not.toHaveProperty('previous_response_id')
+    expect(bodies[2]?.input).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'function_call', call_id: 'call-read' }),
+      expect.objectContaining({ type: 'function_call_output', call_id: 'call-read' }),
+      expect.objectContaining({ type: 'message', role: 'assistant' }),
+      expect.objectContaining({ type: 'message', role: 'user' }),
+    ]))
+    expect(JSON.stringify(bodies[2]?.input)).toContain('Read the visible passage before answering.')
+    expect(JSON.stringify(bodies[2]?.input)).toContain('Why does that follow?')
+
+    conversation.newConversation()
+    conversation.setDraft('Start over from here.')
+    await conversation.send()
+
+    expect(bodies).toHaveLength(4)
+    expect(bodies[3]).not.toHaveProperty('previous_response_id')
+    expect(bodies[3]?.input).toEqual([expect.objectContaining({ role: 'user' })])
+    expect(JSON.stringify(bodies[3]?.input)).toContain('Start over from here.')
+    expect(JSON.stringify(bodies[3]?.input)).not.toContain('Read the visible passage before answering.')
+    expect(JSON.stringify(bodies[3]?.input)).not.toContain('Why does that follow?')
     conversation.dispose()
   })
 
