@@ -1,6 +1,22 @@
 # Current work
 
-Documentation triage updated: 2026-09-20.
+Documentation triage updated: 2026-09-29.
+
+## Next: book artifacts and the daily study loop
+
+On 2026-09-29 the owner redirected the study and tutor work toward their own
+daily routine with technical books on a phone. The
+[book artifacts spec](book-artifacts/spec.md) is accepted and owns the order:
+a phone artifact-surface prototype first, then artifacts, conversations with
+memories and voice, the Notebook with markings, technical-book readability,
+and chapter-scale reading with web search. The
+[North Star](../product-north-star.md), [CONTEXT.md](../../CONTEXT.md),
+[ADR 0012](../decisions/0012-keep-conversations-memories-and-voice.md), and
+[ADR 0013](../decisions/0013-generated-artifacts-run-in-their-own-frame.md)
+record the change: tutoring is no longer transient, lessons and fixed study
+blocks give way to artifacts of any shape, and the old Study model is deleted
+without migration. Sections below that describe Study lessons, native blocks,
+or transient guidance are history, not direction.
 
 ## Completed: provider-neutral direct Open Responses connection
 
