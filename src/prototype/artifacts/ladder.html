@@ -1,0 +1,139 @@
+<style>
+  .ld-stage { padding: 6px 4px 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .ld-stage svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .ld-hint { position: absolute; left: 14px; bottom: 12px; font-family: var(--bh-hand); font-size: 1.35rem; color: var(--bh-accent); pointer-events: none; transition: opacity .4s; }
+  .ld-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 12px 0; }
+  .ld-card { background: var(--bh-raised); border: 1px solid var(--bh-rule); border-radius: 14px; padding: 10px 10px 9px; }
+  .ld-card span { display: block; font: 600 .66rem/1 var(--bh-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--bh-muted); }
+  .ld-card b { display: block; margin-top: 6px; font: 600 1.15rem/1 var(--bh-mono); font-variant-numeric: tabular-nums; }
+  .ld-ratio { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; padding: 14px 16px; }
+  .ld-ratio svg { width: 96px; height: 96px; overflow: visible; }
+  .ld-ratio .bh-big-number { font-size: 2.2rem; }
+  .ld-goal { margin: 16px 0; padding: 14px 16px; border-radius: 16px; border: 1.5px dashed color-mix(in oklch, var(--bh-plum) 60%, transparent); background: color-mix(in oklch, var(--bh-plum) 7%, transparent); transition: all .5s var(--bh-spring); }
+  .ld-goal[data-found] { border-style: solid; border-color: var(--bh-moss); background: color-mix(in oklch, var(--bh-moss) 14%, var(--bh-raised)); transform: scale(1.02); }
+  .ld-goal h3 { margin: 0 0 4px; }
+</style>
+
+<p class="bh-eyebrow">Chapter III · Fig. 5, drag the foot</p>
+<h1>Pull the ladder</h1>
+<p class="bh-lede">A 181-inch ladder leans on a wall. Pull its foot out a little bit, <em>dx</em>, and the top slides down a little bit, <em>dy</em>. How big is one bit compared with the other?</p>
+
+<div class="bh-stage ld-stage">
+  <svg id="ld" viewBox="0 0 340 300" aria-label="A ladder against a wall; drag its foot"></svg>
+  <span class="ld-hint" id="ld-hint">← drag the foot</span>
+</div>
+
+<div class="ld-cards">
+  <div class="ld-card"><span>foot · x</span><b id="ld-x"></b></div>
+  <div class="ld-card"><span>top · y</span><b id="ld-y"></b></div>
+  <div class="ld-card"><span>pull 1″ · top drops</span><b id="ld-dy"></b></div>
+</div>
+
+<div class="bh-card ld-ratio">
+  <svg id="ld-tri" viewBox="0 0 96 96" aria-hidden="true"></svg>
+  <div>
+    <div class="bh-muted" style="font-size:.8rem">the little triangle, magnified</div>
+    <div class="bh-big-number" id="ld-ratio"></div>
+    <div class="bh-muted" style="font-size:.85rem"><bh-math>dy / dx</bh-math>: what calculus is “hunting, hunting, hunting” for</div>
+  </div>
+</div>
+
+<div class="ld-goal" id="ld-goal">
+  <h3>Your turn: find the one special position</h3>
+  <p style="margin:0">Thompson says <em>dy</em> is a different size from <em>dx</em> “except in one particular position.” Drag until they match.</p>
+</div>
+
+<bh-quote section="10" find="except in one particular position" cite="Chapter III">
+  It is also easy to see that (except in one particular position) dy will be of a different size from dx.
+</bh-quote>
+
+<script>
+(async () => {
+  const rough = await bh.load('rough')
+  const svg = document.getElementById('ld')
+  const L = 181, S = 1.42, WALL = 300, GROUND = 272
+  let x = 19, found = false, dragging = false, moved = false
+
+  function draw() {
+    const t = bh.tokens()
+    const rc = rough.svg(svg)
+    svg.textContent = ''
+    const y = Math.sqrt(L * L - x * x)
+    const fx = WALL - x * S, ty = GROUND - y * S
+    const o = (extra) => ({ seed: 7, roughness: 1.1, bowing: .8, stroke: t.ink, strokeWidth: 1.6, ...extra })
+    svg.append(rc.rectangle(WALL, 10, 22, GROUND - 10, o({ fill: t.muted, fillStyle: 'hachure', hachureGap: 7, fillWeight: .8, stroke: t.muted })))
+    svg.append(rc.line(6, GROUND, 334, GROUND, o({ strokeWidth: 2 })))
+    // ghost: the ladder 1 inch further out, exaggerated so it can be seen
+    const gx = x + 8, gy = Math.sqrt(Math.max(0, L * L - gx * gx))
+    svg.append(rc.line(WALL - gx * S, GROUND, WALL, GROUND - gy * S, o({ stroke: t.sky, strokeWidth: 1.2, roughness: .6 })))
+    // rails and rungs
+    const nx = -(GROUND - ty), ny = (WALL - fx)
+    const len = Math.hypot(nx, ny), ox = (nx / len) * 7, oy = (ny / len) * 7
+    svg.append(rc.line(fx - ox, GROUND - oy, WALL - ox, ty - oy, o({ stroke: t.accent, strokeWidth: 2.4 })))
+    svg.append(rc.line(fx + ox, GROUND + oy, WALL + ox, ty + oy, o({ stroke: t.accent, strokeWidth: 2.4 })))
+    for (let i = 1; i < 12; i++) {
+      const p = i / 12, cx = fx + (WALL - fx) * p, cy = GROUND + (ty - GROUND) * p
+      svg.append(rc.line(cx - ox, cy - oy, cx + ox, cy + oy, o({ stroke: t.accent, strokeWidth: 1.6, roughness: .7 })))
+    }
+    // dy, dx braces
+    svg.append(rc.line(WALL - 12, ty, WALL - 12, GROUND - gy * S, o({ stroke: t.sky, strokeWidth: 3, roughness: .4 })))
+    svg.append(rc.line(fx, GROUND + 10, WALL - gx * S, GROUND + 10, o({ stroke: t.amber, strokeWidth: 3, roughness: .4 })))
+    // handle
+    const h = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+    Object.entries({ cx: fx, cy: GROUND, r: dragging ? 14 : 11, fill: t.accent, stroke: t.raised, 'stroke-width': 3 }).forEach(([k, v]) => h.setAttribute(k, v))
+    h.style.transition = 'r .25s'
+    svg.append(h)
+    readouts(y)
+  }
+
+  function readouts(y) {
+    const y1 = Math.sqrt(L * L - (x + 1) * (x + 1))
+    const drop = y - y1
+    document.getElementById('ld-x').textContent = `${x.toFixed(0)}″`
+    document.getElementById('ld-y').textContent = `${y.toFixed(1)}″`
+    document.getElementById('ld-dy').textContent = `${drop.toFixed(2)}″`
+    document.getElementById('ld-ratio').textContent = `−${(x / y).toFixed(2)}`
+    const t = bh.tokens()
+    const tri = document.getElementById('ld-tri')
+    const k = 80 / Math.max(1, x / y)
+    const w = Math.min(80, k), hgt = Math.min(80, (x / y) * k)
+    tri.innerHTML = `
+      <path d="M8 8 L ${8 + w} 8 L 8 ${8 + hgt} Z" fill="${t.accent}" fill-opacity=".12" stroke="${t.accent}" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="8" y1="4" x2="${8 + w}" y2="4" stroke="${t.amber}" stroke-width="3" stroke-linecap="round"/>
+      <line x1="4" y1="8" x2="4" y2="${8 + hgt}" stroke="${t.sky}" stroke-width="3" stroke-linecap="round"/>
+      <text x="${8 + w / 2}" y="${hgt / 2 + 22 > 90 ? 20 : 22}" font-size="11" fill="${t.amber}" text-anchor="middle" font-family="${t.sans}">dx</text>
+      <text x="16" y="${8 + hgt / 2 + 4}" font-size="11" fill="${t.sky}" font-family="${t.sans}">dy</text>`
+    const near = Math.abs(x - y) < 4
+    if (near && !found) {
+      found = true
+      const goal = document.getElementById('ld-goal')
+      goal.setAttribute('data-found', '')
+      goal.innerHTML = '<h3>That’s the one! 45°</h3><p style="margin:0">When the foot and the top are the same distance from the corner (128″ each), the top slides down exactly as fast as you pull: <strong>dy/dx = −1</strong>. Everywhere else they differ.</p>'
+      bh.celebrate(goal)
+      bh.remember('Found the 45° ladder position on your own: dy/dx = −1 when x = y.')
+    }
+  }
+
+  function toX(event) {
+    const box = svg.getBoundingClientRect()
+    const px = ((event.clientX - box.left) / box.width) * 340
+    return Math.min(175, Math.max(6, (WALL - px) / S))
+  }
+  svg.addEventListener('pointerdown', (e) => { dragging = true; svg.setPointerCapture(e.pointerId); x = toX(e); draw() })
+  svg.addEventListener('pointermove', (e) => {
+    if (!dragging) return
+    x = toX(e); draw()
+    if (!moved) { moved = true; document.getElementById('ld-hint').style.opacity = 0 }
+  })
+  const end = () => { dragging = false; draw() }
+  svg.addEventListener('pointerup', end)
+  svg.addEventListener('pointercancel', end)
+  bh.onTheme(draw)
+  draw()
+  if (!bh.reducedMotion) {
+    // a small nudge so it's obvious the thing moves
+    setTimeout(() => bh.spring(19, 42, (v) => { if (moved || dragging) return; x = v; draw() }, { stiffness: 60, damping: 7 }), 600)
+    setTimeout(() => bh.spring(42, 19, (v) => { if (moved || dragging) return; x = v; draw() }, { stiffness: 60, damping: 9 }), 1800)
+  }
+})()
+</script>

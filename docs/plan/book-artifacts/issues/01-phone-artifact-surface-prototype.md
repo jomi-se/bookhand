@@ -1,6 +1,6 @@
 # 01 — Phone artifact surface prototype
 
-Status: ready-for-agent
+Status: ready-for-human
 Type: prototype
 
 ## Question
@@ -32,3 +32,37 @@ The owner has used both surfaces on their phone in Pages and Scroll mode,
 picked one (or a hybrid), and picked a marking direction. Record the choice and
 screenshots under an ignored artifact directory, and the decision in
 [the spec](../spec.md).
+
+## Prototype built (2026-09-29)
+
+Status moves to **ready-for-human**: the owner reviews it on the phone.
+
+What exists (throwaway, behind a flag):
+
+- `public/artifact-frame.html` and `public/artifact-kit/` run generated
+  artifacts in a sandboxed, opaque-origin frame with its own policy, served by
+  `scripts/vite-artifact-frame-plugin.mjs` in dev and preview. KaTeX, d3,
+  Rough.js, canvas-confetti, GSAP and highlight.js load from jsDelivr and
+  cdnjs. Building blocks: `bh-quote`, `bh-math`, `bh-code`, `bh-scrub`,
+  `bh-reveal`, `bh-steps`, `bh-choice`, `bh-callout`, `bh-margin`, plus
+  `bh.tokens()`, `bh.spring()`, `bh.celebrate()`, `bh.remember()`.
+- `src/prototype/` seeds *Calculus Made Easy* (no local copy of *Deep Learning
+  with Python* was available) with ten artifacts, six memories, the tutor's
+  voice, a rich conversation, a scripted "Ask about the ladder" flow that
+  builds an artifact live, Keep (whole reply or a selected part), typed notes,
+  and the Notebook.
+- Surface: a bottom sheet that fits itself under the anchored passage, slides
+  the page up when the passage is low, and spotlights it through the scrim.
+  This is a hybrid of the two options in the question above.
+- Markings: `wash`, `margin` and `pin` (`src/reader/markings.ts`), switchable
+  in the Notebook's prototype settings; passages with several artifacts show a
+  count and open a chooser. A tap on a marking wins over page-turn zones.
+
+Run it: `npm run dev` (flag is on in development), or
+`VITE_ARTIFACT_PROTOTYPE=1 npm run build && npx vite preview`. `?proto=off`
+turns it off. Prototype state lives in this browser's `localStorage`, and the
+Notebook's settings can reset it.
+
+Evidence so far: Pixel 7 emulation in Chromium, Pages and Scroll, light and
+dark; screenshots under `artifacts/proto/`. Still unproven: the owner's real
+phone browser and an embedded agent browser.

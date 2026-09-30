@@ -6,6 +6,8 @@ import { viteStaticCopy } from 'vite-plugin-static-copy'
 import { designContextSource } from './scripts/vite-design-context-plugin.mjs'
 // @ts-expect-error -- build-time compatibility transform, intentionally plain JS.
 import { foliatePersistentFrame } from './scripts/vite-foliate-persistent-frame-plugin.mjs'
+// @ts-expect-error -- dev/preview server policy for the artifact frame, plain JS.
+import { artifactFrame } from './scripts/vite-artifact-frame-plugin.mjs'
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -100,6 +102,7 @@ export default defineConfig(({ mode }) => ({
   // fail-closed persistent-document lifetime transform can inspect it.
   optimizeDeps: { exclude: ['foliate-js/view.js'] },
   plugins: [
+    artifactFrame(),
     foliatePersistentFrame(),
     react(),
     developmentCsp(),

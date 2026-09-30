@@ -1,0 +1,106 @@
+<style>
+  .map-stage { padding: 6px 0 0; background:
+    radial-gradient(circle at 20% 10%, color-mix(in oklch, var(--bh-amber) 10%, transparent), transparent 40%),
+    radial-gradient(circle at 90% 80%, color-mix(in oklch, var(--bh-sky) 10%, transparent), transparent 45%),
+    var(--bh-raised); }
+  .map-stage svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .map-node { cursor: pointer; }
+  .map-node circle.core { transition: r .3s var(--bh-spring); }
+  .map-node:active circle.core { r: 17; }
+  @keyframes map-halo { 0% { r: 14; opacity: .7; } 100% { r: 30; opacity: 0; } }
+  .map-halo { animation: map-halo 1.8s ease-out infinite; }
+  @keyframes map-dash { to { stroke-dashoffset: -40; } }
+  .map-trail-next { animation: map-dash 2.4s linear infinite; }
+  .map-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: .8rem; color: var(--bh-muted); margin: 12px 2px; }
+  .map-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+</style>
+
+<p class="bh-eyebrow">The whole book</p>
+<h1>Your map of <em style="font-family:var(--bh-display)">Calculus Made Easy</em></h1>
+<p class="bh-lede" id="map-lede">Twenty-one chapters, two halves. Tap a chapter to jump there.</p>
+
+<div class="map-legend">
+  <span><i style="background:var(--bh-moss)"></i>understood</span>
+  <span><i style="background:var(--bh-terracotta)"></i>wrestled with</span>
+  <span><i style="border:2px solid var(--bh-accent);box-sizing:border-box"></i>you are here</span>
+  <span><i style="background:var(--bh-amber)"></i>has artifacts</span>
+</div>
+
+<div class="bh-stage map-stage">
+  <svg id="map" viewBox="0 0 340 1000" role="list" aria-label="Chapters"></svg>
+</div>
+
+<bh-callout kind="memory">Your tutor updates this map from your memories. Edit or delete any of them in the Notebook, and the map changes with them.</bh-callout>
+
+<script>
+(() => {
+  const CH = [
+    ['I', 'Preliminary terrors', 8], ['II', 'Degrees of smallness', 9], ['III', 'Relative growings', 10],
+    ['IV', 'Simplest cases', 12], ['V', 'What to do with constants', 13], ['VI', 'Sums, products, quotients', 14],
+    ['VII', 'Successive differentiation', 15], ['VIII', 'When time varies', 16], ['IX', 'A useful dodge', 17],
+    ['X', 'Geometrical meaning', 18], ['XI', 'Maxima and minima', 19], ['XII', 'Curvature', 20],
+    ['XIII', 'Other useful dodges', 21], ['XIV', 'Compound interest & e', 22], ['XV', 'Sines and cosines', 23],
+    ['XVI', 'Partial differentiation', 24], ['XVII', 'Integration', 25], ['XVIII', 'Integrating backwards', 26],
+    ['XIX', 'Finding areas', 27], ['XX', 'Dodges, pitfalls, triumphs', 28], ['XXI', 'Finding solutions', 29],
+  ]
+  const svg = document.getElementById('map')
+  const ctx = (bh.artifact && bh.artifact.context) || {}
+  const states = ctx.chapterStates || {}
+  const counts = ctx.artifactCounts || {}
+  const here = ctx.sectionIndex
+
+  function pos(i) {
+    const y = 50 + i * 45
+    const x = 170 + Math.sin(i * .75) * 95
+    return [x, y]
+  }
+
+  function draw() {
+    const t = bh.tokens()
+    let trail = '', upto = ''
+    const hereIndex = CH.findIndex((c) => c[2] === here)
+    CH.forEach((c, i) => {
+      const [x, y] = pos(i)
+      if (i === 0) { trail = `M${x} ${y}`; upto = trail; return }
+      const [px, py] = pos(i - 1)
+      const seg = ` C ${px} ${py + 24}, ${x} ${y - 24}, ${x} ${y}`
+      trail += seg
+      if (hereIndex >= 0 && i <= hereIndex) upto += seg
+    })
+    let out = `
+      <path d="${trail}" fill="none" stroke="${t.rule}" stroke-width="10" stroke-linecap="round"/>
+      <path d="${trail}" fill="none" stroke="${t.muted}" stroke-width="1.5" stroke-dasharray="2 6" stroke-linecap="round" class="map-trail-next" opacity=".6"/>
+      <path d="${upto}" fill="none" stroke="${t.accent}" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+      <line x1="14" x2="326" y1="${pos(16)[1] - 24}" y2="${pos(16)[1] - 24}" stroke="${t.sky}" stroke-dasharray="3 5"/>
+      <text x="326" y="${pos(16)[1] - 30}" text-anchor="end" font-size="11" font-weight="600" fill="${t.sky}" font-family="${t.sans}" letter-spacing=".08em">∫ INTEGRATION</text>
+      <text x="14" y="22" font-size="11" font-weight="600" fill="${t.accent}" font-family="${t.sans}" letter-spacing=".08em">d DIFFERENTIATION</text>`
+    CH.forEach(([roman, title, section], i) => {
+      const [x, y] = pos(i)
+      const state = section === here ? 'here' : states[section]
+      const fill = state === 'understood' ? t.moss : state === 'struggled' ? t.terracotta : t.raised
+      const stroke = state === 'here' ? t.accent : state ? fill : t.muted
+      const textFill = state === 'understood' || state === 'struggled' ? t.canvas : t.ink
+      const left = x > 170
+      const count = counts[section] || 0
+      out += `<g class="map-node" data-section="${section}" role="listitem" aria-label="Chapter ${roman}: ${title}">
+        ${state === 'here' ? `<circle class="map-halo" cx="${x}" cy="${y}" r="14" fill="none" stroke="${t.accent}" stroke-width="2"/>` : ''}
+        <circle class="core" cx="${x}" cy="${y}" r="15" fill="${fill}" stroke="${stroke}" stroke-width="${state === 'here' ? 3 : 1.5}"/>
+        <text x="${x}" y="${y + 4}" text-anchor="middle" font-size="${roman.length > 3 ? 8.5 : 10.5}" font-weight="700" fill="${textFill}" font-family="${t.display}">${roman}</text>
+        ${count ? `<circle cx="${x + 12}" cy="${y - 12}" r="7" fill="${t.amber}"/><text x="${x + 12}" y="${y - 9}" text-anchor="middle" font-size="9" font-weight="700" fill="#1b1405" font-family="${t.sans}">${count}</text>` : ''}
+        <text x="${left ? x - 24 : x + 24}" y="${y + 4}" text-anchor="${left ? 'end' : 'start'}" font-size="12.5" fill="${state ? t.ink : t.muted}" font-family="${t.serif}" ${state === 'here' ? 'font-weight="700"' : ''}>${title}</text>
+        ${state === 'here' ? `<text x="${left ? x - 24 : x + 24}" y="${y + 22}" text-anchor="${left ? 'end' : 'start'}" font-size="17" fill="${t.accent}" font-family="${t.hand}">you are here</text>` : ''}
+      </g>`
+    })
+    svg.innerHTML = out
+    const understood = Object.values(states).filter((s) => s === 'understood').length
+    document.getElementById('map-lede').textContent = `${understood} of 21 chapters understood so far. Tap any chapter to jump there.`
+  }
+
+  svg.addEventListener('click', (e) => {
+    const node = e.target.closest('.map-node')
+    if (node) bh.navigate(Number(node.dataset.section))
+  })
+  bh.onTheme(draw)
+  draw()
+})()
+</script>

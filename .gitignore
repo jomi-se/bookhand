@@ -44,7 +44,7 @@ test-results/
 .impeccable/hook.cache.json
 
 # Validation evidence: screenshots and traces kept as evidence for a decision.
-artifacts/
+/artifacts/
 
 # Locally installed skill packs. Repository-owned skills that are already
 # tracked remain tracked; local package-manager projections and their lockfile
