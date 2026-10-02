@@ -1,20 +1,43 @@
 # Scope inventory
 
+Updated 2026-10-02. The study side of the product changed direction on
+2026-09-29: the [book artifacts spec](plan/book-artifacts/spec.md) owns what
+comes next. Slice and contract mappings below record what was built and
+validated; the Study lesson and item model they describe is scheduled for
+deletion without migration (spec, “Clean slate”).
+
 ## Present now
 
 - A working local-first library and Foliate.js EPUB reader with official SQLite
   WASM persistence, bundled-book bootstrap, import, navigation, selection,
-  presentation controls, and restore.
+  presentation controls, and restore. Each book reads in **Pages** or
+  **Scroll** (ADR 0010).
+- Explicit section remastering: agents read and rewrite a section's XHTML and
+  CSS while the publisher original, comparison, revision history, Undo, and
+  Reset stay with the reader (ADR 0009).
 - Persistent highlights, notes, one board per book, docked/expanded Study, and
-  native prose, quotation, equation, steps, and question items.
-- Thirteen dynamically registered tools through Chromium's genuine
+  native prose, quotation, equation, steps, and question items. The spec
+  replaces Study with artifacts and the Notebook.
+- Twenty-three dynamically registered tools through Chromium's genuine
   `document.modelContext`: library/open, reading context/TOC/passage/navigation,
-  lexical search, annotation/style, and study item/view operations.
+  focus and guidance, lexical search, annotation/style, design context,
+  section source/diagnosis/rewrite/math, and the Study lesson and item
+  operations that the spec deletes.
+- An optional Tutor over Agent Connect (ADR 0006, ADR 0007) or a direct Open
+  Responses endpoint (ADR 0011). Its conversations are still transient; ADR
+  0012 makes them persistent.
 - A deployed Cloudflare Worker surface and a production browser/live-check
-  harness. The WebMCP agent test is deterministic orchestration, not yet a
-  genuine model-authored lesson run.
+  harness.
 - Shared Codex and Claude guidance, validation contracts, reusable engineering
   and design skills, and persistent handoff documentation.
+
+## Next: book artifacts
+
+The six tickets under [plan/book-artifacts/issues](plan/book-artifacts/issues/)
+in spec order: phone artifact surface prototype, artifacts, conversations with
+memories and voice, the Notebook with markings, technical-book readability,
+and chapter-scale reading with web search. The ticket 01 prototype lives on
+the unmerged `prototype/book-artifacts` branch.
 
 ## Slice 1: the book is usable
 
@@ -148,17 +171,20 @@ The runtime delivery shape and the explicit boundary between EPUB CSS, native
 Study rendering, and future application-shell worlds are in
 `docs/plan/agent-facing-design-guidance.md`.
 
-## Unbuilt slices and options
+## Unbuilt options
 
 - Remaining Slice 4 option: local embeddings, packed vector BLOBs, exact
-  semantic scan, and hybrid retrieval. Lexical retrieval must earn this cost.
-- Slice 5: bounded generated labs and the polished end-to-end tutor scenario.
+  semantic scan, and hybrid retrieval. The spec keeps semantic search out of
+  scope until tool-based retrieval visibly fails.
+- Slice 5's bounded generated labs are superseded by artifacts of any shape
+  (ADR 0013).
 
 ## Deferred
 
-- Agent Connect integration.
 - `sqlite-vec`, approximate-nearest-neighbor infrastructure, hosted embeddings,
   multiple embedding models, and library-wide semantic search.
 - Accounts, cloud storage, cross-device sync, and collaboration.
 - General ebook-library management and format coverage beyond the demo needs.
 - A broad plugin or extension ecosystem.
+- Named study containers, session types, cross-book topics, and spoken audio
+  (book artifacts spec, “Out of scope”).

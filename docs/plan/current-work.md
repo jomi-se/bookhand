@@ -1,6 +1,6 @@
 # Current work
 
-Documentation triage updated: 2026-09-29.
+Documentation triage updated: 2026-10-02.
 
 ## Next: book artifacts and the daily study loop
 
@@ -17,6 +17,34 @@ record the change: tutoring is no longer transient, lessons and fixed study
 blocks give way to artifacts of any shape, and the old Study model is deleted
 without migration. Sections below that describe Study lessons, native blocks,
 or transient guidance are history, not direction.
+
+Ticket 01's throwaway prototype is built on the unmerged, unpushed
+`prototype/book-artifacts` branch and is waiting for the owner's phone review.
+That branch's copy of
+[the ticket](book-artifacts/issues/01-phone-artifact-surface-prototype.md)
+says what it contains and how to run it. Once the owner picks a surface and a
+marking direction, record the decision in the spec and start ticket 02.
+
+### Waiting on the owner (2026-10-02)
+
+1. **Surface and marking.** After trying the prototype on the phone: keep the
+   bottom sheet that settles under the passage, or push for a true inline
+   fold-out? Which marking — wash, margin, or pin? This unblocks ticket 02.
+2. **Push.** May `main` and `prototype/book-artifacts` be pushed? Nothing has
+   been pushed since the redirect; an unsent draft is not approval.
+3. **Tickets 05 and 06.** Both are `needs-triage` but not blocked by 01.
+   Should either start before the surface is decided?
+
+### Notes for the next agent
+
+- `npm run dev` no longer reports the library as open in another tab: React
+  StrictMode's double-run load effect sent two overlapping `initialize`
+  requests, and the storage worker now shares one attempt.
+- At 412px wide the reader toolbar is a horizontally scrolling strip, and its
+  last button (Text) sits 8px past the edge with no visible cue. Ticket 04
+  reworks this toolbar; give the overflow an affordance there.
+- The artifact frame has no production header policy in `public/_headers`;
+  ticket 02 owns that when the frame leaves the prototype.
 
 ## Completed: provider-neutral direct Open Responses connection
 
