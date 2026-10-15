@@ -1,6 +1,8 @@
 # Product North Star: the book becomes an agent-readable study environment
 
-Last consolidated: 2026-09-01
+Last consolidated: 2026-09-01. Revised 2026-09-29: the owner's daily study
+loop replaced the hackathon demo as the target, tutoring stopped being
+transient, and fixed study blocks gave way to artifacts of any shape.
 
 This document preserves the product idea behind the project, including the
 important tensions raised while discussing it. It is the North Star for scope,
@@ -46,7 +48,9 @@ The reader should support:
 - readable typography, themes, spacing, width, and book-level CSS overrides;
 - a per-book choice between polished pages and continuous scrolling across
   reflowable EPUB sections;
-- focused reading on desktop and mobile;
+- focused reading on desktop and mobile, including technical books whose code
+  listings, captions, callouts, and headings stay legible on a narrow phone in
+  both light and dark themes;
 - local persistence without an account or server.
 
 A calculus textbook is the current hero-book placeholder because mathematical
@@ -58,7 +62,7 @@ it if it yields a clearer, more delightful demonstration.
 
 The application should expose enough precise book and workspace semantics that
 the model's creativity, not a hard-coded tutor flow, determines the upper bound
-of the lesson. Useful capability families include:
+of the teaching. Useful capability families include:
 
 ### Understand the reading context
 
@@ -150,59 +154,71 @@ reading into an account-dependent service.
 
 ### Work with the reader's knowledge
 
-- create and update highlights and notes;
-- attach explanations or study artifacts to a passage or concept;
-- assemble summaries, flashcards, questions, worked solutions, concept maps,
-  and progress cues;
-- bring the user back from an artifact to the precise source material.
+- create and update highlights, notes, and other artifacts;
+- anchor artifacts to passages, chapters, or the whole book, and let them
+  leave markings on the book that lead back to them;
+- remember what the reader understood, struggled with, and thinks of the
+  material;
+- bring the reader back from an artifact to the precise source material.
 
-## The study board is both a companion and a place
+## Artifacts can be anything, and the book holds them
 
-The study board should support two spatial modes:
+An agent's best explanation of a passage may be a paragraph, a worked code
+walkthrough, an animation, or a small interactive experiment. A fixed
+catalogue of study blocks makes those explanations rigid and lifeless, so an
+**artifact** may take any shape the agent can build as a web page: its own
+HTML, CSS, and JavaScript, styled however suits the explanation. Bookhand
+offers smart building blocks (live book quotations, typeset math, highlighted
+code, plot and motion helpers, theme tokens) that make good work easy. They
+are accelerators, never a ceiling on shape or style.
 
-1. A docked companion beside or over the reading surface for quick explanations,
-   annotations, and small examples while context remains visible.
-2. A larger focused workspace for diagrams, multi-step derivations, mind maps,
-   comparisons, animations, and interactive lessons.
+The book is the organizing structure. Every artifact is anchored to passages,
+a chapter, or the whole book, and may leave **markings** on the page, such as
+a highlight, a margin stroke, or a pin, that lead back to it. The book's
+**Notebook** is the place to browse everything about it without searching the
+text. Notes the reader types are artifacts too; a highlight is a mark on the
+book that artifacts may be anchored to.
 
-These are two views of the same persistent material, not separate products. A
-reader should be able to zoom into a question, work with it, and zoom back out
-to the book without losing their place or the relationship between source and
-artifact.
+Artifacts are revisable by any later agent, and every earlier version is kept.
+Generated code runs with basic containment and may load libraries from a short
+list of trusted CDNs. For this client-only product, containment is proportionate
+rather than a grand hostile-code project: it keeps a manipulated artifact from
+carrying the reader's book or notes elsewhere, while everything else serves
+creative freedom.
 
-Common study content should use polished native blocks: prose, quotations with
-book citations, equations, steps, callouts, questions, answers, diagrams, and
-simple plots. A fixed catalog alone, however, would undermine the premise that
-the tutor can be as creative as the connected model.
+A cross-book canvas, where a reader steps out of one book to connect ideas
+across several, is a plausible later surface. The first job is helping one
+reader understand one book deeply.
 
-Therefore the board also needs an escape hatch for generated experiences: a
-bounded “lab” or mini-surface where the agent can create custom visual or
-interactive material when predefined blocks are genuinely insufficient. This
-is not an invitation to let arbitrary code invisibly own the application. The
-lab should be explicit, disposable, and confined to its board region, with a
-small bridge to approved data and actions.
+## Conversations, artifacts, and memories are kept
 
-For this client-only proof of concept, do not turn that boundary into a grand
-production sandboxing project. Basic containment and clear user control are
-enough. The purpose is to enable the demonstration, not to solve hostile-code
-execution for the web at large.
+Nothing an agent does with the reader is transient. The reader **dismisses**
+what they are done looking at, and dismissed material stays findable; only an
+explicit **delete** loses anything. Transient tutoring was a technical
+limitation, not a principle.
 
-## Durable study and live tutoring are different products
+Three kinds of material persist, and they serve different purposes:
 
-Bookhand needs two complementary ways for an agent to teach:
+- **Conversations** are the exchange with an agent. They render richly, like
+  the artifacts they produce, and the reader can **keep** any message or part
+  of one as an artifact instantly, without another round-trip to the agent.
+  A conversation stays a conversation; it does not become a document.
+- **Artifacts** are what the reader returns to.
+- **Memories** are what a future agent should know: what the reader
+  understood, where they struggled, what they think of the author, and how
+  they like to be taught. Agents write memories visibly, deciding whether to
+  ask first.
 
-- **Study is durable knowledge.** Lessons, questions, quotations, diagrams,
-  notes, and annotations persist only when the learner chooses to keep them.
-- **Tutor guidance is transient attention.** During a live exchange, the agent
-  may take the learner to an exact passage, point at it, reveal a related study
-  item, or present a small anchored explanation. This state is visible,
-  stoppable, and never becomes an annotation or lesson implicitly.
+The tutor's **voice**—the tone, humour, and rapport that develop between a
+reader and an agent—matters more than any transcript. Bookhand keeps it as a
+memory so it survives a new conversation, a different model, or a different
+provider. That portability is a direct consequence of keeping the reader's
+relationship with the tutor in the page rather than in one vendor's history.
 
-A permanent highlight is not a substitute for pointing. Tutor-directed
-navigation must always show who moved the surface, offer Back and Stop, yield
-to manual navigation, and disappear on reload. The same grounded source and
-navigation primitives should serve both experiences, but their persistence and
-consent boundaries must remain explicit.
+Tutor-directed navigation and pointing remain attributed and under the
+reader's control: they show who moved the surface, offer Back and Stop, and
+yield to manual navigation. What persists is the record of what the tutor
+showed, so the reader can return to it.
 
 ## What WebMCP should make visible
 
@@ -235,19 +251,20 @@ the web application communicate bidirectionally with a powerful user-owned
 agent paid through an existing subscription. It also introduces setup that a
 hackathon judge is unlikely to complete in a few minutes.
 
-So Agent Connect is an optional future or power-user transport, not a dependency
-of the initial submission. The first demo should work with the WebMCP-capable
-agent environment the event expects. If Agent Connect is added later, the
-reader's tool and domain APIs must remain neutral rather than becoming coupled
-to its gateway or to Codex.
+So Agent Connect was an optional transport, not a dependency of the initial
+submission. Since the submission, the in-app Tutor (through Agent Connect or a
+direct Open Responses connection) is the primary way the owner reaches an
+agent; external WebMCP agents remain fully supported. Either way, the reader's
+tool and domain APIs stay neutral rather than coupled to one gateway, harness,
+or model vendor.
 
 ## Product principles
 
 - **Reader first.** The book remains calm, legible, and primary.
 - **Semantics over simulated clicks.** WebMCP tools express domain operations,
   not DOM coordinates.
-- **Creativity with a bounded place to land.** Native blocks cover the common
-  case; generated labs preserve the model's expressive ceiling.
+- **Creativity without a ceiling.** Artifacts may take any shape; smart
+  building blocks make common work easy without constraining it.
 - **Source connection is never lost.** Artifacts point back to exact book
   locations and the user can return easily.
 - **Persistent effects are visible and reversible.** Notes, styles, and study
@@ -261,33 +278,38 @@ to its gateway or to Codex.
   the resulting experience.
 - **Fix once.** A repair the reader keeps becomes durable, and Bookhand should
   move toward exporting that personal copy as a standalone EPUB.
-- **Attention remains under learner control.** Tutor cues are temporary,
-  clearly attributed, easy to stop, and never silently persisted.
+- **Dismiss, never lose.** Conversations, cues, artifacts, and memories stay
+  until the reader dismisses or deletes them; tutor cues are clearly
+  attributed and easy to stop.
 - **Guidance enables creative freedom.** Browser agents receive the semantic
   roles and safety context needed to compose coherently, without Bookhand
   prescribing one acceptable aesthetic.
-- **Local-first and judgeable.** No account, private gateway, or model bill is
-  required to understand the submission.
-- **Prove one magical path before generalizing.** A polished passage-to-lesson
-  interaction matters more than a sprawling tool catalog.
+- **Local-first.** No account or server is required to read, and everything
+  the reader keeps lives on their device.
+- **Prove one magical path before generalizing.** A delightful
+  passage-to-artifact interaction matters more than a sprawling tool catalog.
 
-## The first decisive demonstration
+## The daily study loop
 
-The target experience is:
+The hackathon demonstration is complete. The target is now the owner's own
+routine with technical books such as *Deep Learning with Python*, which today
+means fighting publisher CSS until code is legible on a phone and copying pages
+into a separate AI notebook to ask about them. Bookhand should make that
+routine delightful:
 
-1. The reader opens the bundled technical book and selects a difficult passage.
-2. They ask their compatible agent to help them truly understand it.
-3. The agent obtains exact passage and chapter context through WebMCP.
-4. It retrieves an earlier definition or example, moves the reader there, and
-   temporarily points to the exact source with visible Back and Stop controls.
-5. It gives a short source-anchored explanation without creating permanent
-   content.
-6. When the learner asks to keep or deepen the explanation, it creates one
-   titled, coherent study lesson—ideally visual or interactive—rather than a
-   feed of unrelated records.
-7. The learner opens that lesson, asks a follow-up that updates the same unit,
-   reloads it successfully, and returns to the exact source location. The
-   temporary tutor state does not survive reload.
+1. The reader opens a technical book on their phone. Code, captions, callouts,
+   and headings are legible in both themes, and the tutor offers to finish the
+   job for this particular book's markup.
+2. They ask about the passage in front of them, right there. The agent reads
+   whole chapters when it needs them, searches the web when allowed, and
+   remembers what this reader already understands and how they like to be
+   taught.
+3. The answer is as rich as the explanation deserves: prose, a runnable code
+   walkthrough, an animation, an interactive diagram. The reader keeps what is
+   worth keeping with one tap.
+4. What they keep lives in the book: markings on the page, and the Notebook to
+   browse it all. A later conversation, even with a different model, picks up
+   the same understanding and the same voice.
 
-If this feels obviously more useful than “chat with this PDF,” the project has
+If this beats copying pages into a chat window by a wide margin, Bookhand has
 proved its thesis.

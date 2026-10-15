@@ -18,6 +18,9 @@ Refresh preserves the generation and uses a shared app-level token path with
 expected-current CAS inside the full credential lock; late completion cannot
 restore a disconnected/replaced connection.
 
+Amended 2026-09-29 by [ADR 0012](0012-keep-conversations-memories-and-voice.md):
+its transcript-storage and conversation-database prohibitions no longer apply.
+
 Amended 2026-09-07 by explicit owner request: persist only the app-scoped
 connection in a validated versioned origin-local record, with provider address
 and experience in separate non-secret preferences. No upstream/admin credentials,

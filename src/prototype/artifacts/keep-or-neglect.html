@@ -1,0 +1,150 @@
+<style>
+  .kn-deck { position: relative; height: 290px; margin: 18px 0 10px; }
+  .kn-card { position: absolute; inset: 0 8px; border-radius: 22px; background: var(--bh-raised); border: 1px solid var(--bh-rule); box-shadow: var(--bh-shadow); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; will-change: transform; }
+  .kn-card .term { font-size: 1.9rem; margin: 6px 0 10px; }
+  .kn-card .ctx { font-size: .9rem; color: var(--bh-muted); max-width: 28ch; }
+  .kn-card .stamp { position: absolute; top: 18px; padding: 6px 12px; border: 3px solid; border-radius: 10px; font: 800 1rem/1 var(--bh-sans); letter-spacing: .1em; text-transform: uppercase; opacity: 0; }
+  .kn-card .stamp.keep { right: 18px; color: var(--bh-moss); transform: rotate(10deg); }
+  .kn-card .stamp.drop { left: 18px; color: var(--bh-terracotta); transform: rotate(-10deg); }
+  .kn-card .num { position: absolute; bottom: 14px; font: 600 .7rem/1 var(--bh-sans); color: var(--bh-muted); letter-spacing: .1em; }
+  .kn-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kn-actions .bh-button.drop { background: color-mix(in oklch, var(--bh-terracotta) 16%, var(--bh-raised)); color: var(--bh-terracotta); }
+  .kn-actions .bh-button.keep { background: color-mix(in oklch, var(--bh-moss) 18%, var(--bh-raised)); color: var(--bh-moss); }
+  .kn-feedback { min-height: 5.2em; margin: 14px 0 0; padding: 12px 14px; border-radius: 14px; background: var(--bh-wash); font-size: .92rem; transition: background .3s; }
+  .kn-feedback[data-tone='right'] { background: color-mix(in oklch, var(--bh-moss) 14%, var(--bh-raised)); }
+  .kn-feedback[data-tone='wrong'] { background: color-mix(in oklch, var(--bh-terracotta) 12%, var(--bh-raised)); }
+  .kn-feedback b { display: block; margin-bottom: 2px; }
+  .kn-score { display: flex; gap: 5px; justify-content: center; margin: 12px 0 0; }
+  .kn-score i { width: 9px; height: 9px; border-radius: 99px; background: var(--bh-rule); transition: background .3s, transform .4s var(--bh-spring); }
+  .kn-score i[data-r='right'] { background: var(--bh-moss); transform: scale(1.2); }
+  .kn-score i[data-r='wrong'] { background: var(--bh-terracotta); transform: scale(1.2); }
+  .kn-done { text-align: center; padding: 30px 10px; }
+  .kn-done .bh-big-number { font-size: 3.4rem; }
+</style>
+
+<p class="bh-eyebrow">Chapter II · Check yourself</p>
+<h1>Keep or neglect?</h1>
+<p class="bh-lede"><em>dx</em> is small; <em>x</em> is an ordinary size. Swipe <strong>right to keep</strong> a term, <strong>left to throw it away</strong>.</p>
+
+<div class="kn-deck" id="kn-deck"></div>
+<div class="kn-actions">
+  <button class="bh-button drop" id="kn-drop">← Neglect</button>
+  <button class="bh-button keep" id="kn-keep">Keep →</button>
+</div>
+<div class="kn-score" id="kn-score"></div>
+<div class="kn-feedback" id="kn-feedback"><b>Tip</b>Ask: is this a <em>bit</em>, or a <em>bit of a bit</em>?</div>
+
+<script>
+(() => {
+  const CARDS = [
+    { tex: '2x \\cdot dx', ctx: 'the two strips of the growing square', keep: true, why: 'A first-order bit: one dx, times something ordinary.' },
+    { tex: '(dx)^2', ctx: 'the corner of the growing square', keep: false, why: 'A bit of a bit, second order. Throw it away.' },
+    { tex: 'x^2 \\cdot dx', ctx: 'Thompson says don’t drop this one', keep: true, why: 'Only one dx in it, so first order. x² is just an ordinary factor.' },
+    { tex: 'dx \\cdot dx \\cdot dx', ctx: 'three little bits multiplied', keep: false, why: 'Third order of smallness. Even more negligible than (dx)².' },
+    { tex: '500 \\times \\text{farthing}', ctx: 'next to one sovereign', keep: true, why: 'The trap! A small thing multiplied by something large can matter again. 500 farthings is about half a sovereign.' },
+    { tex: 'a^x \\, dx', ctx: 'from Thompson’s list', keep: true, why: 'One dx, first order. It stays however exotic a^x looks.' },
+  ]
+  const deck = document.getElementById('kn-deck')
+  const feedback = document.getElementById('kn-feedback')
+  const score = document.getElementById('kn-score')
+  let index = 0, results = []
+  score.innerHTML = CARDS.map(() => '<i></i>').join('')
+
+  function makeCard(card, i) {
+    const el = document.createElement('div')
+    el.className = 'kn-card'
+    el.innerHTML = `<span class="stamp keep">Keep</span><span class="stamp drop">Neglect</span>
+      <bh-math class="term">${card.tex}</bh-math><div class="ctx">${card.ctx}</div><div class="num">${i + 1} / ${CARDS.length}</div>`
+    const depth = i - index
+    el.style.transform = `translateY(${depth * 10}px) scale(${1 - depth * .04})`
+    el.style.zIndex = 100 - i
+    el.style.opacity = depth > 2 ? 0 : 1
+    return el
+  }
+
+  function layout() {
+    ;[...deck.children].forEach((el) => {
+      const i = Number(el.dataset.i), depth = i - index
+      el.style.transition = 'transform .45s cubic-bezier(.34,1.56,.64,1), opacity .3s'
+      el.style.transform = `translateY(${depth * 10}px) scale(${1 - depth * .04})`
+      el.style.opacity = depth > 2 ? 0 : 1
+    })
+  }
+
+  function decide(keep) {
+    const card = CARDS[index]
+    const el = deck.querySelector(`[data-i="${index}"]`)
+    if (!card || !el) return
+    const right = card.keep === keep
+    results.push(right)
+    score.children[index].dataset.r = right ? 'right' : 'wrong'
+    feedback.dataset.tone = right ? 'right' : 'wrong'
+    feedback.innerHTML = `<b>${right ? (card.keep ? 'Kept, rightly.' : 'Thrown away, rightly.') : (card.keep ? 'Careful, that one stays.' : 'That one can go.')}</b>${card.why}`
+    el.style.transition = 'transform .5s cubic-bezier(.2,.8,.2,1), opacity .5s'
+    el.style.transform = `translateX(${keep ? 420 : -420}px) rotate(${keep ? 24 : -24}deg)`
+    el.style.opacity = 0
+    setTimeout(() => el.remove(), 500)
+    index++
+    layout()
+    if (index === CARDS.length) finish()
+  }
+
+  function finish() {
+    const got = results.filter(Boolean).length
+    setTimeout(() => {
+      deck.innerHTML = `<div class="kn-done"><div class="bh-big-number">${got}/${CARDS.length}</div><p>${got === CARDS.length ? 'Perfect. You can smell a bit of a bit.' : 'Nice. The farthing trap gets almost everyone.'}</p><button class="bh-button quiet" id="kn-again">Shuffle again</button></div>`
+      document.getElementById('kn-again').onclick = restart
+      if (got >= 5) bh.celebrate(deck)
+      const missed = CARDS.filter((c, i) => !results[i]).map((c) => c.ctx)
+      bh.remember(`Scored ${got}/${CARDS.length} on keep-or-neglect${missed.length ? `; missed: ${missed.join(', ')}` : ''}.`)
+    }, 350)
+  }
+
+  function restart() {
+    index = 0; results = []
+    ;[...score.children].forEach((d) => delete d.dataset.r)
+    feedback.removeAttribute('data-tone')
+    feedback.innerHTML = '<b>Again!</b>Right to keep, left to neglect.'
+    build()
+  }
+
+  function build() {
+    deck.innerHTML = ''
+    CARDS.forEach((card, i) => {
+      const el = makeCard(card, i)
+      el.dataset.i = i
+      deck.append(el)
+      let sx = 0, dx = 0, drag = false
+      el.addEventListener('pointerdown', (e) => {
+        if (i !== index) return
+        drag = true; sx = e.clientX; dx = 0
+        el.setPointerCapture(e.pointerId)
+        el.style.transition = 'none'
+      })
+      el.addEventListener('pointermove', (e) => {
+        if (!drag) return
+        dx = e.clientX - sx
+        el.style.transform = `translateX(${dx}px) rotate(${dx / 14}deg)`
+        el.querySelector('.stamp.keep').style.opacity = Math.max(0, dx / 90)
+        el.querySelector('.stamp.drop').style.opacity = Math.max(0, -dx / 90)
+      })
+      const end = () => {
+        if (!drag) return
+        drag = false
+        if (Math.abs(dx) > 90) decide(dx > 0)
+        else {
+          el.style.transition = 'transform .5s cubic-bezier(.34,1.56,.64,1)'
+          el.style.transform = 'none'
+          el.querySelectorAll('.stamp').forEach((s) => (s.style.opacity = 0))
+        }
+      }
+      el.addEventListener('pointerup', end)
+      el.addEventListener('pointercancel', end)
+    })
+  }
+
+  document.getElementById('kn-keep').onclick = () => decide(true)
+  document.getElementById('kn-drop').onclick = () => decide(false)
+  build()
+})()
+</script>

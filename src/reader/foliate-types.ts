@@ -92,6 +92,8 @@ export interface FoliateOverlayInstance {
 export interface FoliateAnnotationValue {
   readonly value: string
   readonly color?: string
+  readonly style?: string
+  readonly glyph?: string
 }
 
 export type FoliateDrawFunction = (

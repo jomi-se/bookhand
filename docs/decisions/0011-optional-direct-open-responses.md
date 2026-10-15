@@ -1,6 +1,7 @@
 # ADR 0011: Optional direct Open Responses connection
 
-Accepted: 2026-09-20.
+Accepted: 2026-09-20. Conversation persistence amended by
+[ADR 0012](0012-keep-conversations-memories-and-voice.md) on 2026-09-29.
 
 Bookhand offers two ways to connect the optional Tutor. Agent Connect remains
 the recommended path: a compatible provider can authenticate the reader,

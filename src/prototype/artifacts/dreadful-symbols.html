@@ -1,0 +1,130 @@
+<style>
+  .ds-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0 8px; }
+  .ds-sym { position: relative; aspect-ratio: 1 / 1.08; border-radius: 20px; background: var(--bh-raised); border: 1px solid var(--bh-rule); box-shadow: var(--bh-shadow); display: grid; place-items: center; overflow: hidden; cursor: pointer; }
+  .ds-sym .glyph { font: 400 6.2rem/1 var(--bh-display); font-variation-settings: 'SOFT' 100, 'WONK' 1; color: var(--bh-ink); transition: transform .8s var(--bh-spring), opacity .5s, filter .5s; }
+  .ds-sym svg { width: 70%; height: 80%; overflow: visible; }
+  .ds-sym .meaning { position: absolute; inset: auto 10px 14px; text-align: center; font-family: var(--bh-hand); font-size: 1.55rem; line-height: 1; color: var(--bh-accent); opacity: 0; transform: translateY(10px); transition: all .6s var(--bh-spring) .15s; }
+  .ds-sym[data-on] .meaning { opacity: 1; transform: none; }
+  .ds-sym[data-on] .glyph { transform: translateY(-18px) scale(.8); }
+  .ds-sym .tap { position: absolute; top: 10px; right: 12px; font: 600 .62rem/1 var(--bh-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--bh-muted); transition: opacity .3s; }
+  .ds-sym[data-on] .tap { opacity: 0; }
+  .ds-hour { padding: 16px; }
+  .ds-hour svg { display: block; width: 100%; height: 70px; }
+  .ds-hour-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .ds-count { font: 600 1.6rem/1 var(--bh-display); font-variant-numeric: tabular-nums; }
+  .ds-sum { width: 100%; margin-top: 10px; }
+  .ds-total { text-align: center; font: 600 1.25rem/1.3 var(--bh-display); margin: 12px 0 0; min-height: 1.4em; transition: opacity .4s; }
+</style>
+
+<p class="bh-eyebrow">Chapter I · The preliminary terrors</p>
+<h1>Two dreadful symbols, defused</h1>
+<p class="bh-lede">Thompson's first move is to take the scariest symbols in the book and read them out in plain English. Tap each one.</p>
+
+<div class="ds-hero">
+  <div class="ds-sym" id="sym-d" role="button" tabindex="0" aria-label="The symbol d">
+    <span class="tap">tap</span>
+    <span class="glyph">d</span>
+    <span class="meaning">“a little bit of”</span>
+  </div>
+  <div class="ds-sym" id="sym-s" role="button" tabindex="0" aria-label="The integral sign">
+    <span class="tap">tap</span>
+    <svg viewBox="0 0 100 160" aria-hidden="true"><path id="int-path" d="M72 18 C 62 4, 44 10, 46 32 L 54 128 C 56 150, 38 156, 28 142" fill="none" stroke-width="7" stroke-linecap="round"/></svg>
+    <span class="meaning">“the sum of”</span>
+  </div>
+</div>
+
+<p class="bh-muted" style="font-size:.9rem">∫ is just a long S, for <strong>S</strong>um. Mathematicians say “the integral of”, which means “the whole”.</p>
+
+<h2>An hour is 3,600 little bits</h2>
+<div class="bh-stage ds-hour">
+  <div class="ds-hour-top">
+    <span class="bh-muted" style="font-size:.85rem">Cut one hour into</span>
+    <span class="ds-count" id="ds-n">12</span>
+  </div>
+  <svg id="ds-bar" viewBox="0 0 320 70" preserveAspectRatio="none" aria-hidden="true"></svg>
+  <input class="bh-range" id="ds-range" type="range" min="0" max="1000" value="250" aria-label="How many bits" />
+  <button class="bh-button ds-sum" id="ds-sum">∫ Add all the little bits up</button>
+  <p class="ds-total" id="ds-total"></p>
+</div>
+
+<bh-quote section="8" find="That's all." cite="Chapter I">
+  …you are now to perform the operation (if you can) of totalling up all the little bits that are indicated by the symbols that follow. That's all.
+</bh-quote>
+
+<script>
+(() => {
+  const symD = document.getElementById('sym-d')
+  const symS = document.getElementById('sym-s')
+  const path = document.getElementById('int-path')
+  const len = path.getTotalLength()
+  const paintPath = () => { path.setAttribute('stroke', bh.tokens().ink) }
+  paintPath(); bh.onTheme(paintPath)
+  path.style.strokeDasharray = len
+  path.style.strokeDashoffset = 0
+  const toggle = (el) => {
+    el.toggleAttribute('data-on')
+    if (el === symS && el.hasAttribute('data-on') && !bh.reducedMotion) {
+      path.style.transition = 'none'
+      path.style.strokeDashoffset = len
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        path.style.transition = 'stroke-dashoffset 1.1s cubic-bezier(.6,0,.2,1)'
+        path.style.strokeDashoffset = 0
+      }))
+    }
+  }
+  for (const el of [symD, symS]) {
+    el.addEventListener('click', () => toggle(el))
+    el.addEventListener('keydown', (e) => e.key === 'Enter' && toggle(el))
+  }
+  setTimeout(() => toggle(symD), 700)
+
+  const svg = document.getElementById('ds-bar')
+  const range = document.getElementById('ds-range')
+  const count = document.getElementById('ds-n')
+  const total = document.getElementById('ds-total')
+  const NS = 'http://www.w3.org/2000/svg'
+  let n = 12, gap = 1, stop = () => {}
+
+  const fromRange = (v) => Math.max(1, Math.round(Math.pow(3600, v / 1000)))
+  const name = (k) => k === 1 ? 'the whole hour' : k === 60 ? 'minutes' : k === 3600 ? 'seconds' : 'bits'
+
+  function draw() {
+    const t = bh.tokens()
+    svg.textContent = ''
+    const shown = Math.min(n, 240)
+    const W = 320, H = 46, Y = 12
+    const g = gap * Math.min(3, 160 / shown)
+    const w = (W - g * (shown - 1)) / shown
+    const colors = [t.terracotta, t.amber, t.moss, t.sky, t.plum]
+    for (let i = 0; i < shown; i++) {
+      const r = document.createElementNS(NS, 'rect')
+      const lift = gap * Math.sin(i * 1.7) * 6
+      r.setAttribute('x', i * (w + g)); r.setAttribute('y', Y + lift)
+      r.setAttribute('width', Math.max(w, .4)); r.setAttribute('height', H)
+      r.setAttribute('rx', Math.min(3, w / 3))
+      r.setAttribute('fill', colors[Math.floor((i / shown) * colors.length)])
+      r.setAttribute('opacity', .55 + .45 * (1 - gap))
+      svg.append(r)
+    }
+    count.textContent = `${n.toLocaleString()} ${name(n)}`
+  }
+
+  range.addEventListener('input', () => {
+    stop(); gap = 1
+    n = fromRange(Number(range.value))
+    range.style.setProperty('--fill', `${range.value / 10}%`)
+    total.textContent = ''
+    draw()
+  })
+  document.getElementById('ds-sum').addEventListener('click', () => {
+    stop()
+    stop = bh.spring(gap, 0, (v) => { gap = Math.max(0, v); draw() }, { stiffness: 90, damping: 14 })
+    total.innerHTML = `${n.toLocaleString()} ${name(n)} add back up to <span style="color:var(--bh-accent)">one whole hour</span>.`
+    if (n === 3600) { total.innerHTML = '3,600 seconds: ∫ dt = one hour. That’s all.'; bh.celebrate(total) }
+  })
+  range.style.setProperty('--fill', '25%')
+  n = fromRange(250)
+  bh.onTheme(draw)
+  draw()
+})()
+</script>
