@@ -37,6 +37,9 @@ marking direction, record the decision in the spec and start ticket 02.
 
 ### Notes for the next agent
 
+- Oversized EPUB imports now apply the existing 1 GiB limit to file metadata
+  before reading the whole file. Synthetic regressions cover rejection before
+  byte/metadata reads or storage and acceptance at the exact declared limit.
 - `npm run dev` no longer reports the library as open in another tab: React
   StrictMode's double-run load effect sent two overlapping `initialize`
   requests, and the storage worker now shares one attempt.

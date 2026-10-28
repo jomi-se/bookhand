@@ -62,6 +62,10 @@ export async function importEpubFile(
   file: File,
   dependencies: ImportDependencies = {},
 ): Promise<string> {
+  // Reject from file metadata before allocating a whole-file buffer.
+  if (file.size > MAXIMUM_EPUB_BYTES) {
+    throw new ImportRejectedError('too-large', `${file.name} is too large to store.`)
+  }
   const bytes = new Uint8Array(await file.arrayBuffer())
   if (bytes.byteLength === 0) {
     throw new ImportRejectedError('empty', `${file.name} is empty.`)

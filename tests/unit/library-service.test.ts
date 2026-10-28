@@ -58,6 +58,40 @@ describe('importing a person’s own EPUB', () => {
     expect(persist).toHaveBeenCalledOnce()
   })
 
+  it('rejects an oversized file before reading its bytes or metadata', async () => {
+    const client = fakeClient()
+    const file = epubFile('oversized.epub')
+    const read = vi.fn().mockRejectedValue(new RangeError('Synthetic read failure'))
+    const readMetadata = vi.fn(async () => metadata)
+    Object.defineProperties(file, {
+      size: { value: 1_073_741_825 },
+      arrayBuffer: { value: read },
+    })
+
+    const failure = await importEpubFile(client, file, { readMetadata }).catch(
+      (error: unknown) => error,
+    )
+
+    expect(failure).toBeInstanceOf(ImportRejectedError)
+    expect(failure).toMatchObject({ reason: 'too-large' })
+    expect((failure as Error).message).toContain('oversized.epub')
+    expect(read).not.toHaveBeenCalled()
+    expect(readMetadata).not.toHaveBeenCalled()
+    expect(client.importBook).not.toHaveBeenCalled()
+  })
+
+  it('continues importing a file whose declared size is exactly the limit', async () => {
+    const client = fakeClient()
+    const file = epubFile('at-limit.epub')
+    // Use a synthetic size instead of allocating a one-gibibyte test buffer.
+    Object.defineProperty(file, 'size', { value: 1_073_741_824 })
+
+    await expect(
+      importEpubFile(client, file, { readMetadata: async () => metadata }),
+    ).resolves.toBe('stored-id')
+    expect(client.importBook).toHaveBeenCalledOnce()
+  })
+
   it.each([
     ['an empty file', new Uint8Array(), 'empty'],
   ] as const)('rejects %s without storing anything', async (_label, bytes, reason) => {
