@@ -52,12 +52,60 @@ _Avoid_: Patch set, commit
 The visible book and its immediate reading controls.
 _Avoid_: Renderer UI
 
-**Study surface**:
-The durable lessons, notes, diagrams, and other learning material the reader
-chooses to keep.
-_Avoid_: Tutor history
+**Notebook**:
+The place to browse everything about one book (artifacts, highlights,
+memories, and conversations) without searching the book itself.
+_Avoid_: Study surface, study board, library
 
 **Tutor surface**:
-Transient conversation and live guidance, including temporary cues that may
-appear on the reading surface.
-_Avoid_: Study board
+Conversation and live guidance with an agent, including cues that may appear on
+the reading surface. Nothing on it disappears unless the reader dismisses or
+deletes it.
+_Avoid_: Study board, transient tutor, chat
+
+## Learning with an agent
+
+**Conversation**:
+An exchange between the reader and an agent about a book. It is kept, but it
+is the process rather than the thing the reader returns to.
+_Avoid_: Chat log, transcript, session
+
+**Artifact**:
+Anything the reader or an agent makes about a book that should outlive the
+conversation that produced it, anchored to passages, a chapter, or the whole book. It may take any shape,
+from a note the reader typed to an interactive visual, and may leave markings on
+the book.
+_Avoid_: Lesson, card, block, study item
+
+**Highlight**:
+A mark the reader places on a passage. It is part of the book's surface, not an
+artifact, though artifacts may be anchored to it.
+_Avoid_: Annotation
+
+**Marking**:
+A visible sign an artifact leaves on the book, such as a highlight, a margin
+stroke, or a pin, that leads back to the artifact.
+_Avoid_: Badge, indicator
+
+**Memory**:
+Something an agent should know about this reader and this book in future
+conversations: what they understood, where they struggled, what they think of
+the material, and how they like to be taught.
+_Avoid_: History, profile, context
+
+## Reader control
+
+**Keep**:
+Turn something from a conversation into an artifact immediately, without
+asking the agent.
+_Avoid_: Save, bookmark, pin
+
+**Dismiss**:
+Remove something from view while keeping it findable later. It is the ordinary
+way agent cues, explanations, and conversations leave the screen.
+_Avoid_: Close, clear, delete
+
+**Delete**:
+Deliberately destroy something the reader owns. It is the only way Bookhand
+loses learning material.
+_Avoid_: Dismiss, remove

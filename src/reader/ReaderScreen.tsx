@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -7,7 +7,9 @@ import {
   List,
   Minus,
   MessageCircle,
+  NotebookPen,
   Plus,
+  Sparkles,
   RotateCw,
   Search,
   Type,
@@ -42,6 +44,10 @@ import type { TutorAttachment } from '../tutor/conversation.ts'
 import type { ToolDefinition } from '../webmcp/model-context.ts'
 import type { AiConnectionController } from '../ai/connection-controller.ts'
 import type { AiFeatureIntent } from '../ai/pending-intent.ts'
+import type { ReaderAnnotationMark } from '../domain/reader.ts'
+import { ProtoLayer, type ProtoController } from '../prototype/ProtoLayer.tsx'
+import { prototypeEnabled } from '../prototype/flags.ts'
+import { isSeededBook } from '../prototype/seed.ts'
 
 export type { ReaderPanel }
 
@@ -168,6 +174,11 @@ export function ReaderScreen({
     return () => onCommandsReady(undefined)
   }, [onCommandsReady, study.commands])
   const { title } = splitTitle(entry.metadata)
+  // Book artifacts prototype (ticket 01): throwaway surfaces over the reader.
+  const protoOn = useMemo(() => prototypeEnabled() && isSeededBook(title), [title])
+  const protoController = useRef<ProtoController>(undefined)
+  const [protoMarks, setProtoMarks] = useState<readonly ReaderAnnotationMark[]>([])
+  const marks = useMemo(() => [...study.marks, ...protoMarks], [study.marks, protoMarks])
   const expanded = study.board?.view === 'expanded' && panel === 'study'
   const paintedTheme = paintedReaderTheme(reader.style.theme)
   const palette = shellPalette(reader.style.theme)
@@ -216,8 +227,8 @@ export function ReaderScreen({
   // stored highlights on every page turn and every panel toggle.
   const sectionIndex = reader.location?.sectionIndex
   useEffect(() => {
-    bridge.adapter?.renderAnnotations(study.marks)
-  }, [bridge, sectionIndex, study.marks])
+    bridge.adapter?.renderAnnotations(marks)
+  }, [bridge, sectionIndex, marks])
 
   const goToSource = useCallback(
     (range: BookRange) => {
@@ -457,25 +468,38 @@ export function ReaderScreen({
             <List size={16} aria-hidden="true" />
             <span className="tool-label">Contents</span>
           </button>
-          <button
-            type="button"
-            className="button button-quiet"
-            aria-label="Study"
-            aria-pressed={panel === 'study'}
-            aria-expanded={panel === 'study'}
-            aria-controls="reader-study-panel"
-            onClick={() => toggle('study')}
-          >
-            <LayoutPanelLeft size={16} aria-hidden="true" />
-            <span className="tool-label">Study</span>
-          </button>
+          {protoOn ? (
+            <button
+              type="button"
+              className="button button-quiet"
+              aria-label="Notebook"
+              data-proto-notebook
+              onClick={() => protoController.current?.openNotebook()}
+            >
+              <NotebookPen size={16} aria-hidden="true" />
+              <span className="tool-label">Notebook</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="button button-quiet"
+              aria-label="Study"
+              aria-pressed={panel === 'study'}
+              aria-expanded={panel === 'study'}
+              aria-controls="reader-study-panel"
+              onClick={() => toggle('study')}
+            >
+              <LayoutPanelLeft size={16} aria-hidden="true" />
+              <span className="tool-label">Study</span>
+            </button>
+          )}
           <button
             type="button"
             className="button button-quiet"
             aria-label="Tutor"
             aria-expanded={panel === 'tutor'}
             aria-controls="reader-tutor-panel"
-            onClick={() => toggle('tutor')}
+            onClick={() => (protoOn ? protoController.current?.openTutor() : toggle('tutor'))}
           >
             <MessageCircle size={16} aria-hidden="true" />
             <span className="tool-label">Tutor</span>
@@ -711,6 +735,9 @@ export function ReaderScreen({
               onSelectionChange: reader.onSelectionChange,
               onSectionError: reader.onSectionError,
               onTap: onBookTap,
+              onAnnotationActivate: (id: string) => {
+                protoController.current?.activateMark(id)
+              },
               onKeyboardActivity: chrome.show,
               onReaderInteraction: () => {
                 readerInteractionEpoch.current += 1
@@ -727,7 +754,23 @@ export function ReaderScreen({
             <ChevronRight size={20} aria-hidden="true" />
           </button>
 
-          {reader.selection ? (
+          {reader.selection && protoOn ? (
+            <div className="selection-action" role="status">
+              <button type="button" className="button button-quiet" onClick={() => protoController.current?.ask(structuredClone(reader.selection!))}>
+                <Sparkles size={16} aria-hidden="true" />
+                Ask
+              </button>
+              <button type="button" className="button button-quiet" onClick={() => protoController.current?.note(structuredClone(reader.selection!))}>
+                <NotebookPen size={16} aria-hidden="true" />
+                Note
+              </button>
+              <button type="button" className="button button-quiet" onClick={highlightSelection}>
+                <Highlighter size={16} aria-hidden="true" />
+                Highlight
+              </button>
+            </div>
+          ) : null}
+          {reader.selection && !protoOn ? (
             <div className="selection-action" role="status">
               <button type="button" className="button button-quiet" onClick={() => {
                 setTutorAttachment({ bookId: entry.id, selection: structuredClone(reader.selection!) })
@@ -773,6 +816,20 @@ export function ReaderScreen({
             Try again
           </button>
         </p>
+      ) : null}
+
+      {protoOn ? (
+        <ProtoLayer
+          bookTitle={title}
+          adapter={bridge.adapter}
+          readerReady={reader.phase === 'reading'}
+          {...(reader.location ? { sectionIndex: reader.location.sectionIndex } : {})}
+          theme={{ name: paintedTheme, palette }}
+          highlights={study.annotations}
+          navigate={reader.navigate}
+          onMarks={setProtoMarks}
+          controller={protoController}
+        />
       ) : null}
 
       <footer className="reader-footer">

@@ -1,3 +1,4 @@
+import { MARKING_DRAWERS } from './markings.ts'
 import type {
   BookMetadata,
   BookRange,
@@ -333,6 +334,37 @@ export class FoliateReaderAdapter implements ReaderAdapter {
     }
   }
 
+  /**
+   * Prototype helper (book artifacts ticket 01): the CFI of the first place
+   * `needle` occurs in a section, matching across element boundaries and
+   * ignoring differences in whitespace.
+   */
+  async locateText(sectionIndex: number, needle: string): Promise<string | undefined> {
+    const { view } = this.#requireActive()
+    const document = await this.#createSectionDocument(sectionIndex, 'displayed')
+    const walker = document.createTreeWalker(document.body ?? document.documentElement, NodeFilter.SHOW_TEXT)
+    const chars: { node: Text; offset: number }[] = []
+    let text = ''
+    for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+      const value = node.data
+      for (let offset = 0; offset < value.length; offset++) {
+        const char = /\s/.test(value[offset]!) ? ' ' : value[offset]!
+        if (char === ' ' && text.endsWith(' ')) continue
+        text += char
+        chars.push({ node, offset })
+      }
+    }
+    const wanted = needle.replace(/\s+/g, ' ').trim()
+    const at = text.indexOf(wanted)
+    if (at < 0) return undefined
+    const start = chars[at]!
+    const end = chars[at + wanted.length - 1]!
+    const range = document.createRange()
+    range.setStart(start.node, start.offset)
+    range.setEnd(end.node, end.offset + 1)
+    return view.getCFI(sectionIndex, range)
+  }
+
   async getSectionChunks(sectionIndex: number) {
     const { book, view } = this.#requireActive()
     const document = await this.#createSectionDocument(sectionIndex)
@@ -496,7 +528,12 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       if (!kept.has(stale.cfi)) void view.deleteAnnotation?.({ value: stale.cfi })?.catch?.(noop)
     }
     for (const mark of marks) {
-      void view.addAnnotation({ value: mark.cfi, color: mark.color })?.catch?.(noop)
+      void view.addAnnotation({
+        value: mark.cfi,
+        color: mark.color,
+        ...(mark.style ? { style: mark.style } : {}),
+        ...(mark.glyph ? { glyph: mark.glyph } : {}),
+      })?.catch?.(noop)
     }
   }
 
@@ -604,7 +641,15 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       const detail = (event as CustomEvent<FoliateDrawDetail>).detail
       const overlayer = this.#overlayer
       if (!overlayer) return
-      detail.draw(overlayer.highlight, { color: detail.annotation.color ?? 'currentColor' })
+      const { style, glyph, color = 'currentColor' } = detail.annotation
+      const custom = style && style in MARKING_DRAWERS
+        ? MARKING_DRAWERS[style as keyof typeof MARKING_DRAWERS]
+        : undefined
+      detail.draw(custom ?? overlayer.highlight, {
+        color,
+        cfi: detail.annotation.value,
+        ...(glyph ? { glyph } : {}),
+      })
     }
     const onShowAnnotation = (event: Event) => {
       const value = (event as CustomEvent<{ value: string }>).detail.value
@@ -711,6 +756,14 @@ export class FoliateReaderAdapter implements ReaderAdapter {
         fraction: this.#hostFraction(doc, touch.clientX),
       })
       if (!zone) return
+      // A tap on a marked passage belongs to the marking, not to a page-turn
+      // zone: let Foliate's click through so it can report the annotation.
+      const overlayer = this.#active?.view.renderer.getContents()
+        .find((content) => content.doc === doc)?.overlayer as
+        | { hitTest?: (point: { x: number; y: number }) => unknown[] }
+        | undefined
+      const [hit] = overlayer?.hitTest?.({ x: touch.clientX, y: touch.clientY }) ?? []
+      if (typeof hit === 'string' && !hit.startsWith('foliate-search:')) return
       event.stopPropagation()
       event.stopImmediatePropagation()
       this.#options.onTap?.(zone)

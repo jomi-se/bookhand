@@ -1,0 +1,86 @@
+<style>
+  .st-stage { padding: 12px 12px 8px; }
+  .st-stage svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .st-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 4px; }
+  .st-row div { background: var(--bh-wash); border-radius: 12px; padding: 9px 10px; }
+  .st-row span { display: block; font: 600 .64rem/1 var(--bh-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--bh-muted); }
+  .st-row b { display: block; font: 600 1.05rem/1 var(--bh-mono); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .st-err { height: 8px; border-radius: 99px; background: var(--bh-rule); overflow: hidden; margin: 10px 0 2px; }
+  .st-err span { display: block; height: 100%; background: var(--bh-terracotta); transition: width .35s var(--bh-ease); }
+</style>
+
+<p class="bh-eyebrow">Chapter XIX · Finding areas</p>
+<h1>Strips into area</h1>
+<p class="bh-lede">The area under a curve is hard to get at in one go. Cut it into strips of width <em>dx</em>, add them up, and let the strips get thinner.</p>
+
+<div class="bh-stage st-stage">
+  <svg id="st" viewBox="0 0 320 210" aria-label="Area under y = 1 + x² / 2 split into strips"></svg>
+  <div class="st-row">
+    <div><span>strips</span><b id="st-n"></b></div>
+    <div><span>sum of y·dx</span><b id="st-sum"></b></div>
+    <div><span>true area</span><b id="st-true"></b></div>
+  </div>
+  <div class="st-err" aria-hidden="true"><span id="st-err"></span></div>
+  <div class="bh-muted" style="font-size:.8rem" id="st-errtext"></div>
+  <input class="bh-range" type="range" id="st-range" min="1" max="120" value="4" aria-label="Number of strips" />
+</div>
+
+<bh-math block>S = \int dS = \int_{x_1}^{x_2} y\,dx</bh-math>
+
+<bh-quote section="27" find="conceive the area as being divided up into a lot of narrow strips" cite="Chapter XIX">
+  The secret of solving this problem is to conceive the area as being divided up into a lot of narrow strips, each of them being of the width dx.
+</bh-quote>
+
+<p class="bh-muted" style="font-size:.9rem">∫ is still just “the sum of”, the long S from <a href="bookhand:artifact/dreadful-symbols">Chapter I</a>.</p>
+
+<script>
+(() => {
+  const svg = document.getElementById('st')
+  const range = document.getElementById('st-range')
+  const f = (x) => 1 + x * x / 2
+  const a = .5, b = 2.5
+  const exact = (b - a) + (b ** 3 - a ** 3) / 6
+  let n = 4, shownN = 4, stop = () => {}
+
+  function draw(count) {
+    const t = bh.tokens()
+    const X = 26, Y = 10, W = 286, H = 170
+    const sx = (x) => X + (x / 3) * W
+    const sy = (y) => Y + H - (y / 5) * H
+    const k = Math.max(1, Math.round(count))
+    const dx = (b - a) / k
+    let rects = '', sum = 0
+    for (let i = 0; i < k; i++) {
+      const x0 = a + i * dx, mid = x0 + dx / 2, h = f(mid)
+      sum += h * dx
+      const hue = [t.amber, t.terracotta][i % 2]
+      rects += `<rect x="${sx(x0)}" y="${sy(h)}" width="${Math.max(.5, sx(x0 + dx) - sx(x0) - (k < 40 ? 1 : 0))}" height="${sy(0) - sy(h)}" fill="${hue}" fill-opacity="${k > 60 ? .55 : .42}" rx="${k < 20 ? 2 : 0}"/>`
+    }
+    let curve = ''
+    for (let i = 0; i <= 90; i++) { const x = (i / 90) * 2.8; curve += `${i ? 'L' : 'M'}${sx(x).toFixed(1)} ${sy(f(x)).toFixed(1)} ` }
+    svg.innerHTML = `
+      <line x1="${X}" y1="${sy(0)}" x2="${X + W}" y2="${sy(0)}" stroke="${t.muted}"/>
+      <line x1="${X}" y1="${Y}" x2="${X}" y2="${sy(0)}" stroke="${t.muted}"/>
+      ${rects}
+      <path d="${curve}" fill="none" stroke="${t.ink}" stroke-width="2.2"/>
+      <text x="${sx(2.6)}" y="${sy(f(2.6)) - 10}" font-size="13" fill="${t.ink}" font-family="${t.serif}" font-style="italic" text-anchor="end">y = 1 + x²⁄2</text>
+      <text x="${sx(a)}" y="${sy(0) + 16}" font-size="11" fill="${t.muted}" text-anchor="middle" font-family="${t.serif}" font-style="italic">x₁</text>
+      <text x="${sx(b)}" y="${sy(0) + 16}" font-size="11" fill="${t.muted}" text-anchor="middle" font-family="${t.serif}" font-style="italic">x₂</text>`
+    document.getElementById('st-n').textContent = k
+    document.getElementById('st-sum').textContent = sum.toFixed(4)
+    document.getElementById('st-true').textContent = exact.toFixed(4)
+    const err = Math.abs(exact - sum) / exact
+    document.getElementById('st-err').style.width = `${Math.min(100, err * 2500)}%`
+    document.getElementById('st-errtext').textContent = err < 1e-4
+      ? 'Too small to draw. The strips have become the area.'
+      : `off by ${(err * 100).toFixed(err < .01 ? 3 : 2)}%`
+    range.value = k
+    range.style.setProperty('--fill', `${(k / 120) * 100}%`)
+  }
+  function paint(v) { shownN = v; draw(v) }
+  range.addEventListener('input', () => { stop(); paint(Number(range.value)) })
+  bh.onTheme(() => draw(shownN))
+  paint(1)
+  setTimeout(() => { stop = bh.spring(1, 8, paint, { stiffness: 40, damping: 10 }) }, 600)
+})()
+</script>

@@ -106,6 +106,7 @@ export class StorageWorkerRuntime {
   private repository: LibraryRepository | undefined
   private pool: SAHPoolUtil | undefined
   private mode: StorageDiagnostics['mode'] | undefined
+  private initializing: Promise<StorageDiagnostics> | undefined
   private readonly hooks: StorageRuntimeHooks
   constructor(
     initializeSqlite: SqliteInitializer = initializeOfficialSqlite,
@@ -287,7 +288,19 @@ export class StorageWorkerRuntime {
     }
   }
 
-  private async initialize(): Promise<StorageDiagnostics> {
+  /**
+   * Overlapping initialize requests share one attempt. React StrictMode runs
+   * the library's load effect twice in development, and two concurrent
+   * attempts would each install the sahpool VFS and lock each other out.
+   */
+  private initialize(): Promise<StorageDiagnostics> {
+    this.initializing ??= this.performInitialize().finally(() => {
+      this.initializing = undefined
+    })
+    return this.initializing
+  }
+
+  private async performInitialize(): Promise<StorageDiagnostics> {
     if (this.mode) return this.diagnostics()
     this.sqlite ??= await this.initializeSqlite()
 

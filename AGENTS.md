@@ -20,7 +20,8 @@ agents from reopening settled choices during the short build.
 ## Current scope
 
 - EPUB reading built on the smallest practical Foliate.js integration.
-- Local persistence for books, position, highlights, notes, and study boards.
+- Local persistence for books, position, highlights, artifacts, conversations,
+  and memories.
 - Official SQLite WASM owned by one dedicated worker, persisted with
   `opfs-sahpool`; FTS5 for lexical retrieval and ordinary packed BLOBs plus an
   exact JavaScript scan for vectors. Do not use `sqlite-vec`, Dexie, MiniSearch,
@@ -34,16 +35,18 @@ agents from reopening settled choices during the short build.
   publisher original and exposes comparison, revision history, Undo, and
   Reset. Deterministic repair helpers are optional accelerators, not the
   architecture or a limit on agent judgement. Never apply a remaster silently.
-- Study boards that work both docked beside the book and as a larger workspace.
-- Stable native blocks for common content, plus explicitly created generated
-  labs for richer diagrams and interactive explanations. Keep generated work
-  bounded to its study-board surface; do not let it silently rewrite the reader.
+- Artifacts of any shape, including agent-generated HTML, CSS, and JavaScript,
+  anchored to the book and rendered in their own contained frame (ADR 0013).
+  Smart building blocks accelerate artifacts without limiting their style.
+  Artifacts leave markings on the book and are browsed in the book's Notebook.
+- Conversations, memories, and the tutor's voice persist until the reader
+  dismisses or deletes them (ADR 0012).
 - Public-domain technical books are temporary judging fixtures, not permanent
   product commitments.
 
-Favor a convincing vertical slice over a generalized platform. The immediate
-question is whether WebMCP enables a materially better study experience than an
-ordinary ebook reader.
+Favor a convincing vertical slice over a generalized platform. The target is
+the owner's daily study loop with technical books on a phone; the active plan
+is `docs/plan/book-artifacts/spec.md`.
 
 ## Commands
 

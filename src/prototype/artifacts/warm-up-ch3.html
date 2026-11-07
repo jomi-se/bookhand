@@ -1,0 +1,106 @@
+<style>
+  .wu-hero { position: relative; margin: 8px 0 18px; padding: 18px 18px 16px; border-radius: 22px; overflow: hidden;
+    background: radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--bh-amber) 30%, transparent), transparent 55%),
+      radial-gradient(circle at 0% 100%, color-mix(in oklch, var(--bh-plum) 22%, transparent), transparent 60%), var(--bh-raised);
+    border: 1px solid var(--bh-rule); }
+  .wu-hero .bh-hand { font-size: 1.6rem; }
+  .wu-time { display: inline-flex; gap: 6px; align-items: center; font: 600 .72rem/1 var(--bh-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--bh-muted); }
+  .wu-know { display: grid; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+  .wu-know li { position: relative; padding-left: 18px; font-size: .92rem; }
+  .wu-know li::before { content: '◆'; position: absolute; left: 0; top: .45em; font-size: .6rem; line-height: 1; color: var(--bh-moss); }
+  .wu-know li.wobbly::before { color: var(--bh-terracotta); }
+  .wu-tri svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .wu-ratio { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; }
+  .wu-link { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 16px;
+    border: 1px solid var(--bh-rule); background: var(--bh-raised); color: var(--bh-ink); text-decoration: none; margin: 10px 0; }
+  .wu-link span:first-child { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: #1c1c1c; color: #fff; font-size: 1.2rem; }
+  .wu-link small { display: block; color: var(--bh-muted); font-size: .78rem; }
+  .wu-mini { display: flex; align-items: center; gap: 12px; }
+  .wu-mini svg { flex: none; width: 88px; height: 66px; }
+</style>
+
+<p class="bh-eyebrow">Tonight · before Chapter III</p>
+<h1>Warm-up: from bits to ratios</h1>
+
+<div class="wu-hero">
+  <span class="wu-time">◷ five minutes · four steps</span>
+  <p class="bh-hand" style="margin:8px 0 4px">You've got the bits. Now we compare them.</p>
+  <ul class="wu-know">
+    <li>d means “a little bit of”. You own this.</li>
+    <li>A bit of a bit, (dx)², can be thrown away. Clicked yesterday.</li>
+    <li class="wobbly">dy⁄dx is a <em>ratio</em>, not a bit. Still wobbly: that's tonight.</li>
+  </ul>
+</div>
+
+<bh-steps id="wu">
+  <bh-step>
+    <h3>1 · Two bits at once</h3>
+    <p>Chapter III grows <em>two</em> things together. Nudge <em>x</em> by a bit, <em>dx</em>, and <em>y</em> moves by its own bit, <em>dy</em>.</p>
+    <p>Calculus doesn't care how big either bit is. It cares how they <strong>compare</strong>: <bh-math>dy / dx</bh-math>.</p>
+  </bh-step>
+  <bh-step>
+    <h3>2 · Remember the corner?</h3>
+    <div class="wu-mini">
+      <svg viewBox="0 0 88 66" aria-hidden="true"><rect x="6" y="6" width="44" height="44" rx="3" fill="var(--bh-accent)" opacity=".15" stroke="var(--bh-accent)"/><rect x="51" y="6" width="8" height="44" fill="var(--bh-amber)"/><rect x="6" y="51" width="44" height="8" fill="var(--bh-amber)"/><rect x="51" y="51" width="8" height="8" fill="var(--bh-sky)"/></svg>
+      <p style="margin:0">Same move as <a href="bookhand:artifact/bit-of-a-bit">the bit of a bit</a>: we'll throw tiny things away once we've taken the ratio.</p>
+    </div>
+  </bh-step>
+  <bh-step>
+    <h3>3 · Fig. 4, alive</h3>
+    <p>A 30° triangle grows. Drag <bh-scrub id="wu-dx" min="4" max="60" value="20" sensitivity="3"></bh-scrub> for dx and watch the ratio.</p>
+    <div class="wu-tri"><svg id="wu-svg" viewBox="0 0 300 150" aria-label="A right triangle with a 30 degree slope"></svg></div>
+    <div class="wu-ratio"><span class="bh-muted" style="font-size:.85rem">dy ⁄ dx</span><span class="bh-big-number" id="wu-r" style="font-size:1.7rem"></span></div>
+    <p class="bh-muted" style="font-size:.85rem">It never moves. On a straight slope the ratio is the same at every size: 1 ⁄ 1.73.</p>
+  </bh-step>
+  <bh-step>
+    <h3>4 · Quick check</h3>
+    <p>On the 30° triangle, you double <em>dx</em>. What happens to <em>dy⁄dx</em>?</p>
+    <bh-choice>
+      <button data-option>It doubles<span class="bh-why">dy doubles too, so the ratio stays put.</span></button>
+      <button data-option data-correct>It stays the same<span class="bh-why">Yes! Both bits grow together. That's what makes it a ratio.</span></button>
+      <button data-option>It halves<span class="bh-why">Other way around: think of what dy does.</span></button>
+    </bh-choice>
+  </bh-step>
+</bh-steps>
+
+<h2>Then read on</h2>
+<p>Thompson's next example, the ladder, is where the ratio stops being constant. <strong>That's the interesting bit.</strong></p>
+<bh-quote section="10" find="hunting, hunting, hunting" cite="Chapter III · where you're heading">
+  Now right through the differential calculus we are hunting, hunting, hunting for a curious thing, a mere ratio…
+</bh-quote>
+
+<a class="wu-link" href="https://www.3blue1brown.com/lessons/derivatives">
+  <span>▶</span>
+  <span><strong>If you want a second voice</strong><small>3Blue1Brown · The paradox of the derivative · 17 min</small></span>
+</a>
+
+<script>
+(() => {
+  const scrub = document.getElementById('wu-dx')
+  const svg = document.getElementById('wu-svg')
+  const r = document.getElementById('wu-r')
+  const TAN = Math.tan(Math.PI / 6)
+  let dx = 20
+  function draw() {
+    const t = bh.tokens()
+    const X = 30, Y = 130, base = 170
+    const h = base * TAN
+    const dh = dx * TAN
+    svg.innerHTML = `
+      <path d="M${X} ${Y} L${X + base} ${Y} L${X + base} ${Y - h} Z" fill="${t.accent}" fill-opacity=".12" stroke="${t.accent}" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M${X + base} ${Y - h} L${X + base + dx} ${Y - h - dh}" stroke="${t.accent}" stroke-width="1.6" stroke-dasharray="4 3"/>
+      <path d="M${X + base} ${Y - h} L${X + base + dx} ${Y - h} L${X + base + dx} ${Y - h - dh} Z" fill="${t.sky}" fill-opacity=".18" stroke="${t.sky}" stroke-width="1.4"/>
+      <line x1="${X + base}" y1="${Y - h + 8}" x2="${X + base + dx}" y2="${Y - h + 8}" stroke="${t.amber}" stroke-width="3" stroke-linecap="round"/>
+      <line x1="${X + base + dx + 8}" y1="${Y - h}" x2="${X + base + dx + 8}" y2="${Y - h - dh}" stroke="${t.sky}" stroke-width="3" stroke-linecap="round"/>
+      <text x="${X + base + dx / 2}" y="${Y - h + 22}" font-size="11" text-anchor="middle" fill="${t.amber}" font-family="${t.serif}" font-style="italic">dx</text>
+      <text x="${X + base + dx + 14}" y="${Y - h - dh / 2 + 4}" font-size="11" fill="${t.sky}" font-family="${t.serif}" font-style="italic">dy</text>
+      <text x="${X + 30}" y="${Y - 8}" font-size="11" fill="${t.muted}" font-family="${t.sans}">30°</text>
+      <text x="${X + base / 2}" y="${Y + 16}" font-size="12" text-anchor="middle" fill="${t.ink}" font-family="${t.serif}" font-style="italic">x</text>
+      <text x="${X + base + 8}" y="${Y - h / 2 + 8}" font-size="12" fill="${t.ink}" font-family="${t.serif}" font-style="italic">y</text>`
+    r.textContent = (dh / dx).toFixed(3)
+  }
+  scrub.addEventListener('input', (e) => { dx = e.detail; draw() })
+  bh.onTheme(draw)
+  draw()
+})()
+</script>

@@ -110,6 +110,10 @@ export interface ReaderAnnotationMark {
   readonly id: string
   readonly cfi: string
   readonly color: string
+  /** How the passage is marked; a plain highlight when absent. */
+  readonly style?: 'highlight' | 'wash' | 'margin' | 'pin'
+  /** A short glyph some marking styles draw beside the passage. */
+  readonly glyph?: string
 }
 
 export type TutorCueKind = 'highlight' | 'underline' | 'outline'
@@ -150,6 +154,8 @@ export interface ReaderAdapter {
   getStyle(): ReaderStyle
   resetStyle(): void
   renderAnnotations(marks: readonly ReaderAnnotationMark[]): void
+  /** Prototype: the CFI of the first occurrence of some text in a section. */
+  locateText?(sectionIndex: number, needle: string): Promise<string | undefined>
   /** Runtime-only verified tutor target, visually distinct from durable annotations. */
   setTutorTarget?(passage: Passage | null, cue?: TutorCue): void
   /**

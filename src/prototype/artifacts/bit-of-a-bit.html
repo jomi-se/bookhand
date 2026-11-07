@@ -1,0 +1,194 @@
+<style>
+  .sq-stage { padding: 10px 6px 4px; touch-action: pan-y; }
+  .sq-stage svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .sq-label { font-family: var(--bh-serif); font-style: italic; }
+  .sq-controls { margin-top: 14px; }
+  .sq-sentence { font: 500 1.02rem/1.5 var(--bh-sans); margin: 4px 2px 2px; }
+  .sq-presets { margin: 10px 0 2px; gap: 6px; }
+  .sq-presets .bh-chip { padding: 7px 11px; }
+  .sq-bar { position: relative; display: flex; height: 16px; border-radius: 999px; overflow: hidden; background: var(--bh-rule); margin: 16px 0 6px; }
+  .sq-bar > span { display: block; height: 100%; transition: width .5s var(--bh-ease); }
+  .sq-bar .strips { background: var(--bh-amber); }
+  .sq-bar .corner { background: var(--bh-sky); min-width: 2px; }
+  .sq-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; font-size: .86rem; }
+  .sq-legend b { font: 600 1.05rem/1.2 var(--bh-mono); font-variant-numeric: tabular-nums; display: block; }
+  .sq-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .sq-formula { margin: 18px 0 6px; font-size: 1.15rem; }
+  .sq-verdict { font: 600 1.35rem/1.25 var(--bh-display); margin: 18px 0 4px; min-height: 2.5em; transition: color .3s; }
+  .sq-verdict small { display: block; font: 400 .9rem/1.4 var(--bh-sans); color: var(--bh-muted); margin-top: 4px; }
+  @keyframes sq-pulse { 50% { opacity: .35; } }
+  .sq-corner-ring { animation: sq-pulse 1.6s ease-in-out infinite; }
+</style>
+
+<p class="bh-eyebrow">Chapter II · Fig. 1, alive</p>
+<h1>The bit of a bit</h1>
+<p class="bh-lede">A square of side <em>x</em> grows by a sliver <em>dx</em>. Drag the sliver and watch which new pieces matter.</p>
+
+<div class="bh-stage sq-stage">
+  <svg id="sq" viewBox="0 0 340 290" role="img" aria-label="A square of side x growing by dx"></svg>
+</div>
+
+<div class="sq-controls">
+  <p class="sq-sentence">Let <em>dx</em> be <bh-scrub id="sq-scrub" min="2" max="1000" step="1" value="4" sensitivity="3"></bh-scrub> of <em>x</em>.</p>
+  <input id="sq-range" class="bh-range" type="range" min="0" max="1000" value="0" aria-label="How small dx is" />
+  <div class="bh-row sq-presets" id="sq-presets">
+    <button class="bh-chip" data-n="2">½</button>
+    <button class="bh-chip" data-n="10">1⁄10</button>
+    <button class="bh-chip" data-n="60">1⁄60 · a minute</button>
+    <button class="bh-chip" data-n="1000">1⁄1000</button>
+  </div>
+</div>
+
+<div class="sq-bar" aria-hidden="true"><span class="strips"></span><span class="corner"></span></div>
+<div class="sq-legend">
+  <div><i style="background:var(--bh-amber)"></i>Two strips, 2·x·dx<b id="sq-strips"></b></div>
+  <div><i style="background:var(--bh-sky)"></i>The corner, (dx)²<b id="sq-corner"></b></div>
+</div>
+
+<p class="sq-verdict" id="sq-verdict"></p>
+
+<div class="sq-formula"><bh-math block id="sq-formula">(x + dx)^2 = x^2 + 2x\,dx + (dx)^2</bh-math></div>
+
+<bh-quote section="9" find="being a bit of, a bit of" cite="Chapter II · Thompson">
+  The second term is not negligible because it is a first-order quantity; while the third term is of the second order of smallness, being a bit of, a bit of x².
+</bh-quote>
+
+<bh-margin>↑ he means the little blue corner!</bh-margin>
+
+<bh-reveal prompt="If dx is a hundredth of x, how big is the corner compared with the whole square?">
+  <strong>One ten-thousandth.</strong>
+  <span>A bit (1⁄100) of a bit (1⁄100). The two strips together are still 2⁄100: two hundred times bigger than the corner.</span>
+</bh-reveal>
+
+<bh-callout kind="insight">Thompson's rule of thumb: make <em>dx</em> small enough and you keep the first-order bits and throw away the bit of a bit. That throwing-away is the whole trick of differentiation.</bh-callout>
+
+<script>
+(() => {
+  const svg = document.getElementById('sq')
+  const scrub = document.getElementById('sq-scrub')
+  const range = document.getElementById('sq-range')
+  const presets = document.getElementById('sq-presets')
+  const NS = 'http://www.w3.org/2000/svg'
+  const T = 214, OX = 34, OY = 40
+  let n = 4
+  let shown = 4
+  let stop = () => {}
+
+  scrub.format = (v) => `1⁄${Math.round(v)}`
+  scrub.refresh()
+
+  const toRange = (value) => Math.round((Math.log(value / 2) / Math.log(500)) * 1000)
+  const fromRange = (value) => Math.max(2, Math.round(2 * Math.pow(500, value / 1000)))
+
+  function node(tag, attrs, parent = svg) {
+    const el = document.createElementNS(NS, tag)
+    for (const k in attrs) el.setAttribute(k, attrs[k])
+    parent.append(el)
+    return el
+  }
+
+  function draw(value) {
+    const t = bh.tokens()
+    svg.textContent = ''
+    const r = 1 / value
+    const x = T / (1 + r)
+    const d = T - x
+    node('rect', { x: OX, y: OY, width: x, height: x, rx: 4, fill: t.accent, opacity: t.dark ? .22 : .14 })
+    node('rect', { x: OX, y: OY, width: x, height: x, rx: 4, fill: 'none', stroke: t.accent, 'stroke-width': 1.5 })
+    node('rect', { x: OX + x + 1, y: OY, width: Math.max(d - 1, .6), height: x, fill: t.amber, opacity: .85, rx: 2 })
+    node('rect', { x: OX, y: OY + x + 1, width: x, height: Math.max(d - 1, .6), fill: t.amber, opacity: .85, rx: 2 })
+    node('rect', { x: OX + x + 1, y: OY + x + 1, width: Math.max(d - 1, .6), height: Math.max(d - 1, .6), fill: t.sky, rx: 1 })
+    const label = node('text', { x: OX + x / 2, y: OY + x / 2 + 12, 'text-anchor': 'middle', 'font-size': 38, fill: t.accent, class: 'sq-label' })
+    label.textContent = 'x²'
+    const top = node('text', { x: OX + x / 2, y: OY - 10, 'text-anchor': 'middle', 'font-size': 18, fill: t.ink, class: 'sq-label' })
+    top.textContent = 'x'
+    const side = node('text', { x: OX - 12, y: OY + x / 2 + 6, 'text-anchor': 'middle', 'font-size': 18, fill: t.ink, class: 'sq-label' })
+    side.textContent = 'x'
+    if (d > 16) {
+      const dl = node('text', { x: OX + x + d / 2, y: OY - 10, 'text-anchor': 'middle', 'font-size': 14, fill: t.amber, class: 'sq-label' })
+      dl.textContent = 'dx'
+    }
+    // A lens on the corner once it becomes too small to see.
+    const cx = OX + x + d / 2, cy = OY + x + d / 2
+    if (d < 18) {
+      const lx = 300, ly = 70, R = 34
+      node('line', { x1: cx, y1: cy, x2: lx - R * .5, y2: ly + R * .85, stroke: t.sky, 'stroke-width': 1.2, 'stroke-dasharray': '3 3' })
+      node('circle', { cx, cy, r: 7, fill: 'none', stroke: t.sky, 'stroke-width': 1.5, class: 'sq-corner-ring' })
+      const clipId = 'lens'
+      const defs = node('defs', {})
+      const clip = node('clipPath', { id: clipId }, defs)
+      node('circle', { cx: lx, cy: ly, r: R }, clip)
+      node('circle', { cx: lx, cy: ly, r: R + 3, fill: t.raised, stroke: t.rule, 'stroke-width': 1 })
+      const g = node('g', { 'clip-path': `url(#${clipId})` })
+      const zoom = Math.min(400, (R * 0.9) / Math.max(d, .01))
+      const inner = node('g', { transform: `translate(${lx - (OX + x) * zoom} ${ly - (OY + x) * zoom}) scale(${zoom})` }, g)
+      node('rect', { x: OX, y: OY, width: x, height: x, fill: t.accent, opacity: t.dark ? .22 : .14 }, inner)
+      node('rect', { x: OX + x, y: OY, width: d, height: x, fill: t.amber, opacity: .85 }, inner)
+      node('rect', { x: OX, y: OY + x, width: x, height: d, fill: t.amber, opacity: .85 }, inner)
+      node('rect', { x: OX + x, y: OY + x, width: d, height: d, fill: t.sky }, inner)
+      node('circle', { cx: lx, cy: ly, r: R, fill: 'none', stroke: t.sky, 'stroke-width': 2 })
+      const cap = node('text', { x: lx, y: ly + R + 18, 'text-anchor': 'middle', 'font-size': 11, fill: t.muted, 'font-family': t.sans })
+      cap.textContent = `×${Math.round(zoom)} zoom`
+    }
+  }
+
+  function describe(value) {
+    const strips = 2 / value
+    const corner = 1 / (value * value)
+    const total = strips + corner
+    document.querySelector('.sq-bar .strips').style.width = `${(strips / total) * 100}%`
+    document.querySelector('.sq-bar .corner').style.width = `${(corner / total) * 100}%`
+    const pct = (v) => v >= .01 ? `${(v * 100).toFixed(v >= .1 ? 0 : 1)}% of x²` : `1⁄${Math.round(1 / v).toLocaleString()} of x²`
+    document.getElementById('sq-strips').textContent = pct(strips)
+    document.getElementById('sq-corner').textContent = pct(corner)
+    const ratio = Math.round(strips / corner)
+    const verdict = document.getElementById('sq-verdict')
+    if (value <= 3) {
+      verdict.innerHTML = `The corner still matters.<small>At this size it is a real chunk of the growth. dx isn't small yet.</small>`
+      verdict.style.color = 'var(--bh-terracotta)'
+    } else if (value < 60) {
+      verdict.innerHTML = `The strips are ${ratio}× the corner.<small>Shrinking dx shrinks the corner much faster than the strips.</small>`
+      verdict.style.color = 'var(--bh-ink)'
+    } else {
+      verdict.innerHTML = `The corner is a speck. Throw it away.<small>The strips are ${ratio.toLocaleString()}× bigger. What's left is x² + 2x·dx.</small>`
+      verdict.style.color = 'var(--bh-moss)'
+    }
+    for (const chip of presets.children) chip.setAttribute('aria-pressed', String(Number(chip.dataset.n) === Math.round(value)))
+    range.value = toRange(value)
+    range.style.setProperty('--fill', `${range.value / 10}%`)
+  }
+
+  function paint(value) {
+    shown = value
+    draw(value)
+    describe(value)
+    scrub.value = value
+  }
+
+  function goTo(target) {
+    n = target
+    stop()
+    const from = Math.log(shown), to = Math.log(target)
+    stop = bh.spring(from, to, (v) => paint(Math.exp(v)), { stiffness: 120, damping: 20 })
+  }
+
+  scrub.addEventListener('input', (e) => { stop(); n = e.detail; paint(n) })
+  range.addEventListener('input', () => { stop(); n = fromRange(Number(range.value)); paint(n) })
+  presets.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-n]')
+    if (chip) goTo(Number(chip.dataset.n))
+  })
+
+  async function colorFormula() {
+    const katex = await bh.load('katex')
+    const t = bh.tokens()
+    katex.render(`(x + dx)^2 = x^2 + \\color{${t.amber}}{2x\\,dx} + \\color{${t.sky}}{(dx)^2}`,
+      document.getElementById('sq-formula'), { displayMode: true, throwOnError: false })
+  }
+
+  bh.onTheme(() => { paint(shown); colorFormula() })
+  paint(2)
+  colorFormula()
+  setTimeout(() => goTo(10), 500)
+})()
+</script>

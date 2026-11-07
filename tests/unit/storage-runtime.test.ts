@@ -77,6 +77,22 @@ describe('storage worker runtime over the official SQLite artifact', () => {
     newSession.close()
   })
 
+  it('shares one initialization between overlapping initialize requests', async () => {
+    // React StrictMode runs the library's load effect twice, so the worker
+    // receives a second initialize before the first finishes. Two attempts
+    // would each install the sahpool VFS and lock each other out.
+    const initializeSqlite = vi.fn(() => sqlite3InitModule())
+    const runtime = new StorageWorkerRuntime(initializeSqlite)
+    const [first, second] = await Promise.all([
+      runtime.handle({ requestId: '1', type: 'initialize' }),
+      runtime.handle({ requestId: '2', type: 'initialize' }),
+    ])
+    expect(first).toMatchObject({ type: 'initialized', diagnostics: { mode: 'session-only' } })
+    expect(second).toEqual(first)
+    expect(initializeSqlite).toHaveBeenCalledTimes(1)
+    runtime.close()
+  })
+
   it('runtime-validates messages before they reach SQLite', async () => {
     const runtime = new StorageWorkerRuntime(() => sqlite3InitModule())
     await expect(

@@ -1,0 +1,122 @@
+<style>
+  .e-number { font: 600 3rem/1 var(--bh-display); font-variant-numeric: tabular-nums; letter-spacing: -.02em; margin: 6px 0 2px; display: flex; flex-wrap: wrap; }
+  .e-number span { display: inline-block; transition: color .3s, transform .45s var(--bh-spring); }
+  .e-number span[data-locked] { color: var(--bh-moss); }
+  .e-number span[data-pop] { transform: translateY(-6px) scale(1.12); }
+  .e-caption { font-size: .88rem; color: var(--bh-muted); margin: 0 0 12px; }
+  .e-stage { padding: 14px 12px 10px; }
+  .e-stage svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .e-n { display: flex; justify-content: space-between; align-items: baseline; margin: 12px 2px 0; }
+  .e-n b { font: 600 1.05rem/1 var(--bh-mono); }
+  .e-chips { gap: 6px; margin: 8px 0 0; }
+  .e-chips .bh-chip { padding: 7px 10px; font-size: .76rem; }
+</style>
+
+<p class="bh-eyebrow">Chapter XIV · True compound interest</p>
+<h1>Where <em style="font-family:var(--bh-display)">e</em> comes from</h1>
+<p class="bh-lede">£100 at 100% a year. Add the interest in more and more often, and the money doesn't explode. It creeps up on a strange number.</p>
+
+<div class="e-number" id="e-num" aria-live="polite"></div>
+<p class="e-caption" id="e-cap"></p>
+
+<div class="bh-stage e-stage">
+  <svg id="e-chart" viewBox="0 0 320 190" aria-label="Growth of £100 over one year"></svg>
+  <div class="e-n"><span class="bh-muted" style="font-size:.85rem">interest added</span><b id="e-n"></b></div>
+  <input class="bh-range" type="range" id="e-range" min="0" max="1000" value="0" aria-label="How often interest is added" />
+  <div class="bh-row e-chips" id="e-chips">
+    <button class="bh-chip" data-n="1">yearly</button>
+    <button class="bh-chip" data-n="10">Thompson's 10</button>
+    <button class="bh-chip" data-n="12">monthly</button>
+    <button class="bh-chip" data-n="365">daily</button>
+    <button class="bh-chip" data-n="31536000">every second</button>
+  </div>
+</div>
+
+<bh-quote section="22" find="will multiply the original capital by 2.59374" cite="Chapter XIV">
+  …and if continued for ten years (which will multiply by this factor ten times over) will multiply the original capital by 2.59374.
+</bh-quote>
+
+<bh-reveal prompt="Why does it stop at 2.718… instead of growing forever?">
+  <span>Every extra split makes each bit of interest <strong>smaller</strong> as well as more frequent. The two effects nearly cancel. What's left over is <bh-math>e = \lim_{n\to\infty}\left(1+\tfrac1n\right)^n</bh-math>, the growth of a thing whose growth is always proportional to itself.</span>
+</bh-reveal>
+
+<script>
+(() => {
+  const E = '2.718281828'
+  const num = document.getElementById('e-num')
+  const range = document.getElementById('e-range')
+  const chips = document.getElementById('e-chips')
+  const svg = document.getElementById('e-chart')
+  let n = 1, shown = 1, prevLocked = 0, stop = () => {}
+  const MAXLOG = Math.log(31536000)
+  const fromRange = (v) => Math.max(1, Math.round(Math.exp((v / 1000) * MAXLOG)))
+  const toRange = (k) => Math.round((Math.log(k) / MAXLOG) * 1000)
+  const value = (k) => Math.pow(1 + 1 / k, k)
+
+  function renderNumber(k) {
+    const v = value(k).toFixed(9)
+    let locked = 0
+    while (locked < v.length && v[locked] === E[locked]) locked++
+    num.innerHTML = [...v].map((ch, i) => `<span ${i < locked ? 'data-locked' : ''} ${i < locked && i >= prevLocked ? 'data-pop' : ''}>${ch}</span>`).join('')
+    if (locked > prevLocked) setTimeout(() => num.querySelectorAll('[data-pop]').forEach((s) => s.removeAttribute('data-pop')), 260)
+    const digits = Math.max(0, locked - 2)
+    document.getElementById('e-cap').textContent = locked <= 1
+      ? `× ${v} after one year. Green digits are ones that have stopped moving.`
+      : digits === 0
+        ? `Only the 2 has settled. £100 becomes £${(value(k) * 100).toFixed(2)}. Keep going.`
+        : `${digits} decimal place${digits === 1 ? '' : 's'} of e locked in. £100 becomes £${(value(k) * 100).toFixed(2)}.`
+    prevLocked = locked
+  }
+
+  function chart(k) {
+    const t = bh.tokens()
+    const X = 34, Y = 12, W = 276, H = 150
+    const y = (v) => Y + H - ((v - 1) / 1.9) * H
+    const x = (p) => X + p * W
+    let steps = ''
+    const shownSteps = Math.min(k, 400)
+    for (let i = 0; i <= shownSteps; i++) {
+      const p = i / shownSteps
+      const v = Math.pow(1 + 1 / k, p * k)
+      const floorV = Math.pow(1 + 1 / k, Math.floor(p * k))
+      if (k <= 60) {
+        steps += `${i === 0 ? 'M' : 'L'}${x(p).toFixed(1)} ${y(floorV).toFixed(1)} `
+        if (i < shownSteps) steps += `L${x((i + 1) / shownSteps).toFixed(1)} ${y(floorV).toFixed(1)} `
+      } else steps += `${i === 0 ? 'M' : 'L'}${x(p).toFixed(1)} ${y(v).toFixed(1)} `
+    }
+    let ecurve = ''
+    for (let i = 0; i <= 80; i++) ecurve += `${i === 0 ? 'M' : 'L'}${x(i / 80).toFixed(1)} ${y(Math.exp(i / 80)).toFixed(1)} `
+    const grid = [1, 1.5, 2, 2.5].map((g) => `<line x1="${X}" x2="${X + W}" y1="${y(g)}" y2="${y(g)}" stroke="${t.rule}"/><text x="${X - 6}" y="${y(g) + 4}" font-size="10" text-anchor="end" fill="${t.muted}" font-family="${t.sans}">£${g * 100}</text>`).join('')
+    const final = value(k)
+    svg.innerHTML = `${grid}
+      <line x1="${X}" x2="${X + W}" y1="${y(Math.E)}" y2="${y(Math.E)}" stroke="${t.moss}" stroke-dasharray="4 4"/>
+      <text x="${X + W}" y="${y(Math.E) - 6}" font-size="11" text-anchor="end" fill="${t.moss}" font-family="${t.sans}" font-weight="600">e · £271.83</text>
+      <path d="${ecurve}" fill="none" stroke="${t.moss}" stroke-opacity=".35" stroke-width="6" stroke-linecap="round"/>
+      <path d="${steps}" fill="none" stroke="${t.accent}" stroke-width="2.4" stroke-linejoin="round"/>
+      <circle cx="${x(1)}" cy="${y(final)}" r="5" fill="${t.accent}"/>
+      <text x="${X}" y="${Y + H + 20}" font-size="10" fill="${t.muted}" font-family="${t.sans}">Jan</text>
+      <text x="${X + W}" y="${Y + H + 20}" font-size="10" text-anchor="end" fill="${t.muted}" font-family="${t.sans}">Dec</text>`
+  }
+
+  const label = (k) => k === 1 ? 'once a year' : k === 31536000 ? 'every second' : `${k.toLocaleString()} times`
+  function paint(k) {
+    shown = k
+    const whole = Math.max(1, Math.round(k))
+    renderNumber(whole)
+    chart(whole)
+    document.getElementById('e-n').textContent = label(whole)
+    range.value = toRange(whole)
+    range.style.setProperty('--fill', `${range.value / 10}%`)
+    for (const chip of chips.children) chip.setAttribute('aria-pressed', String(Number(chip.dataset.n) === whole))
+  }
+  function goTo(k) {
+    stop()
+    stop = bh.spring(Math.log(shown), Math.log(k), (v) => paint(Math.exp(v)), { stiffness: 70, damping: 14 })
+  }
+  range.addEventListener('input', () => { stop(); paint(fromRange(Number(range.value))) })
+  chips.addEventListener('click', (e) => { const c = e.target.closest('[data-n]'); if (c) goTo(Number(c.dataset.n)) })
+  bh.onTheme(() => paint(shown))
+  paint(1)
+  setTimeout(() => goTo(12), 700)
+})()
+</script>
