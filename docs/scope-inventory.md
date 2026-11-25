@@ -23,9 +23,9 @@ deletion without migration (spec, “Clean slate”).
   focus and guidance, lexical search, annotation/style, design context,
   section source/diagnosis/rewrite/math, and the Study lesson and item
   operations that the spec deletes.
-- An optional Tutor over Agent Connect (ADR 0006, ADR 0007) or a direct Open
-  Responses endpoint (ADR 0011). Its conversations are still transient; ADR
-  0012 makes them persistent.
+- An optional Tutor over Agent Connect ACP (ADR 0014). The last conversation
+  is retained in the tab. ADR 0012 covers durable local conversations, memory
+  and voice.
 - A deployed Cloudflare Worker surface and a production browser/live-check
   harness.
 - Shared Codex and Claude guidance, validation contracts, reusable engineering

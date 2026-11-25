@@ -7,6 +7,7 @@ import { StudyText } from '../study/StudyItemCard.tsx'
 import type { ToolDefinition } from '../webmcp/model-context.ts'
 import { TutorConversation, type TutorAttachment } from './conversation.ts'
 import { formatTutorFailureDiagnostic } from './failure.ts'
+import { bookhandToolDeclarations } from './tool-adapter.ts'
 import './tutor.css'
 
 export interface TutorPanelProps {
@@ -94,12 +95,13 @@ export function TutorPanel(props: TutorPanelProps) {
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
-          const intent = await props.connection.finishAuthorization()
-          if (!current || intent?.feature !== 'tutor' || intent.bookId !== props.bookId) return
+          const intent = props.pendingIntent
+          if (!current || !intent) return
           bundle.conversation.setDraft(intent.draft)
           bundle.conversation.attach(intent.attachment)
-        } catch (error) {
-          if (current) setLocalError(describeError(error))
+          await props.connection.finishAuthorization(bookhandToolDeclarations(bundle.tools))
+        } catch {
+          if (current && !props.connection.getSnapshot().error) setLocalError('Could not verify approval. Connect again.')
         } finally {
           if (current) props.onAuthorizationFinished?.()
         }
@@ -161,20 +163,13 @@ function TutorPanelContent({
   const heading = useRef<HTMLHeadingElement>(null)
   const transcript = useRef<HTMLDivElement>(null)
   const followScroll = useRef(true)
-  const [bearerToken, setBearerToken] = useState('')
 
   useEffect(() => { if (open) heading.current?.focus() }, [open])
   useEffect(() => {
-    if (
-      !open
-      || !readerReady
-      || connectionState.phase !== 'connected'
-      || !connectionState.generation
-      || !connectionState.historyAvailable
-    ) return
-
-    void conversation.restoreLastConversation().catch(() => undefined)
-  }, [bookId, connectionState.generation, connectionState.historyAvailable, connectionState.phase, conversation, open, readerReady])
+    if (!open || !readerReady) return
+    void connection.resume(bookhandToolDeclarations(tools))
+    if (connectionState.phase === 'connected') conversation.restoreLastConversation()
+  }, [connection, connectionState.phase, conversation, open, readerReady, tools])
   useEffect(() => {
     if (open && state.messages.length && followScroll.current && transcript.current) {
       transcript.current.scrollTop = transcript.current.scrollHeight
@@ -186,15 +181,10 @@ function TutorPanelContent({
   const problem = localError ?? connectionState.error ?? state.error
 
   const authorize = async () => {
-    const addressError = validateProviderAddress(connectionState.providerUrl)
-    if (addressError) {
-      reportLocalError(addressError)
-      return
-    }
     clearLocalError()
     try {
       await connection.authorize({
-        tools,
+        tools: bookhandToolDeclarations(tools),
         intent: {
           feature: 'tutor',
           bookId,
@@ -203,16 +193,6 @@ function TutorPanelContent({
         },
         beforeRedirect: async () => { await beforeRedirect?.() },
       })
-    } catch (error) {
-      reportLocalError(describeError(error))
-    }
-  }
-
-  const connectDirect = async () => {
-    clearLocalError()
-    try {
-      await connection.connectDirect({ tools, bearerToken })
-      setBearerToken('')
     } catch (error) {
       reportLocalError(describeError(error))
     }
@@ -235,168 +215,51 @@ function TutorPanelContent({
         {connectionState.phase !== 'connected' ? (
           <section className="tutor-connect" aria-label="Connect your AI">
             <MessageCircle size={24} aria-hidden="true" />
-            <h3>A tutor beside your book</h3>
-            <p>Connect your AI to explain passages and create study material with you.</p>
-            <p className="tutor-hint">Reading and Study work without an AI connection. Tutor sends your questions, requested book passages, the Bookhand tools you approve, and their results to the provider you choose.</p>
+            <h3>Connect your tutor</h3>
+            <p className="tutor-hint">Your gateway receives questions and book passages when you ask Tutor.</p>
 
-            <label htmlFor="tutor-connection-method">Connection method</label>
-            <select
-              id="tutor-connection-method"
-              value={connectionState.method}
+            <label htmlFor="tutor-provider">Gateway address</label>
+            <input
+              id="tutor-provider"
+              type="text"
+              inputMode="url"
+              value={connectionState.providerUrl}
               disabled={busy}
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="https://gateway.example"
               onChange={(event) => {
                 clearLocalError()
-                setBearerToken('')
-                connection.setMethod(event.target.value as 'agent-connect' | 'direct')
+                connection.setProviderUrl(event.target.value)
               }}
+            />
+            <button
+              className="button button-primary"
+              type="button"
+              disabled={busy || !connectionState.providerUrl.trim()}
+              onClick={() => { void authorize() }}
             >
-              <option value="agent-connect">Agent Connect — recommended</option>
-              <option value="direct">Direct Open Responses — advanced</option>
-            </select>
-
-            {connectionState.method === 'agent-connect' ? (
-              <>
-                <p className="tutor-hint">Use an existing AI subscription when your provider supports it. Agent Connect handles sign-in, scoped authorization, and provider-owned Tutor history without asking Bookhand for a permanent API key.</p>
-
-                <label htmlFor="tutor-provider">AI address</label>
-                <input
-                  id="tutor-provider"
-                  type="url"
-                  inputMode="url"
-                  value={connectionState.providerUrl}
-                  disabled={busy}
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="https://your-ai.example"
-                  aria-describedby="tutor-provider-hint"
-                  onChange={(event) => {
-                    clearLocalError()
-                    connection.setProviderUrl(event.target.value)
-                  }}
-                />
-                <p id="tutor-provider-hint" className="tutor-hint">Use the HTTPS address supplied by your Agent Connect provider.</p>
-
-                <label htmlFor="tutor-experience">Provider access</label>
-                <select
-                  id="tutor-experience"
-                  value={connectionState.experience}
-                  disabled={busy}
-                  onChange={(event) => connection.setExperience(event.target.value as 'tailscale' | 'https')}
-                >
-                  <option value="tailscale">Tailscale (recommended)</option>
-                  <option value="https">Ordinary HTTPS (provider support required)</option>
-                </select>
-
-                <button
-                  className="button button-primary"
-                  type="button"
-                  disabled={busy || !connectionState.providerUrl.trim()}
-                  onClick={() => { void authorize() }}
-                >
-                  {!readerReady ? 'Waiting for the book…' : busy ? 'Connecting…' : 'Connect with Agent Connect'}
-                </button>
-                <p className="tutor-hint">Your provider owns Tutor history. Bookhand may restore bounded history for this book in this tab; saved Study material stays.</p>
-              </>
-            ) : (
-              <>
-                <div className="tutor-direct-notice">
-                  <p>Your provider’s API rates and limits apply. With Agent Connect, compatible providers can instead let Bookhand use an existing AI subscription.</p>
-                  <a href="https://github.com/jomi-se/agent-connect" target="_blank" rel="noreferrer">Learn about Agent Connect</a>
-                </div>
-
-                <p className="tutor-hint">Use any provider that implements the Open Responses features Bookhand needs. A Chat Completions-compatible endpoint is not enough.</p>
-
-                <label htmlFor="tutor-direct-endpoint">Open Responses endpoint</label>
-                <input
-                  id="tutor-direct-endpoint"
-                  type="url"
-                  inputMode="url"
-                  value={connectionState.directEndpoint}
-                  disabled={busy}
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="https://api.example.com/v1/responses"
-                  onChange={(event) => {
-                    clearLocalError()
-                    connection.setDirectEndpoint(event.target.value)
-                  }}
-                />
-
-                <label htmlFor="tutor-direct-model">Model</label>
-                <input
-                  id="tutor-direct-model"
-                  value={connectionState.directModel}
-                  disabled={busy}
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="model-id"
-                  onChange={(event) => {
-                    clearLocalError()
-                    connection.setDirectModel(event.target.value)
-                  }}
-                />
-
-                <label htmlFor="tutor-direct-token">Bearer token</label>
-                <input
-                  id="tutor-direct-token"
-                  type="password"
-                  autoComplete="off"
-                  value={bearerToken}
-                  disabled={busy}
-                  placeholder="Not saved by Bookhand"
-                  aria-describedby="tutor-direct-token-hint"
-                  onChange={(event) => {
-                    clearLocalError()
-                    setBearerToken(event.target.value)
-                  }}
-                />
-                <p id="tutor-direct-token-hint" className="tutor-hint">The token stays only in this page’s memory. Reloading or disconnecting removes it.</p>
-
-                <button
-                  className="button button-primary"
-                  type="button"
-                  disabled={busy || !connectionState.directEndpoint.trim() || !connectionState.directModel.trim() || !bearerToken.trim()}
-                  onClick={() => { void connectDirect() }}
-                >
-                  {!readerReady ? 'Waiting for the book…' : busy ? 'Connecting…' : 'Use direct API'}
-                </button>
-                <p className="tutor-hint">Direct connections resend this tab’s Tutor conversation with each request, so API usage grows as the conversation gets longer. Reloading or choosing New conversation starts fresh. The first Tutor request checks whether this provider works with Bookhand. If it fails, check the endpoint, token, model, and whether the provider allows browser connections.</p>
-              </>
-            )}
+              {!readerReady ? 'Waiting for the book…' : busy ? 'Connecting…' : 'Connect with Agent Connect'}
+            </button>
             {problem ? <p className="tutor-error" role="alert">{problem}</p> : null}
           </section>
         ) : (
           <>
             <div className="tutor-connection-line">
-              <span title={connectionState.method === 'direct' ? connectionState.directEndpoint : connectionState.providerUrl}>
-                {connectionState.method === 'direct' ? 'Direct API ready in this tab' : 'Connected on this browser'}
-              </span>
+              <span title={connectionState.providerUrl}>Gateway connected</span>
               <button className="button button-text" type="button" disabled={running} onClick={() => conversation.newConversation()}>New conversation</button>
               <button className="button button-text" type="button" onClick={() => { void connection.disconnect().catch(() => undefined) }}>Disconnect</button>
             </div>
-            <p className="tutor-hint">
-              {connectionState.method === 'direct'
-                ? 'Disconnect removes the bearer token. Bookhand keeps only the endpoint and model.'
-                : 'Disconnect removes access. Bookhand keeps this address.'}
-            </p>
-            {state.restoreState === 'loading' ? (
-              <p className="tutor-hint" role="status">Restoring last conversation…</p>
-            ) : state.restoreState === 'restored' ? (
-              <p className="tutor-hint" role="status">
-                Last conversation restored.{state.restoredHistoryTruncated ? ' Some history was omitted.' : ''}
-              </p>
-            ) : null}
+            {state.restored ? <p className="tutor-hint" role="status">Last conversation restored.</p> : null}
           </>
         )}
 
         {state.messages.map((message) => (
           <section key={message.id} className="tutor-message" data-role={message.role}>
-            <h3>{message.role === 'input' ? 'Input (prompt or application output)' : message.role === 'user' ? 'You' : 'Tutor'}</h3>
+            <h3>{message.role === 'user' ? 'You' : 'Tutor'}</h3>
             <p className="tutor-message-text">
-              {message.restored ? message.text : <StudyText text={message.text} />}
+              <StudyText text={message.text} />
             </p>
             {message.activity ? <p className="tutor-hint">{message.activity}</p> : null}
             {message.status === 'interrupted' ? <p className="tutor-hint">Turn interrupted</p> : null}
@@ -407,13 +270,6 @@ function TutorPanelContent({
       {connectionState.phase === 'connected' ? (
         <div className="tutor-compose">
           {problem ? <p className="tutor-error" role="alert">{problem}</p> : null}
-          {state.restoreState === 'error' ? (
-            <div className="tutor-recovery">
-              <button className="button button-quiet" type="button" onClick={() => {
-                void conversation.retryRestore().catch(() => undefined)
-              }}>Retry restore</button>
-            </div>
-          ) : null}
           {state.diagnostic ? (
             <p className="tutor-hint" role="status">
               Technical detail: {formatTutorFailureDiagnostic(state.diagnostic)}
@@ -424,7 +280,7 @@ function TutorPanelContent({
           ) : null}
           {state.status === 'interrupted' ? (
             <div className="tutor-recovery">
-              <p className="tutor-hint">This conversation cannot continue. Nothing will be replayed.</p>
+              <p className="tutor-hint">This conversation has ended.</p>
               <button className="button button-quiet" type="button" disabled={busy} onClick={() => conversation.newConversation()}>Start new conversation</button>
             </div>
           ) : null}
@@ -451,27 +307,15 @@ function TutorPanelContent({
               {running ? (
                 <button type="button" className="button button-quiet" onClick={() => { void conversation.stop() }}>Stop response</button>
               ) : (
-                <button type="submit" className="button button-primary" disabled={!readerReady || connectionState.phase !== 'connected' || state.restoreState === 'loading' || state.restoreState === 'error' || !state.canSend || !state.draft.trim()}>Send</button>
+                <button type="submit" className="button button-primary" disabled={!readerReady || connectionState.phase !== 'connected' || !state.canSend || !state.draft.trim()}>Send</button>
               )}
-              <span className="tutor-hint" role="status">{running ? 'Your AI is working…' : state.attachment ? 'Selected passage attached' : 'Uses this book’s tools'}</span>
+              <span className="tutor-hint" role="status">{running ? 'Tutor is working…' : state.attachment ? 'Selected passage attached' : 'Uses this book’s tools'}</span>
             </div>
           </form>
         </div>
       ) : null}
     </aside>
   )
-}
-
-function validateProviderAddress(value: string): string | undefined {
-  try {
-    const address = new URL(value)
-    if (address.protocol !== 'https:' || !address.hostname || address.username || address.password) {
-      return 'Enter a complete HTTPS address without a username or password.'
-    }
-    return undefined
-  } catch {
-    return 'Enter a complete HTTPS address, such as https://your-ai.example.'
-  }
 }
 
 function describeError(error: unknown): string {

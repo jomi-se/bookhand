@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createAiSdkApplicationTools, type JsonSchema } from '@open-agent-connect/web'
-import { asSchema } from 'ai'
+import { Validator, type Schema } from '@cfworker/json-schema'
 
 import type { BookRange, MutationReceipt, ReaderStyle } from '../../src/domain/index.ts'
 import {
@@ -196,17 +195,11 @@ describe('the WebMCP tool surface', () => {
     const { tool } = setup()
     for (const name of ['navigate_book', 'search_book', 'set_reading_style', 'upsert_study_item', 'set_study_board_view']) {
       const definition = tool(name)
-      const sdk = createAiSdkApplicationTools([{
-        name,
-        description: definition.description,
-        inputSchema: definition.inputSchema as JsonSchema,
-        execute: vi.fn(),
-      }], { connectionId: 'description-examples' })
-      const validate = asSchema(sdk[name]!.inputSchema).validate!
+      const validator = new Validator(definition.inputSchema as Schema, '7')
       const examples = definition.description.match(/\{[^{}]+\}/g) ?? []
       expect(examples.length).toBeGreaterThan(0)
       for (const example of examples) {
-        expect(await validate(JSON.parse(example))).toMatchObject({ success: true })
+        expect(validator.validate(JSON.parse(example)).valid).toBe(true)
       }
     }
     expect(tool('navigate_book').description).toContain('exactly ONE navigation selector')
@@ -674,23 +667,10 @@ describe('the WebMCP tool surface', () => {
     expect(commands.upsertStudyItem).not.toHaveBeenCalled()
   })
 
-  it('publishes closed kind-specific study schemas to Bookhand and the installed AI SDK', async () => {
+  it('publishes closed kind-specific study schemas to Bookhand and the ACP SDK schema dialect', async () => {
     const { tool, commands } = setup()
     const definition = tool('upsert_study_item')
-    const safeExecute = vi.fn()
-    const sdkTools = createAiSdkApplicationTools(
-      [
-        {
-          name: definition.name,
-          description: definition.description,
-          inputSchema: definition.inputSchema as JsonSchema,
-          execute: safeExecute,
-        },
-      ],
-      { connectionId: 'schema-test' },
-    )
-    const validate = asSchema(sdkTools.upsert_study_item!.inputSchema).validate
-    expect(validate).toBeTypeOf('function')
+    const validator = new Validator(definition.inputSchema as Schema, '7')
 
     const valid = [
       { kind: 'prose', text: 'A concise explanation.' },
@@ -700,7 +680,7 @@ describe('the WebMCP tool surface', () => {
       { kind: 'question', prompt: 'Why does the slope change?' },
     ]
     for (const input of valid) {
-      expect(await validate!(input)).toMatchObject({ success: true, value: input })
+      expect(validator.validate(input).valid).toBe(true)
       expect((await definition.execute(input)).isError).toBeFalsy()
     }
     expect(commands.upsertStudyItem).toHaveBeenCalledTimes(5)
@@ -714,7 +694,7 @@ describe('the WebMCP tool surface', () => {
       { kind: 'question', prompt: 'Why?', title: '' },
     ]
     for (const input of invalid) {
-      expect(await validate!(input)).toMatchObject({ success: false })
+      expect(validator.validate(input).valid).toBe(false)
       expect((await definition.execute(input)).isError).toBe(true)
     }
     // The SDK validator intentionally implements draft 7, where
@@ -727,7 +707,6 @@ describe('the WebMCP tool surface', () => {
       expect((await definition.execute(input)).isError).toBe(true)
     }
     expect(commands.upsertStudyItem).not.toHaveBeenCalled()
-    expect(safeExecute).not.toHaveBeenCalled()
   })
 
   it('rejects missing or duplicate lesson block ids before calling commands', async () => {

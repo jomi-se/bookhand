@@ -1,15 +1,15 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { PendingAiReturnStatus } from '../../src/ai/pending-intent.ts'
+import type { AiFeatureIntent } from '../../src/ai/pending-intent.ts'
 
 const testState = vi.hoisted(() => ({
-  pending: undefined as PendingAiReturnStatus | undefined,
+  pending: undefined as { intent: AiFeatureIntent } | undefined,
   dismissPending: vi.fn(),
 }))
 
 vi.mock('../../src/ai/pending-intent.ts', () => ({
-  inspectPendingAiReturn: () => testState.pending,
+  pendingPairingReturn: () => testState.pending,
 }))
 
 vi.mock('../../src/ai/connection-controller.ts', () => ({
@@ -74,24 +74,8 @@ afterEach(() => {
 })
 
 describe('App AI return recovery', () => {
-  it('shows a malformed saved return with its safe draft and dismisses it locally', () => {
-    testState.pending = {
-      kind: 'invalid',
-      message: 'The saved OpenClaw return could not be verified. Dismiss it and connect again.',
-      intent: { feature: 'tutor', bookId: 'missing-book', draft: 'Keep my exact question' },
-    }
-    render(<App />)
-
-    expect(screen.getByRole('status')).toHaveTextContent('could not be verified')
-    expect(screen.getByRole('status')).toHaveTextContent('Keep my exact question')
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
-    expect(testState.dismissPending).toHaveBeenCalledTimes(1)
-    expect(screen.getByText('Library ready')).toBeInTheDocument()
-  })
-
   it('keeps an owned Tutor draft visible when its intended book is missing', () => {
     testState.pending = {
-      kind: 'owned',
       intent: { feature: 'tutor', bookId: 'missing-book', draft: 'Explain the retained source' },
     }
     render(<App />)
@@ -99,9 +83,12 @@ describe('App AI return recovery', () => {
     expect(screen.getByRole('status')).toHaveTextContent('could not reopen the book')
     expect(screen.getByRole('status')).toHaveTextContent('Explain the retained source')
     expect(screen.queryByText('Reader')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(testState.dismissPending).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('Library ready')).toBeInTheDocument()
   })
 
-  it('does not invent a recovery state when no owned or invalid return was detected', () => {
+  it('does not invent a recovery state when there is no pending return', () => {
     testState.pending = undefined
     render(<App />)
     expect(screen.getByText('Library ready')).toBeInTheDocument()

@@ -252,9 +252,9 @@ agent paid through an existing subscription. It also introduces setup that a
 hackathon judge is unlikely to complete in a few minutes.
 
 So Agent Connect was an optional transport, not a dependency of the initial
-submission. Since the submission, the in-app Tutor (through Agent Connect or a
-direct Open Responses connection) is the primary way the owner reaches an
-agent; external WebMCP agents remain fully supported. Either way, the reader's
+submission. Since the submission, the in-app Tutor through Agent Connect is
+the primary way the owner reaches an agent. External WebMCP agents remain
+fully supported. In both cases, the reader's
 tool and domain APIs stay neutral rather than coupled to one gateway, harness,
 or model vendor.
 

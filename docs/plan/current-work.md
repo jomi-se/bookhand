@@ -1,6 +1,6 @@
 # Current work
 
-Documentation triage updated: 2026-10-02.
+Documentation updated: 2026-11-25.
 
 ## Next: book artifacts and the daily study loop
 
@@ -22,8 +22,24 @@ Ticket 01's prototype is merged into `main` (2026-11-25): the owner accepted
 it as the base to build on ("We build on that"). [The
 ticket](book-artifacts/issues/01-phone-artifact-surface-prototype.md) says
 what it contains and how to run it. Its bottom-sheet surface is the
-direction; the marking choice is still open. The tutor is being moved from the
-removed OpenClaw / Open Responses integration to the Agent Connect ACP SDK.
+direction; the marking choice is still open. The live Tutor uses the Agent
+Connect ACP SDK. [ADR 0014](../decisions/0014-tutor-agent-connect-acp.md)
+records gateway approval, tool execution and continuation. The phone
+prototype’s scripted chat and Notebook remain the starting point for
+the artifact and durable conversation tickets.
+
+### Verify the live Tutor
+
+Run `npm run build` in Bookhand. In a separate Agent Connect checkout,
+build the gateway with `cargo build --locked --bin agent-connect` and
+install its pinned test adapters with
+`npm ci --prefix deploy/gateway/test/fixtures/adapters`. Point
+`AGENT_CONNECT_CHECKOUT` at that checkout when running
+`npm run test:e2e:tutor-acp` from Bookhand. Run it again with
+`BOOKHAND_TUTOR_FIXTURE_MOBILE=1` for the same-tab phone approval flow.
+The fixture uses a private disposable gateway, a Chromium virtual passkey
+and a local scripted model. It exercises browser consent, MCP-over-ACP page
+tools, follow-up and transcript restore without a provider login.
 
 ### Waiting on the owner (2026-10-02)
 
@@ -45,47 +61,6 @@ removed OpenClaw / Open Responses integration to the Agent Connect ACP SDK.
   reworks this toolbar; give the overflow an affordance there.
 - The artifact frame has no production header policy in `public/_headers`;
   ticket 02 owns that when the frame leaves the prototype.
-
-## Completed: provider-neutral direct Open Responses connection
-
-The Tutor now offers an advanced direct connection alongside the recommended
-Agent Connect flow. A person can supply an exact HTTPS Open
-Responses endpoint, model ID, and bearer token. Endpoint and model are ordinary
-local preferences; the token is page-memory only and disappears on disconnect
-or reload. Direct mode uses the same fixed Bookhand tool snapshot and replays
-its complete, page-memory Open Responses history on each request. It does not
-depend on provider-owned response state and deliberately has no OAuth, refresh,
-provider discovery, or provider-history restoration. Agent Connect retains its
-native provider-checkpoint continuation path.
-
-Deterministic coverage proves that the bearer token never enters Bookhand
-persistence or observable state, a changed tool declaration invalidates
-execution, disconnect retires the token getter, unsafe endpoints fail closed,
-and direct mode never guesses at a non-standard provider-history API. A focused
-replay regression proves complete user, assistant, function-call, and
-function-output items are resent without `previous_response_id`, and that
-**New conversation** clears the replay history. The production browser flow
-proves that endpoint and model survive reload while the token does not, at both
-desktop and phone widths. A finishing review accepted
-the setup hierarchy, ordinary-language compatibility guidance, inline errors,
-and coarse-pointer link target.
-
-Full verification is green: lint, typecheck, 585 unit tests, production build,
-bundle, published-SDK packaging, CSP, setup verification, and the complete
-built-browser suite (57 passed and 3 intentionally skipped). One unrelated
-keyboard-paging assertion first stopped at an exact floating-point boundary in
-the parallel browser run; its focused rerun and the complete browser rerun both
-passed. No real provider key appears in fixtures, screenshots, logs, or
-repository files. Live compatibility with any particular provider remains a
-user-supplied endpoint, key, model, CORS, and protocol concern; the first real
-Tutor request is intentionally the end-to-end compatibility check. A live
-production-build check against OpenRouter's Responses endpoint completed a
-two-turn Tutor exchange with Bookhand tools: all four streaming requests
-returned HTTP 200, none sent `previous_response_id`, and the follow-up requests
-carried the required function-call history. The bearer token was not persisted.
-
-[ADR 0011](../decisions/0011-optional-direct-open-responses.md) records the
-security, protocol, persistence, and product-language boundaries.
 
 ## Completed: RE-003 production continuous scrolling
 
@@ -204,70 +179,9 @@ visibly sliding pages, settled at the correct chapters, retained the reader
 frame, and preserved `get_reading_context`. Local `main` was fast-forwarded to
 that commit. No remote push was performed. RE-002 remains paused.
 
-## Pending: infer the connection experience from the provider address
+## Earlier reader compatibility work
 
-Remove the manual Tailscale-versus-HTTPS selector from the Tutor connection
-form. Once the person enters a valid provider address, select the `tailscale`
-experience for a canonical `*.ts.net` hostname and `https` otherwise. Recompute
-the suggestion when the address changes, while preserving an already-authorized
-connection's saved experience until the person deliberately replaces it.
-
-This is presentation and owner-login guidance only. A `.ts.net` suffix does not
-prove Tailscale Serve rather than Funnel, endpoint ownership, tailnet membership,
-or requester identity. Bookhand must not add identity headers or treat this URL
-classification as authorization; the gateway and its deployment remain
-responsible for every security check.
-
-## Current checkpoint: Agent Connect SDK 0.0.9 refresh (2026-09-17)
-
-Bookhand now consumes exact published `@open-agent-connect/web@0.0.9` from the
-public npm registry. This release preserves the approved application-tool
-snapshot on every Open Responses continuation, including the request that
-returns tool results to the model. Package, deterministic, and browser gates
-pass, including 570 unit tests and the isolated-port production browser suite.
-
-Owner acceptance then exercised three parallel read tools followed by a larger
-mixed parallel/sequential run with 20 successful tool completions. The live run
-repaired two EPUB image descriptions, created a four-block Study lesson,
-switched rewritten sections into view, and returned a final assistant response.
-This closes the SDK 0.0.9 continuation gate. Navigation and Study-focus attempts
-that supplied conflicting selectors were safely rejected and remain a separate
-[open Bookhand issue](../issues/tutor-search-navigation.md), not an Agent Connect
-transport failure.
-
-## Previous checkpoint: live Agent Connect vertical slice accepted (2026-09-15)
-
-Bookhand now consumes exact published `@open-agent-connect/web@0.0.5` from the
-public npm registry. The package verifier checks its exact registry resolution
-and integrity. No SDK API adaptation was required;
-Bookhand retains its Web Lock/CAS, epoch-millisecond expiry, generation,
-cancellation, same-book association and no-replay boundaries.
-
-The owner-operated plugin endpoint is healthy. The owner reports the real
-Bookhand flow working through the published SDK and OpenClaw, including
-conversation restoration after reload. This closes the live vertical-slice
-acceptance gate. It is owner-observed evidence, distinct from the deterministic
-package and browser checks below, and does not resolve unrelated mobile defects.
-The same acceptance exposed an open
-[restored-conversation presentation defect](../issues/tutor-restored-conversation-presentation.md):
-raw application/tool history overwhelms the reloaded transcript. Record it as a
-future projection/UI fix without weakening restoration or no-replay semantics.
-
-The installed SDK completed live unauthenticated discovery against that endpoint
-and a phone-width production browser reached the real owner sign-in page through
-Bookhand's Connect flow. No enrollment secret was supplied and no grant/model or
-tool action was created by that pre-auth check. `BOOKHAND_E2E_PORT` now permits
-an isolated local Playwright port when another preserved preview owns `4173`.
-
-Commit-boundary evidence: clean `npm ci`, SDK packaging verification, focused
-connection/persistence/history/Tutor regressions, lint, typecheck, production
-build, bundle and phone-width strict-CSP checks pass. The first broad verify ran
-all of those successfully, then its browser phase was blocked by the preserved
-preview on `4173`. On isolated `4174`, 34 browser tests passed and three failures
-were traced to test-local hard-coded origin assumptions; both affected files now
-derive Playwright's configured base URL and their focused rerun passes. Two
-reproducible Pixel 7 failures recorded at that checkpoint were repaired on
-2026-09-17. Tutor CSS had globally changed the compact reader toolbar into a
+Two reproducible Pixel 7 failures were repaired on 2026-09-17. Tutor CSS had globally changed the compact reader toolbar into a
 two-row grid, making the chrome 111px tall; the reader now owns a one-row,
 horizontally scrollable toolbar with unchanged 44px targets. The panel assertion
 now excludes the intentionally mounted-but-hidden Tutor, whose persistent mount
@@ -291,263 +205,6 @@ eligible candidates, plan the chosen one in detail, use bounded clean-context
 Luna implementation lanes, then integrate and validate centrally. No candidate
 has been selected or started.
 
-## Previous checkpoint: main merged, cleanup complete (2026-09-08)
-
-Local checkout is on `main` at integration commit
-`ea3b18e31993adbf74e2778f6c30880fddefd055`; clean before this docs-only update.
-Agent Connect root reports the authorized fast-forward and removal of merged
-`work/bookhand-plugin-sdk` and `work/openclaw-tutor-demo` branches. The migration
-and packaging sections below preserve historical evidence, not pending merge
-instructions or current branch names.
-
-Root also reports that `feat/document-remaster` was already an ancestor of main.
-Its checkout, including the unique untracked review, was preserved intact at
-`artifacts/local-archive/2026-09-08/bookhand-remaster/`; `.git` was renamed to
-`.git.archived`, then worktree registration and merged branch were removed.
-This ledger pass verified that archive directory and `.git.archived` exist;
-the intact-content/no-data-loss assertion is root's cleanup report, not a new
-file-by-file audit. Do not treat the archive as an active Git worktree.
-
-Root reports origin remains `bookhand-next` and the judged original is unchanged.
-Live OpenClaw was relocated: plugin health passes at the owner-operated provider
-URL, grants preserved, but old
-conversation heads were reset by the restart. This is upstream runtime evidence;
-no health/auth/model call was made for this ledger update. Retained authorization
-does not imply old conversations can continue; use the existing unavailable-head
-handling and explicit fresh conversation, never replay prior prompts or tools.
-
-Previously verified Bookhand preview serves byte-identical `ea3b18e` assets with
-strict CSP. Known search/navigation/timeout defects and owner-evidence limits
-remain unchanged. This update runs no tests, changes no services and pushes
-nothing; only the current-work ledger is committed.
-
-## Historical: plugin SDK migration approved for local commit (2026-09-08)
-
-Agent Connect root authorized bounded consumer decoupling, not live cutover.
-Checkout inspected clean on `main` at `11f04cc`. Upstream plan: Agent Connect's
-`docs/plan/plugin-sdk-bookhand-migration.md`, following
-plugin-host `1b8b67a`. Root approved exact SDK signatures; source migration is
-complete against approved SDK source `e3fa090809e1197dac4a7347a6f48c78240bef44`,
-with byte-identical hash `ccd489d…` to the tested candidate. Root reports real
-installed Agent Connect plugin for OpenClaw composition PASS on Node 24.15 and
-approves this migration diff, including the dispatch guard. [Exact
-evidence](plugin-sdk-migration.md).
-Root authorized branch `work/bookhand-plugin-sdk`; preparation and subsequent
-migration work live there. Local main remains at `11f04cc`; no extra worktree.
-
-Migration ownership: replace route/fetch/parser duplication in
-`src/ai/conversation-history.ts` and `connection.ts` with SDK history client;
-delegate inner record/schema/hash validation in `connection-persistence.ts`;
-use SDK provider URL helpers and transaction issuer for callback rediscovery.
-Keep app envelope/origin checks, absolute grant cap, full rotation lock/CAS,
-markers, cancellation, connection/book generations, catalog and no replay.
-
-Contract checkpoint resolved by root: history `expiresAt` is epoch milliseconds
-(`Date.now()` plus TTL milliseconds); the upstream plan's seconds wording was
-corrected. Preserve existing units, with no conversion or magnitude inference.
-SDK unavailable error must retain the fresh-vs-recoverable
-distinction without changing existing restore behavior.
-
-Focused installed-SDK connection/persistence/history/restore tests for both
-provider layouts and phone-width production strict-CSP smoke completed. No
-model/auth/consent replay, service/Serve, merge or push changes. No validation
-against old SDK bytes or invented exports. Candidate connection/
-history tests (37/37), persistence, Tutor core/panel, package/patch check, build,
-lint, bundle and phone-width strict-CSP import pass. Independent review's
-token-to-fetch await gap is closed with a synchronous dispatch guard and focused
-regression. These are deterministic local checks, not live plugin OAuth proof.
-Root authorized the bounded local commit; no merge or push. Filename/provenance
-finalization leaves SDK bytes unchanged; only package/hash/reference checks are
-repeated. Local main remains untouched.
-
-## Local main merged; bounded CSP dependency refresh (2026-09-08)
-
-Root authorized the fast-forward and local main reached `7c74142`; integration
-branch preserved. The obsolete 9736495 SDK tarball is now in ignored
-`artifacts/local-archive/2026-09-08/`, checksum unchanged. The earlier packaging
-sections below are historical, not an outstanding merge authorization request.
-
-Root subsequently supplied AC `3cc49ec` with the strict-CSP Zod import fix.
-[SDK CSP refresh](sdk-csp-refresh.md) records bounded package/build/production
-browser verification. No tool catalog, conversation or consent change, no live
-model calls, services or push. Known defects and owner-evidence limits remain.
-
-## Local integration packaging, awaiting root merge approval (2026-09-08)
-
-Jose confirms connection and contextual follow-up work and requests reviewed
-local integration commits. [Merge readiness](bookhand-merge-readiness.md)
-tracks exact ownership/commit splits and checks. General flow confirmation does
-not pass every automatic reload/New-conversation acceptance scenario. Earlier
-credential reload and saved-Study reload/source-link confirmations retain their
-own specific evidence; new automatic conversation restore remains separately
-fixture-validated unless the owner reports that exact flow.
-
-[Unstable search anchors, navigation and timeout reporting](../issues/tutor-search-navigation.md)
-are **OPEN** defects, not solved by this integration. No pending indexing code
-was found or folded into this packaging. Main merge requires root's next go-ahead;
-no push, service/auth/Serve change or live mutation/model replay is authorized.
-
-Packaging checks pass: lint, typecheck, full unit suite, build, bundle, installed
-SDK/patch and setup verification. Independent qualitative review found no merge
-blocker; two non-blocking provider-address/schema-clarity follow-ups are recorded
-in the readiness note. The ideas cleanup is a separate commit; the obsolete SDK
-tarball remains untracked and preserved. These are local integration commits,
-not a merge or deployment.
-
-## Implemented locally: automatic last Tutor conversation (2026-09-08)
-
-Jose authorized minimal automatic restore, not a picker. Backend contract is
-Agent Connect 97c69d6; [bounded plan](tutor-last-conversation.md) and ADR 0007
-amendment capture tab-local same-book/same-authorization head matching,
-provider-owned history, active-head locking and no replay. Two sequential
-contract reviews complete; bounded port/core/UI implementation finished. No SDK
-architecture change or tool-catalog change: this feature does not itself require
-fresh consent (the earlier tool-description changes still do).
-
-Combined focused checks pass for connection, credential persistence, history
-parser, Tutor conversation, Tutor panel and app OAuth return; production build
-and focused lint passed. Independent lifecycle/lease review found no remaining
-blocker. The tests use synthetic history/model transport and real installed AI
-SDK; no live history/model acceptance is claimed. Tutor core is now 28/28 with
-explicit different-book/scope, absent/expired/pending/changed-head fresh outcomes
-and late history after disposal covered. Final UI truncation copy says some
-history was omitted, without claiming which messages were clipped. Parent final
-core/panel regression and rebuilt production artifact both passed.
-
-Read-only HTTPS fetch verifies the preview serves the byte-identical local asset
-index-DiXsiEfF.js, SHA-256
-80dc4f9a56bbc44cee368684d4a237d3da6dd1d5738eec86f8e32fde62615516.
-No owner browser reload, live model/tool replay, proxy restart, service/Serve
-change, commit, merge or push. Root must coordinate proxy readiness/live smoke.
-Use a completed turn on this build before reloading: pre-feature conversations
-have no known book association and are deliberately not guessed from a list.
-
-## Tool-description follow-up (2026-09-08)
-
-Implemented plain-language exclusive/dependent-field guidance directly in tool
-descriptions: navigate_book, open_book, focus_passage, set_reading_style,
-set_study_board_view, create_study_lesson and upsert_study_item. Navigation
-explicitly requires ONE selector with all others omitted, not empty placeholders.
-Minimal JSON examples are included; search_book distinguishes index unavailable
-from no matches and warns that partial results are not exhaustive. Schemas,
-runtime validation, call shapes and consent binding are unchanged.
-
-Focused tool/library/connection tests, example validation through the installed
-SDK, focused lint, diff whitespace check and production build passed. Read-only
-HTTPS verification serves index-khtm_nof.js matching the local asset:
-SHA-256 59ec59bfd55f64503fb90da79e660009d0c715f0b6a8a4a8417e8a641faa8574.
-This is served-artifact evidence, not a live model smoke. Descriptions participate
-in exact approved catalog equality, so existing Tutor grants need fresh consent;
-no automatic catalog expansion. No owner browser reload, consent, model calls,
-mutation replay, service changes, commit, merge or push performed.
-
-Agent Connect root now owns a conversation-history/reopening API implementation;
-it is no longer deferred upstream. Bookhand conversation UI remains gated on the
-validated contract handoff. Preserve existing dirty work; no UI work started.
-
-## Accepted follow-up: scoped connection persistence (2026-09-07)
-
-Jose requests credential reload persistence and remembered provider preferences.
-Amended ADR 0007 and [the bounded persistence contract](ai-connection-persistence.md)
-supersede the previous memory-only choice. Implementation must hold the origin
-Web Lock through uncancelled refresh/save, fail closed on orphan rotation, and
-preserve exact approved declarations. No chat/task replay or live consent work.
-Jose reports the saved lesson survives reload and its source link works.
-
-Persistence implemented and focused checks passed: 26 connection tests plus
-Tutor-panel/App-return checks; focused lint and TypeScript/build clean. Writer-tab
-refresh failures explicitly clear their own connection, guarded by persistent
-identity; no reliance on self storage events. Disconnect/resync and stale
-cross-tab callback races are covered. Detailed evidence and local build hash are
-in the persistence contract. No live model, consent, browser reload, service
-restart, push or deployment was performed by this implementation lane.
-
-Owner acceptance, relayed by Agent Connect Astra: Jose confirms the connection
-works after a phone reload without re-entering the provider address or repeating
-consent. Saved Study lesson persistence and source-link navigation are also
-owner-confirmed. This is real owner reload evidence, separate from deterministic
-refresh/rotation tests; it does not establish that a token refresh occurred.
-One initial attempt failed before a later success. Jose explicitly requests no
-investigation now; its cause remains unknown. Root is closing vertical-slice
-acceptance. Review/commit packaging is a separate follow-up, with no permission
-to sweep unrelated dirty work into a commit.
-
-## Implementation history: native OpenClaw auth and AI SDK (2026-09-06)
-
-Bounded follow-up: reported standalone prose rejection is confirmed as a
-declaration/runtime mismatch: `upsert_study_item` advertises foreign-kind fields
-that `toPayload` rejects. Close each discriminator's schema without widening
-runtime acceptance or changing flat call shape. Validate the exposed schema
-through the installed SDK and existing page validator using fixtures only.
-The changed catalog requires fresh owner consent; never bypass snapshot equality.
-Native-normalizer limitation verified offline against the pinned OpenClaw
-`packages/ai/src/providers/agent-tools-parameter-schema.ts` and
-`openai-tool-schema.ts`: both normal and strict outputs flatten the new closed
-branches into all 17 properties, `required: ["kind"]`,
-`additionalProperties: true`, and no `oneOf` or field dependencies. Therefore
-the local closure fix is NOT model-visible closure through this provider. Keep
-actionable descriptions and runtime rejection; no custom protocol or broad
-schema rewrite is authorized. Probe executed source only, no model/tool writes.
-Transport diagnostics are a separate bounded follow-up: preserve the original
-Error/cause identity in conversation memory only, with bounded allowlisted UI
-diagnostics, never raw error serialization/logging. Warn that interrupted tool
-turns may already have saved changes; no retry/checkpoint policy changes.
-Jose switched from the phone browser to Termux during the failed turn. This is
-context, not proof of suspension/network causality; add no visibility-change
-cancellation. A later successful lesson/follow-up is owner-reported, not an
-independent stored-content check. Subsequent owner acceptance confirmed the saved
-lesson survives reload and its source link returns to the passage. Do not
-reload or reauthorize Jose's active context on his behalf.
-
-Follow-up implemented: closed local standalone-block schemas plus explicit
-kind/field guidance; 36 tool tests and typecheck pass. Conversation now retains
-the original failure/cause tree privately through `getFailureCause()`, with
-bounded allowlisted diagnostics rendered separately and possible-tool-effects
-warnings. No raw logging/persistence/export or replay changes. Focused Tutor
-tests: 22 passed, including one error-result tool followed by HTTP 200 body-read
-failure, nested TypeError identity, secret exclusion and no replay. This fixture
-does not prove a successful mutation; the owner accepted that bounded evidence.
-Production build passed and read-only HTTPS fetch confirmed the preview serves the
-byte-identical local asset `index-CbI9_QXO.js`, SHA-256
-`bd728bcfefd931878239621e4026c4256145f82a5dfd16a9a01a1bb3368bf782`.
-No browser reload, consent, live tool invocation or service changes were made.
-
-The previous runtime-card/custom AgentChat replacement demo is superseded for
-new integration work. Current ownership, mapping and interface questions are in
-[`connect-your-ai-bookhand.md`](connect-your-ai-bookhand.md). Parent owns design,
-integration review and failure diagnosis; authorized Sol high-effort lanes own
-bounded edits against the now-validated `cf3b3d1` SDK artifact and required
-Open Responses continuation patch. Package, shared-connection, conversation and
-UI/wiring lanes are active under ADR 0007. Existing dirty work is preserved. No
-live services, credentials, Serve, push or publication changes authorized.
-
-Current local evidence: packaged dependency clean-install/export/continuation
-checks pass, as do integration typecheck and focused connection/conversation
-unit suites. The latter exercise the installed AI SDK against deterministic
-response fixtures, including partial-stream EOF without replay; they are not
-native provider or model evidence. Bounded independent shared-auth review is
-clear after fixes for stale returned intent, expiry during callback claiming,
-and malformed-state dismissal. App callback-recovery fixtures also pass.
-Disconnected production-build browser smoke passed at desktop and 412×915:
-real EPUB selection, draft/address/attachment retained across panel reopen,
-controls visible, no horizontal overflow, strict CSP and no console/page errors.
-Screenshots: ignored `artifacts/tutor-disconnected-smoke-20260906/`.
-Broad unit run: 514 passed, one failed: the reader-Foliate Section 23 workload
-deadline measured 18.14s against a 15s bound. Broad-suite success is not claimed
-and baseline causality has not been established. The bounded command log was
-retained outside the repository for that development session.
-The same workload test passed on a focused isolated rerun; this suggests load
-sensitivity but does not establish the cause or turn the broad run green.
-The live native-auth,
-source-linked Study hero remains unproven pending upstream runtime readiness.
-
-## Previous checkpoint: separate-gateway Tutor demo preparation
-
-The runtime-neutral integration is the intended real Agent Connect demo instead
-of Canvas. The superseded replacement-gateway runbook was removed because it
-mixed public product history with operator-specific deployment details. No SDK
-API change is currently required.
-
 ## Development-fork handoff
 
 Remaining root brainstorming is indexed in
@@ -560,9 +217,8 @@ fresh reproductions if problems recur rather than revive speculative backlog.
 Standalone EPUB restoration work lives in its own repository. This checkout
 tracks `bookhand-next`; leave the judged Bookhand repository and deployment
 unchanged. Agent Connect integration is now authorized under ADR 0006; current
-scope, validation requirements and progress live in
-[`agent-connect-tutor.md`](agent-connect-tutor.md). Ask Jose before any git push;
-no publishing or deployment is authorized.
+the Tutor’s current transport is documented in
+[ADR 0014](../decisions/0014-tutor-agent-connect-acp.md). The owner pushes and deploys.
 
 The execution notes below are the **2026-09-03 pre-submission snapshot**. Their
 deployment/recording instructions and runtime counts are historical, not current

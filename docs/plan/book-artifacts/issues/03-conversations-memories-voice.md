@@ -11,12 +11,12 @@ developed together (ADR 0012).
 
 ## Scope
 
-- Store conversations locally for Agent Connect and direct Open Responses;
-  rebuild direct-mode replay from storage after reload.
+- Store conversations locally. Keep the opaque ACP session association
+  separate from the displayed transcript, and retain the transcript when
+  the gateway can no longer reopen the session.
 - Render messages with the artifact renderer, including generated visuals.
-  Tool activity appears as compact receipts; raw payloads never appear as
-  conversation text. This replaces the
-  [restored-conversation defect](../../../issues/tutor-restored-conversation-presentation.md).
+  Tool activity appears as compact receipts. Keep raw payloads out of both
+  live and restored conversation text.
 - **Keep** on a message or a selected part of one creates an artifact
   immediately, locally, anchored to what the conversation concerned.
 - A compact link in the conversation when an agent creates or revises an
@@ -33,5 +33,4 @@ developed together (ADR 0012).
 The owner tells a tutor something personal about their understanding and their
 opinion of the author, reloads, starts a new conversation with a different
 model, and the new agent knows both and continues in a recognizably similar
-voice. A kept message appears as an artifact without an agent round-trip. The
-direct bearer token is still absent from every store.
+voice. A kept message appears as an artifact without an agent round-trip. Gateway credentials remain outside the book database.

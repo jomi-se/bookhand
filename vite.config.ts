@@ -17,7 +17,7 @@ const contentSecurityPolicy = [
   "img-src 'self' blob: data:",
   "font-src 'self' blob: data:",
   "media-src 'self' blob: data:",
-  "connect-src 'self' blob: https:",
+  "connect-src 'self' blob: https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*",
   "worker-src 'self' blob:",
   "frame-src 'self' blob:",
   "object-src 'none'",
@@ -39,7 +39,7 @@ const contentSecurityPolicy = [
 function relaxForDevelopment(policy: string): string {
   return policy
     .replace("script-src 'self' 'wasm-unsafe-eval'", "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'")
-    .replace("connect-src 'self'", "connect-src 'self' ws: wss:")
+    .replace("connect-src 'self'", "connect-src 'self' ws:")
 }
 
 const developmentContentSecurityPolicy = relaxForDevelopment(contentSecurityPolicy)

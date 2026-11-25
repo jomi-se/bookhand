@@ -19,10 +19,7 @@ import { createLibraryTools } from './webmcp/library-tools.ts'
 import { createBookhandTools } from './webmcp/tools.ts'
 import { useWebMcpTools, type ToolCallReporter } from './webmcp/useWebMcpTools.ts'
 import { AiConnectionController } from './ai/connection-controller.ts'
-import {
-  inspectPendingAiReturn,
-  type PendingAiReturnStatus,
-} from './ai/pending-intent.ts'
+import { pendingPairingReturn } from './ai/pending-intent.ts'
 
 /**
  * The tools whose calls change how something looks. `get_design_context`
@@ -42,13 +39,7 @@ function App() {
   const library = useLibrary({ client: runtime.client, ports: runtime.ports })
   const [reading, setReading] = useState<BookCatalogEntry>()
   const [readerCommands, setReaderCommands] = useState<BookhandCommands>()
-  const [pendingAiReturn, setPendingAiReturn] = useState<PendingAiReturnStatus | undefined>(() =>
-    inspectPendingAiReturn(),
-  )
-  const pendingAiIntent = pendingAiReturn?.kind === 'owned'
-    && pendingAiReturn.intent.feature === 'tutor'
-    ? pendingAiReturn.intent
-    : undefined
+  const [pendingAiIntent, setPendingAiIntent] = useState(() => pendingPairingReturn()?.intent)
   const readingRef = useRef(reading)
   const agentOpenPending = useRef(false)
   const pendingReaderCommands = useRef<BookhandCommands | undefined>(undefined)
@@ -175,7 +166,7 @@ function App() {
     designState.clear()
     void library.refresh()
   }, [designState, library])
-  const finishAiAuthorization = useCallback(() => setPendingAiReturn(undefined), [])
+  const finishAiAuthorization = useCallback(() => setPendingAiIntent(undefined), [])
 
   if (reading) {
     return (
@@ -201,24 +192,15 @@ function App() {
     )
   }
 
-  const invalidAiReturn = pendingAiReturn?.kind === 'invalid' ? pendingAiReturn : undefined
-  const unsupportedAiReturn = pendingAiReturn?.kind === 'owned'
-    && pendingAiReturn.intent.feature !== 'tutor' ? pendingAiReturn : undefined
   const missingAiBook = pendingAiIntent && library.phase === 'ready' && !library.bootstrapping
     && !books.some((book) => book.id === pendingAiIntent.bookId)
-  const pendingDraft = (invalidAiReturn?.intent?.draft
-    ?? unsupportedAiReturn?.intent.draft
-    ?? pendingAiIntent?.draft)?.trim()
-  const aiReturnNotice = invalidAiReturn
-    ? `${invalidAiReturn.message}${pendingDraft ? ` Your draft is still here: “${pendingDraft}”` : ''}`
-    : unsupportedAiReturn
-      ? `This AI return targets a feature that is not available here.${pendingDraft ? ` Your draft is still here: “${pendingDraft}”` : ''} Dismiss it and connect again from that feature.`
-      : missingAiBook
-        ? `Tutor could not reopen the book for this return. Your draft is still here: ${pendingDraft ? `“${pendingDraft}”` : '(no question drafted)'}. Open the same EPUB to continue, or dismiss this return.`
-        : undefined
+  const draft = pendingAiIntent?.draft.trim()
+  const aiReturnNotice = missingAiBook
+    ? `Tutor could not reopen the book. ${draft ? `Your draft: “${draft}”. ` : ''}Open the same EPUB to continue.`
+    : undefined
   const dismissAiReturn = () => {
     aiConnection.dismissPendingAuthorization()
-    setPendingAiReturn(undefined)
+    setPendingAiIntent(undefined)
   }
 
   return (

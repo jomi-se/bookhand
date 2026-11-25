@@ -2,7 +2,7 @@
 
 Accepted: 2026-09-05, by Jose's authorized integration handoff.
 
-Historical decision: ADR 0007 supersedes the runtime-card transport, credential
+Historical decision: [ADR 0014](0014-tutor-agent-connect-acp.md) supersedes the runtime-card transport, credential
 storage and conversation-restoration choices below. The optional-Tutor and
 page-owned-tool boundaries remain in force.
 
