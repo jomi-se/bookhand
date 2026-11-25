@@ -72,6 +72,7 @@ import { isInteractiveTarget, tapZone, type TapZone } from './tap-intent.ts'
 import { localized, mapMetadata } from './metadata.ts'
 import {
   extractDocumentText,
+  extractRangeText,
   fingerprintText,
   normalizeBookText,
   passageFromAnchoredRange,
@@ -393,15 +394,10 @@ export class FoliateReaderAdapter implements ReaderAdapter {
       const range = validationDocument.createRange()
       range.setStart(start.startContainer, start.startOffset)
       range.setEnd(end.endContainer, end.endOffset)
-      const resolved = passageFromAnchoredRange(
-        range,
-        sectionIndex,
-        this.#chapterBreadcrumb(sectionIndex),
-        (value) => view.getCFI(sectionIndex, value),
-      )
+      const resolvedText = extractRangeText(range)
       if (
-        resolved.range.textFingerprint === chunk.range.textFingerprint &&
-        resolved.text.includes(chunk.text)
+        fingerprintText(resolvedText) === chunk.range.textFingerprint &&
+        resolvedText.includes(chunk.text)
       ) {
         stable.push(chunk)
       } else {

@@ -2,13 +2,13 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { extractDocumentText } from '../../src/reader/index.ts'
 import {
-  passageFromAnchoredRange,
+  extractRangeText,
+  fingerprintText,
   passageFromRange,
   toSemanticTextRange,
 } from '../../src/reader/text.ts'
 import { makeBook } from '../../src/reader/foliate-module.ts'
 import { buildSectionChunks } from '../../src/reader/chunking.ts'
-import { fingerprintText } from '../../src/reader/text.ts'
 
 describe('pinned Foliate fixture baseline', () => {
   it('parses real package metadata, nested navigation, XHTML, and accessible figure text', async () => {
@@ -116,7 +116,12 @@ describe('pinned Foliate fixture baseline', () => {
     } finally { book.destroy?.() }
   })
 
-  it('keeps every Section 11 anchor stable and bounds the large Section 23 workload', async () => {
+  // These fixtures exercise every CFI, including the large Section 23. A
+  // jsdom wall-clock budget would mostly measure the host and its DOM emulator.
+  it.each([
+    { sectionNumber: 11, expectedChunks: 15 },
+    { sectionNumber: 23, expectedChunks: 62 },
+  ])('keeps every search anchor stable in bundled section $sectionNumber', async ({ sectionNumber, expectedChunks }) => {
     const bytes = await readFile('public/books/calculus-made-easy.epub')
     const book = await makeBook(
       new File([bytes], 'calculus-made-easy.epub', { type: 'application/epub+zip' }),
@@ -124,32 +129,29 @@ describe('pinned Foliate fixture baseline', () => {
     try {
       // @ts-expect-error foliate-js does not publish declaration files
       const CFI = await import('foliate-js/epubcfi.js')
-      for (const [sectionIndex, deadline] of [[10, 5_000], [22, 15_000]] as const) {
-        const section = book.sections[sectionIndex]!
-        const started = performance.now()
-        const document = await section.createDocument!()
-        const chunks = buildSectionChunks(document, sectionIndex, `Section ${sectionIndex + 1}`, (range) =>
-          CFI.joinIndir(section.cfi!, CFI.fromRange(range)),
-        )
-        const fresh = await section.createDocument!()
-        for (const chunk of chunks) {
-          const start = (book.resolveCFI!(chunk.range.startCfi).anchor as (document: Document) => Range)(fresh)
-          const end = (book.resolveCFI!(chunk.range.endCfi).anchor as (document: Document) => Range)(fresh)
-          const range = fresh.createRange()
-          range.setStart(start.startContainer, start.startOffset)
-          range.setEnd(end.endContainer, end.endOffset)
-          const resolved = passageFromAnchoredRange(range, sectionIndex, [], () => chunk.range.startCfi)
-          expect(resolved.range.textFingerprint).toBe(chunk.range.textFingerprint)
-          expect(resolved.text).toContain(chunk.text)
-          expect(chunk.text.length).toBeLessThanOrEqual(1_200)
-        }
-        expect(performance.now() - started).toBeLessThan(deadline)
+      const sectionIndex = sectionNumber - 1
+      const section = book.sections[sectionIndex]!
+      const document = await section.createDocument!()
+      const chunks = buildSectionChunks(document, sectionIndex, `Section ${sectionNumber}`, (range) =>
+        CFI.joinIndir(section.cfi!, CFI.fromRange(range)),
+      )
+      expect(chunks).toHaveLength(expectedChunks)
+      const fresh = await section.createDocument!()
+      for (const chunk of chunks) {
+        const start = (book.resolveCFI!(chunk.range.startCfi).anchor as (document: Document) => Range)(fresh)
+        const end = (book.resolveCFI!(chunk.range.endCfi).anchor as (document: Document) => Range)(fresh)
+        const range = fresh.createRange()
+        range.setStart(start.startContainer, start.startOffset)
+        range.setEnd(end.endContainer, end.endOffset)
+        const resolvedText = extractRangeText(range)
+        expect(fingerprintText(resolvedText)).toBe(chunk.range.textFingerprint)
+        expect(resolvedText).toContain(chunk.text)
+        expect(chunk.text.length).toBeLessThanOrEqual(1_200)
       }
     } finally {
       book.destroy?.()
     }
-  }, 30_000)
-
+  }, 60_000)
 
   it('round-trips the bundled Chapter XIX figure and mathematics without semantic loss', async () => {
     const bytes = await readFile('public/books/calculus-made-easy.epub')

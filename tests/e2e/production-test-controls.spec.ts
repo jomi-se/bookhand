@@ -32,9 +32,10 @@ test('production cannot activate validation-only controls', async ({ page, baseU
     `/?${testControlNames.map((name) => `${name}=1`).join('&')}`,
   )
   await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
-  // The bundled book must reach the catalog through the real worker, so this
-  // also proves the production path runs with every control name attempted.
-  await expect(page.getByRole('heading', { name: 'All books' })).toBeVisible()
+  // Cold startup imports the bundled EPUBs through the real worker. Use the
+  // same readiness budget as the other browser tests that open this book.
+  await expect(page.locator('.book-open', { hasText: 'Calculus Made Easy' }))
+    .toBeVisible({ timeout: 20_000 })
 
   const policy = response?.headers()['content-security-policy'] ?? ''
   expect(policy).toContain("default-src 'self'")
