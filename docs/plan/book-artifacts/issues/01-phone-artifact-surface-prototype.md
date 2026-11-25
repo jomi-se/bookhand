@@ -1,6 +1,6 @@
 # 01 — Phone artifact surface prototype
 
-Status: ready-for-human
+Status: done (merged to main 2026-11-25)
 Type: prototype
 
 ## Question
@@ -66,3 +66,13 @@ Notebook's settings can reset it.
 Evidence so far: Pixel 7 emulation in Chromium, Pages and Scroll, light and
 dark; screenshots under `artifacts/proto/`. Still unproven: the owner's real
 phone browser and an embedded agent browser.
+
+## Comments
+
+2026-11-25: the owner accepted the prototype as the base to build on: "Assume
+we love the prototype and it is worth merging", then "Merged that prototype
+idea to main. We build on that." `prototype/book-artifacts` was fast-forwarded
+into `main`. The surface it built (the bottom sheet that settles under the
+passage) is the direction; the marking choice among wash, margin and pin was
+not decided.
+
